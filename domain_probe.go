@@ -2,6 +2,7 @@ package zlib
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,10 +23,8 @@ type DomainStatus string
 
 const (
 	DomainStatusHealthy DomainStatus = "healthy"
-	// DomainStatusChallenged means the domain answered with Z-Library's own JS
-	// proof-of-work interstitial. It is a USABLE domain: Client.get() solves the
-	// challenge transparently. The interstitial arrives with HTTP 503, so
-	// without this status the most usable mirrors were reported as http_error.
+	// DomainStatusChallenged means the domain answered with an HTML challenge.
+	// EAPI requests cannot use this domain until it serves JSON again.
 	DomainStatusChallenged      DomainStatus = "challenged"
 	DomainStatusDiamWallBlocked DomainStatus = "diamwall_blocked"
 	DomainStatusRedirectLoop    DomainStatus = "redirect_loop"
@@ -153,7 +152,11 @@ func ProbeDomainWithOptions(ctx context.Context, domain string, opts DomainProbe
 			return result
 		}
 		req.Header.Set("User-Agent", defaultUserAgent)
-		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+		if strings.HasPrefix(opts.Path, "/eapi/") {
+			req.Header.Set("Accept", "application/json")
+		} else {
+			req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+		}
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -180,15 +183,18 @@ func ProbeDomainWithOptions(ctx context.Context, domain string, opts DomainProbe
 			result.Detail = "DiamWall anti-bot response"
 			return result
 		}
-		// Z-Library's own challenge arrives with HTTP 503, so it must be
-		// recognised before the status checks below call it an http_error. The
-		// domain is usable: the client clears this automatically.
+		// Keep an HTML challenge distinct from an ordinary HTTP error.
 		if isChallengePage(string(body)) {
 			result.Status = DomainStatusChallenged
-			result.Detail = "JS challenge; the client solves this automatically"
+			result.Detail = "HTML challenge; EAPI unavailable"
 			return result
 		}
 		if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+			if strings.HasPrefix(opts.Path, "/eapi/") && !json.Valid(body) {
+				result.Status = DomainStatusHTTPError
+				result.Detail = "EAPI returned non-JSON content"
+				return result
+			}
 			result.Status = DomainStatusHealthy
 			return result
 		}

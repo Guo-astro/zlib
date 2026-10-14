@@ -7,27 +7,9 @@ import (
 	"github.com/heartleo/zlib/internal/config"
 )
 
-func TestAutoThemeName(t *testing.T) {
-	if got := autoThemeName(true); got != "mocha" {
-		t.Errorf("autoThemeName(dark) = %q, want mocha", got)
-	}
-	if got := autoThemeName(false); got != "latte" {
-		t.Errorf("autoThemeName(light) = %q, want latte", got)
-	}
-}
-
-func TestAutoThemeNamesResolveToRealThemes(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		name := autoThemeName(dark)
-		if _, ok := themes[name]; !ok {
-			t.Errorf("autoThemeName(%v) = %q is not a built-in theme", dark, name)
-		}
-	}
-}
-
 func TestIsSelectableTheme(t *testing.T) {
-	if !isSelectableTheme(themeAuto) {
-		t.Errorf("auto should be selectable")
+	if isSelectableTheme("auto") {
+		t.Errorf("auto must not be selectable")
 	}
 	if !isSelectableTheme("mocha") {
 		t.Errorf("mocha should be selectable")
@@ -61,12 +43,12 @@ func TestConfiguredThemeNamePrefersEnvOverConfig(t *testing.T) {
 	}
 }
 
-func TestConfiguredThemeNameDefaultsToAuto(t *testing.T) {
+func TestConfiguredThemeNameDefaultsToMocha(t *testing.T) {
 	isolateConfigHome(t)
 	t.Setenv(themeEnvVar, "")
 
-	if got := configuredThemeName(); got != themeAuto {
-		t.Errorf("configuredThemeName() = %q, want auto", got)
+	if got := configuredThemeName(); got != "mocha" {
+		t.Errorf("configuredThemeName() = %q, want mocha", got)
 	}
 }
 
@@ -76,5 +58,28 @@ func TestThemeLongHelpFormatsAvailableOnOwnLine(t *testing.T) {
 	}
 	if !strings.HasSuffix(themeCmd.Long, "\n") {
 		t.Errorf("theme help should end with newline: %q", themeCmd.Long)
+	}
+}
+
+func TestLegacyAutoThemeIsUnset(t *testing.T) {
+	isolateConfigHome(t)
+	t.Setenv(themeEnvVar, "auto")
+	for _, saved := range []string{"auto", "latte"} {
+		if err := config.SaveConfig(config.Config{Theme: saved}); err != nil {
+			t.Fatal(err)
+		}
+		want := saved
+		if saved == "auto" {
+			want = "mocha"
+		}
+		if got := configuredThemeName(); got != want {
+			t.Fatalf("saved %q: got %q, want %q", saved, got, want)
+		}
+		if themeOverride() != "" {
+			t.Fatal("legacy auto must not override fixed theme")
+		}
+	}
+	if err := themeCmd.RunE(themeCmd, []string{"auto"}); err == nil {
+		t.Fatal("theme auto must be rejected")
 	}
 }

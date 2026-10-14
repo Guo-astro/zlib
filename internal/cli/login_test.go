@@ -16,23 +16,20 @@ func TestResolveLoginDomain(t *testing.T) {
 	tests := []struct {
 		name       string
 		flagDomain string
-		eapi       bool
 		domainEnv  string
 		want       string
 		wantErr    string
 	}{
-		{name: "explicit HTML", flagDomain: "https://z-lib.gl/", domainEnv: "https://z-lib.sk", want: "https://z-lib.gl"},
-		{name: "HTML environment", domainEnv: "https://z-lib.sk", want: "https://z-lib.sk"},
-		{name: "EAPI uses same environment", eapi: true, domainEnv: "https://z-lib.gd", want: "https://z-lib.gd"},
-		{name: "missing HTML environment", wantErr: zlib.EnvDomain},
-		{name: "missing EAPI environment", eapi: true, wantErr: zlib.EnvDomain},
-		{name: "invalid EAPI environment", eapi: true, domainEnv: "https://z-library.sk", wantErr: "EAPI requires"},
+		{name: "explicit domain", flagDomain: "https://z-lib.gl/", domainEnv: "https://z-lib.sk", want: "https://z-lib.gl"},
+		{name: "environment domain", domainEnv: "https://z-lib.gd", want: "https://z-lib.gd"},
+		{name: "missing domain", wantErr: zlib.EnvDomain},
+		{name: "invalid domain", domainEnv: "https://z-library.sk", wantErr: "EAPI requires"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv(zlib.EnvDomain, tt.domainEnv)
-			got, err := resolveLoginDomain(tt.flagDomain, tt.eapi)
+			got, err := resolveLoginDomain(tt.flagDomain)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("resolveLoginDomain() error = %v, want mention of %s", err, tt.wantErr)

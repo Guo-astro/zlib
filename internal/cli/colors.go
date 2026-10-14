@@ -1,9 +1,10 @@
 package cli
 
 import (
+	"image/color"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 const (
@@ -38,8 +39,8 @@ var (
 	colorRed   = colorRedFn
 )
 
-// extLipglossColor returns the lipgloss.Color for a file extension.
-func extLipglossColor(ext string) lipgloss.Color {
+// extLipglossColor returns the color.Color for a file extension.
+func extLipglossColor(ext string) color.Color {
 	switch strings.ToUpper(strings.TrimSpace(ext)) {
 	case "EPUB":
 		return currentTheme.ExtEPUB
@@ -55,7 +56,7 @@ func extLipglossColor(ext string) lipgloss.Color {
 }
 
 // remainingColor returns the appropriate color for remaining download quota.
-func remainingColor(remaining int) lipgloss.Color {
+func remainingColor(remaining int) color.Color {
 	switch {
 	case remaining <= 0:
 		return currentTheme.Error

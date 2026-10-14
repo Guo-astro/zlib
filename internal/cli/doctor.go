@@ -1,13 +1,13 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 	zlib "github.com/heartleo/zlib"
 	"github.com/spf13/cobra"
 )
@@ -18,41 +18,28 @@ var doctorCmd = &cobra.Command{
 	Long:  "Check configured Z-Library candidate domains without logging in or changing your active domain.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		proxyValue, _ := cmd.Flags().GetString("proxy")
-		eapi, _ := cmd.Flags().GetBool("eapi")
 		proxyURL, err := validateDoctorProxy(proxyValue)
 		if err != nil {
 			return err
 		}
-		probeOptions := zlib.DomainProbeOptions{ProxyURL: proxyURL}
-		if eapi {
-			probeOptions.Path = "/eapi/info/domains"
-		}
-		results := zlib.ProbeDomainsWithOptions(
-			cmd.Context(),
-			zlib.KnownDomains(),
-			probeOptions,
-		)
+		results := checkAvailableDomains(cmd.Context(), zlib.KnownDomains(), proxyURL)
 		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
 			return printJSON(results)
+		}
+		if len(results) == 0 {
+			lipgloss.Fprintln(cmd.OutOrStdout(), "No available EAPI domains found.")
+			return nil
 		}
 
 		rows := make([][]string, 0, len(results))
 		for _, result := range results {
-			httpStatus := "-"
-			if result.HTTPStatus != 0 {
-				httpStatus = strconv.Itoa(result.HTTPStatus)
-			}
-			detail := result.Detail
-			if detail == "" && result.FinalURL != "" && result.FinalURL != result.Domain {
-				detail = "final: " + result.FinalURL
-			}
-			rows = append(rows, []string{result.Domain, string(result.Status), httpStatus, detail})
+			rows = append(rows, []string{result.Domain, "Available"})
 		}
 
 		t := table.New().
 			Border(lipgloss.RoundedBorder()).
 			BorderStyle(lipgloss.NewStyle().Foreground(currentTheme.Accent)).
-			Headers("Domain", "Status", "HTTP", "Detail").
+			Headers("Domain", "Status").
 			Rows(rows...).
 			StyleFunc(func(row, col int) lipgloss.Style {
 				pad := lipgloss.NewStyle().PaddingLeft(1).PaddingRight(1)
@@ -60,18 +47,39 @@ var doctorCmd = &cobra.Command{
 					return pad.Bold(true).Foreground(currentTheme.Accent)
 				}
 				switch col {
-				case 0, 2:
+				case 0:
 					return pad.Foreground(currentTheme.Muted)
 				case 1:
-					return pad.Foreground(doctorStatusColor(zlib.DomainStatus(rows[row][1])))
-				default:
-					return pad
+					return pad.Foreground(currentTheme.Success)
 				}
+				return pad
 			})
 
-		fmt.Println(t)
+		lipgloss.Fprintln(cmd.OutOrStdout(), t)
 		return nil
 	},
+}
+
+func checkAvailableDomains(ctx context.Context, candidates []string, proxy string) []zlib.DomainCheck {
+	return availableDomains(zlib.ProbeDomainsWithOptions(ctx, candidates, zlib.DomainProbeOptions{ProxyURL: proxy, Path: "/eapi/info/domains"}))
+}
+
+func availableDomains(results []zlib.DomainCheck) []zlib.DomainCheck {
+	available := make([]zlib.DomainCheck, 0, len(results))
+	for _, result := range results {
+		if result.Status != zlib.DomainStatusHealthy {
+			continue
+		}
+		finalURL, err := url.Parse(result.FinalURL)
+		if err != nil || finalURL.Host == "" {
+			continue
+		}
+		if _, err := zlib.ParseAllowedDomain(finalURL.Scheme + "://" + finalURL.Host); err != nil {
+			continue
+		}
+		available = append(available, result)
+	}
+	return available
 }
 
 func validateDoctorProxy(rawURL string) (string, error) {
@@ -94,20 +102,9 @@ func validateDoctorProxy(rawURL string) (string, error) {
 	return rawURL, nil
 }
 
-func doctorStatusColor(status zlib.DomainStatus) lipgloss.Color {
-	switch status {
-	case zlib.DomainStatusHealthy, zlib.DomainStatusChallenged:
-		// Challenged domains are usable; the client clears the challenge.
-		return currentTheme.Success
-	case zlib.DomainStatusDiamWallBlocked, zlib.DomainStatusRedirectLoop:
-		return currentTheme.Error
-	default:
-		return currentTheme.Muted
-	}
-}
-
 func init() {
-	doctorCmd.Flags().Bool("json", false, "Output domain checks as JSON")
+	doctorCmd.Flags().Bool("json", false, "Output available domains as JSON")
 	doctorCmd.Flags().String("proxy", "", "Proxy URL for checks (http, https, socks5, or socks5h)")
-	doctorCmd.Flags().Bool("eapi", false, "Check the EAPI health endpoint instead of the home page")
+	doctorCmd.Flags().Bool("eapi", false, "Check the EAPI health endpoint")
+	_ = doctorCmd.Flags().MarkHidden("eapi")
 }

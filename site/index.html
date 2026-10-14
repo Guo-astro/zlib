@@ -36,7 +36,7 @@
   "applicationCategory": "UtilitiesApplication",
   "applicationSubCategory": "Command Line Utility",
   "operatingSystem": "macOS, Linux, Windows",
-  "softwareRequirements": "Go 1.25 or later when building from source",
+  "softwareRequirements": "Go 1.26 or later when building from source",
   "downloadUrl": "https://github.com/heartleo/zlib/releases",
   "codeRepository": "https://github.com/heartleo/zlib",
   "programmingLanguage": "Go",
@@ -106,7 +106,7 @@
       </div>
 
       <div class="meta">
-        <span><i></i>Go 1.25+</span>
+        <span><i></i>Go 1.26+</span>
         <span><i></i>macOS · Linux · Windows</span>
         <span><i></i>MIT</span>
       </div>
@@ -146,8 +146,8 @@
         <span data-i18n="zh">每个版本都发 macOS、Linux、Windows 的预编译二进制。也可以自己编译，就一个 Go module。</span>
       </p>
       <div class="status-key next" style="margin-top:1.6rem">
-        <div><b data-i18n="en">Then</b><b data-i18n="zh">然后</b><span data-i18n="en">run <span style="color:var(--accent)">zlib doctor --eapi</span> to pick a domain</span><span data-i18n="zh">跑 <span style="color:var(--accent)">zlib doctor --eapi</span> 挑一个可用域名</span></div>
-        <div><b data-i18n="en">And</b><b data-i18n="zh">接着</b><span data-i18n="en"><span style="color:var(--accent)">zlib login --eapi</span>, then <span style="color:var(--accent)">zlib search</span></span><span data-i18n="zh"><span style="color:var(--accent)">zlib login --eapi</span>，再 <span style="color:var(--accent)">zlib search</span></span></div>
+        <div><b data-i18n="en">Then</b><b data-i18n="zh">然后</b><span data-i18n="en">run <span style="color:var(--accent)">zlib doctor</span> to pick a domain</span><span data-i18n="zh">跑 <span style="color:var(--accent)">zlib doctor</span> 挑一个可用域名</span></div>
+        <div><b data-i18n="en">And</b><b data-i18n="zh">接着</b><span data-i18n="en"><span style="color:var(--accent)">zlib login</span>, then <span style="color:var(--accent)">zlib search</span></span><span data-i18n="zh"><span style="color:var(--accent)">zlib login</span>，再 <span style="color:var(--accent)">zlib search</span></span></div>
       </div>
     </div>
 
@@ -186,7 +186,7 @@
           <span class="p">$</span><code>go install github.com/heartleo/zlib/cmd/zlib@latest</code>
           <button class="copy" type="button" data-copy="go install github.com/heartleo/zlib/cmd/zlib@latest"><span data-i18n="en">copy</span><span data-i18n="zh">复制</span></button>
         </div>
-        <p class="note"><span data-i18n="en">Requires Go 1.25 or later.</span><span data-i18n="zh">需要 Go 1.25 及以上。</span></p>
+        <p class="note"><span data-i18n="en">Requires Go 1.26 or later.</span><span data-i18n="zh">需要 Go 1.26 及以上。</span></p>
       </div>
       <div class="pane" data-pane="src">
         <div class="card" style="padding:0;box-shadow:none;border:0">
@@ -296,7 +296,7 @@
         <span class="dot" style="background:var(--t-red)"></span>
         <span class="dot" style="background:var(--t-yellow)"></span>
         <span class="dot" style="background:var(--t-green)"></span>
-        <span class="term-title">zlib doctor --eapi</span>
+        <span class="term-title">zlib doctor</span>
       </div>
       <div class="term-body" id="doctorOut"></div>
     </div>
@@ -594,7 +594,7 @@
   const BLANK = "<div>&nbsp;</div>";
 
   const TRANSCRIPTS = {
-    login: P("zlib login --eapi --domain https://z-lib.gd") + BLANK +
+    login: P("zlib login --domain https://z-lib.gd") + BLANK +
       L("muted", "  Checking https://z-lib.gd …") +
       '<div>  <span class="green">✓</span> <span class="muted">reachable via EAPI</span></div>' + BLANK +
       '<div>  <span class="mauve">Email</span>    <span class="title">you@example.com</span></div>' +
@@ -666,7 +666,7 @@
       L("muted", "  EPUB · PDF · MOBI · TXT · DOC · DOCX · RTF · HTML") +
       L("muted", "  The SMTP password lives in ZLIB_SMTP_PWD, never on disk."),
 
-    doctor: P("zlib doctor --eapi") + BLANK +
+    doctor: P("zlib doctor") + BLANK +
       L("muted", "  Probing 8 known domains …") + BLANK +
       '<div>  <span class="green">healthy</span>           <span class="title">z-lib.gd</span></div>' +
       '<div>  <span class="green">healthy</span>           <span class="title">1lib.sk</span></div>' +

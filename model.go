@@ -34,10 +34,24 @@ type DownloadLimit struct {
 	DailyReset     string `json:"daily_reset"`
 }
 
+// UserProfile contains the account fields safe to display or serialize.
+// Authentication credentials returned by EAPI are intentionally excluded.
+type UserProfile struct {
+	DownloadLimit
+	ID              string   `json:"id,omitempty"`
+	Name            string   `json:"name,omitempty"`
+	Email           string   `json:"email,omitempty"`
+	KindleEmail     string   `json:"kindle_email,omitempty"`
+	Premium         *bool    `json:"premium,omitempty"`
+	Confirmed       *bool    `json:"confirmed,omitempty"`
+	DonationsActive *bool    `json:"donations_active,omitempty"`
+	DonationsExpire string   `json:"donations_expire,omitempty"`
+	PersonalDomains []string `json:"personal_domains,omitempty"`
+	QuotaKnown      bool     `json:"quota_known"`
+}
+
 type DownloadHistoryItem struct {
-	// ID is the alphanumeric book ID extracted from URL. The parser leaves it
-	// empty; consumers that need it (e.g. the CLI's --json output) derive it
-	// from URL.
+	// ID and Hash identify the downloaded book in EAPI responses.
 	ID          string `json:"id,omitempty"`
 	Hash        string `json:"hash,omitempty"`
 	Name        string `json:"name"`

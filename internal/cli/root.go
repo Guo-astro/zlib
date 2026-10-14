@@ -1,8 +1,8 @@
 package cli
 
 import (
+	"charm.land/lipgloss/v2"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/url"
@@ -29,7 +29,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show version",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s version %s\n", rootCmd.Name(), zlib.Version)
+		lipgloss.Fprintf(cmd.OutOrStdout(), "%s version %s\n", rootCmd.Name(), zlib.Version)
 	},
 }
 
@@ -48,22 +48,19 @@ func resolveClientDomain(envDomain, sessionDomain string) string {
 func newClient() *zlib.Client {
 	session, err := config.LoadSession()
 	if err != nil || len(session.Cookies) == 0 {
-		fmt.Fprintln(os.Stderr, "Not logged in. Run: zlib login")
+		lipgloss.Fprintln(os.Stderr, "Not logged in. Run: zlib login")
 		os.Exit(1)
 	}
 	c := zlib.NewClient()
-	if session.Mode == string(zlib.ClientModeEAPI) {
-		c.SetMode(zlib.ClientModeEAPI)
-	}
 	// SetDomain before SetCookies: SetCookies seats the jar against c.domain.
 	domain := resolveClientDomain(os.Getenv(zlib.EnvDomain), session.Domain)
 	if domain == "" {
-		fmt.Fprintf(os.Stderr, "Domain is not configured. Set %s or run zlib login --domain URL again.\n", zlib.EnvDomain)
+		lipgloss.Fprintf(os.Stderr, "Domain is not configured. Set %s or run zlib login --domain URL again.\n", zlib.EnvDomain)
 		os.Exit(1)
 	}
 	allowedDomain, err := zlib.ParseAllowedDomain(domain)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid Z-Library domain: %v\n", err)
+		lipgloss.Fprintf(os.Stderr, "Invalid Z-Library domain: %v\n", err)
 		os.Exit(1)
 	}
 	c.SetDomain(allowedDomain)
@@ -73,12 +70,12 @@ func newClient() *zlib.Client {
 
 func Execute() {
 	if err := loadDotEnv(); err != nil {
-		fmt.Fprintln(os.Stderr, formatCLIError(err))
+		lipgloss.Fprintln(os.Stderr, formatCLIError(err))
 		os.Exit(1)
 	}
 	resolveTheme()
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, formatCLIError(err))
+		lipgloss.Fprintln(os.Stderr, formatCLIError(err))
 		os.Exit(1)
 	}
 }
@@ -145,6 +142,8 @@ func init() {
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(logoutCmd)
 	rootCmd.AddCommand(searchCmd)
+	rootCmd.AddCommand(recommendedCmd)
+	rootCmd.AddCommand(mostPopularCmd)
 	rootCmd.AddCommand(downloadCmd)
 	rootCmd.AddCommand(profileCmd)
 	rootCmd.AddCommand(doctorCmd)

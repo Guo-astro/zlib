@@ -74,9 +74,8 @@ func TestProbeDomainHealthyDespiteDiamWallClearanceCookie(t *testing.T) {
 	}
 }
 
-// Z-Library's own challenge is served with HTTP 503. Reporting it as an
-// http_error told users the most usable mirrors were broken.
-func TestProbeDomainReportsChallengeAsUsable(t *testing.T) {
+// A challenge has its own status; EAPI cannot consume it.
+func TestProbeDomainReportsChallenge(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprint(w, `<html><title>Checking your browser ...</title><body><script>`+
@@ -87,6 +86,21 @@ func TestProbeDomainReportsChallengeAsUsable(t *testing.T) {
 	result := ProbeDomain(context.Background(), server.URL)
 	if result.Status != DomainStatusChallenged {
 		t.Fatalf("ProbeDomain() status = %q, want %q (%+v)", result.Status, DomainStatusChallenged, result)
+	}
+}
+
+func TestProbeDomainEAPIRequiresJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Accept") != "application/json" {
+			t.Errorf("Accept = %q", r.Header.Get("Accept"))
+		}
+		fmt.Fprint(w, `<html>login required</html>`)
+	}))
+	defer server.Close()
+
+	result := ProbeDomainWithOptions(context.Background(), server.URL, DomainProbeOptions{Path: "/eapi/info/domains"})
+	if result.Status != DomainStatusHTTPError || result.Detail != "EAPI returned non-JSON content" {
+		t.Fatalf("probe = %+v", result)
 	}
 }
 
@@ -198,6 +212,7 @@ func TestProbeDomainWithOptionsUsesEndpointPath(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"success":1}`)
 	}))
 	defer server.Close()
 

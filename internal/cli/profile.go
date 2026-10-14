@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	zlib "github.com/heartleo/zlib"
 	"github.com/spf13/cobra"
 )
 
@@ -13,15 +14,60 @@ var profileCmd = &cobra.Command{
 	Short: "Show profile",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c := newClient()
-		limits, err := c.GetLimits()
+		profile, err := c.GetProfile()
 		if err != nil {
 			return err
 		}
 
 		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
-			return printJSON(limits)
+			return printJSON(profile)
 		}
+		lipgloss.Fprintln(cmd.OutOrStdout(), renderProfileCard(profile))
+		return nil
+	},
+}
 
+func renderProfileCard(profile zlib.UserProfile) string {
+	limits := profile.DownloadLimit
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Accent)
+	labelStyle := lipgloss.NewStyle().Foreground(currentTheme.Muted).Width(17)
+	var rows []string
+	rows = append(rows, titleStyle.Render("Profile"))
+	appendField := func(label, value string) {
+		if value != "" {
+			rows = append(rows, fmt.Sprintf("  %s%s", labelStyle.Render(label), value))
+		}
+	}
+	appendField("Name", profile.Name)
+	appendField("Email", profile.Email)
+	appendField("Kindle email", profile.KindleEmail)
+	if profile.Premium != nil {
+		if *profile.Premium {
+			appendField("Plan", "Premium")
+		} else {
+			appendField("Plan", "Standard")
+		}
+	}
+	if profile.Confirmed != nil {
+		if *profile.Confirmed {
+			appendField("Email confirmed", "Yes")
+		} else {
+			appendField("Email confirmed", "No")
+		}
+	}
+	if profile.DonationsActive != nil {
+		if *profile.DonationsActive {
+			appendField("Donation", "Active")
+		} else {
+			appendField("Donation", "Inactive")
+		}
+	}
+	appendField("Donation expires", profile.DonationsExpire)
+	appendField("Personal domains", strings.Join(profile.PersonalDomains, ", "))
+	rows = append(rows, "", titleStyle.Render("Daily Downloads"), "")
+	if !profile.QuotaKnown {
+		rows = append(rows, "  Quota unavailable")
+	} else {
 		// Progress bar
 		barWidth := 30
 		var filled int
@@ -43,34 +89,21 @@ var profileCmd = &cobra.Command{
 			fmt.Sprintf("%d / %d", limits.DailyAmount, limits.DailyAllowed))
 		remainingStyle := lipgloss.NewStyle().Foreground(barColor).Bold(true)
 
-		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Accent)
-		labelStyle := lipgloss.NewStyle().Foreground(currentTheme.Muted).Width(12)
-
-		var rows []string
-		rows = append(rows, titleStyle.Render("Daily Downloads"))
-		rows = append(rows, "")
 		rows = append(rows, fmt.Sprintf("  %s  %s", bar, ratio))
 		rows = append(rows, "")
-		rows = append(rows, fmt.Sprintf("  %s%s",
-			labelStyle.Render("Remaining"),
-			remainingStyle.Render(fmt.Sprintf("%d", limits.DailyRemaining))))
+		appendField("Remaining", remainingStyle.Render(fmt.Sprintf("%d", limits.DailyRemaining)))
 		if limits.DailyReset != "" {
-			rows = append(rows, fmt.Sprintf("  %s%s",
-				labelStyle.Render("Resets at"),
-				lipgloss.NewStyle().Foreground(currentTheme.Muted).Render(limits.DailyReset)))
+			appendField("Resets at", limits.DailyReset)
 		}
+	}
 
-		card := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(currentTheme.Accent).
-			Padding(1, 2).
-			Render(strings.Join(rows, "\n"))
-
-		fmt.Println(card)
-		return nil
-	},
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(currentTheme.Accent).
+		Padding(1, 2).
+		Render(strings.Join(rows, "\n"))
 }
 
 func init() {
-	profileCmd.Flags().Bool("json", false, "Output limits as JSON")
+	profileCmd.Flags().Bool("json", false, "Output account profile and download quota as JSON")
 }

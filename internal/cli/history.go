@@ -2,11 +2,12 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 	"github.com/heartleo/zlib"
 	"github.com/mattn/go-runewidth"
 	"github.com/spf13/cobra"
@@ -26,8 +27,19 @@ var historyCmd = &cobra.Command{
 		sendToKindle, _ := cmd.Flags().GetBool("send-to-kindle")
 		formatFilter, _ := cmd.Flags().GetString("format")
 		jsonOut, _ := cmd.Flags().GetBool("json")
+		deleteID, _ := cmd.Flags().GetString("delete")
 
 		c := newClient()
+		if deleteID != "" {
+			if err := c.DeleteDownloadHistory(deleteID); err != nil {
+				return err
+			}
+			if jsonOut {
+				return printJSON(map[string]any{"success": true, "id": deleteID})
+			}
+			lipgloss.Fprintln(cmd.OutOrStdout(), "History entry deleted.")
+			return nil
+		}
 
 		if downloadID != "" {
 			item, err := findHistoryItemByBookID(c, downloadID)
@@ -35,18 +47,18 @@ var historyCmd = &cobra.Command{
 				return err
 			}
 			if item.DownloadURL == "" {
-				return fmt.Errorf("no history download URL available for book %s", downloadID)
+				return runDownload(newDownloadModel(historyCommandID(item), dir, c), sendToKindle, cmd)
 			}
 
 			bookName := item.Name
 			if bookName == "" {
 				bookName = downloadID
 			}
-			return runDownload(newDirectDownloadModel(bookName, item.DownloadURL, dir, c), sendToKindle)
+			return runDownload(newDirectDownloadModel(bookName, item.DownloadURL, dir, c), sendToKindle, cmd)
 		}
 
 		// No flags: interactive mode (--json always forces the static path)
-		if !cmd.Flags().Changed("page") && formatFilter == "" && !jsonOut {
+		if !cmd.Flags().Changed("page") && formatFilter == "" && !jsonOut && isInteractive() {
 			p := tea.NewProgram(newHistorySelectModel(c))
 			result, err := p.Run()
 			if err != nil {
@@ -60,11 +72,14 @@ var historyCmd = &cobra.Command{
 				return nil
 			}
 			item := hm.selected
+			if item.DownloadURL == "" {
+				return runDownload(newDownloadModel(historyCommandID(*item), dir, c), sendToKindle, cmd)
+			}
 			bookName := item.Name
 			if bookName == "" {
 				bookName = bookIDFromURL(item.URL)
 			}
-			return runDownload(newDirectDownloadModel(bookName, item.DownloadURL, dir, c), sendToKindle)
+			return runDownload(newDirectDownloadModel(bookName, item.DownloadURL, dir, c), sendToKindle, cmd)
 		}
 
 		result, err := c.DownloadHistory(page)
@@ -72,8 +87,8 @@ var historyCmd = &cobra.Command{
 			return err
 		}
 
-		if len(result.Items) == 0 {
-			fmt.Printf("No download history found on page %d.\n", result.Page)
+		if len(result.Items) == 0 && !jsonOut {
+			lipgloss.Fprintf(os.Stdout, "No download history found on page %d.\n", result.Page)
 			return nil
 		}
 
@@ -116,7 +131,7 @@ var historyCmd = &cobra.Command{
 			return printJSON(result)
 		}
 
-		fmt.Printf("%s %s\n\n", colorBold("Download history page"), colorBold(fmt.Sprintf("%d", result.Page)))
+		lipgloss.Fprintf(os.Stdout, "%s %s\n\n", colorBold("Download history page"), colorBold(fmt.Sprintf("%d", result.Page)))
 
 		rows := make([][]string, 0, len(result.Items))
 		for i, item := range result.Items {
@@ -165,10 +180,10 @@ var historyCmd = &cobra.Command{
 				return pad
 			})
 
-		fmt.Println(t)
+		lipgloss.Fprintln(os.Stdout, t)
 
 		if len(rows) == 0 && formatFilter != "" {
-			fmt.Printf("No %s books found on page %d.\n", strings.ToUpper(formatFilter), result.Page)
+			lipgloss.Fprintf(os.Stdout, "No %s books found on page %d.\n", strings.ToUpper(formatFilter), result.Page)
 		}
 		return nil
 	},
@@ -181,6 +196,11 @@ func init() {
 	historyCmd.Flags().Bool("send-to-kindle", false, "Send the downloaded file to Kindle.")
 	historyCmd.Flags().StringP("format", "f", "", "Filter by file format (e.g. epub, pdf)")
 	historyCmd.Flags().Bool("json", false, "Output history as JSON (implies non-interactive)")
+	historyCmd.Flags().String("delete", "", "Delete a remote history entry by numeric ID or id:hash (keeps local files)")
+	historyCmd.MarkFlagsMutuallyExclusive("delete", "download")
+	historyCmd.MarkFlagsMutuallyExclusive("delete", "page")
+	historyCmd.MarkFlagsMutuallyExclusive("delete", "format")
+	historyCmd.MarkFlagsMutuallyExclusive("delete", "send-to-kindle")
 	rootCmd.AddCommand(historyCmd)
 }
 

@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"fmt"
+	"charm.land/lipgloss/v2"
 	"os"
 
 	"github.com/heartleo/zlib/internal/config"
@@ -15,7 +15,7 @@ var logoutCmd = &cobra.Command{
 		if err := os.Remove(config.SessionPath()); err != nil && !os.IsNotExist(err) {
 			return err
 		}
-		fmt.Printf("%s Logged out.\n", colorFaint(symbolSuccess))
+		lipgloss.Fprintf(os.Stdout, "%s Logged out.\n", colorFaint(symbolSuccess))
 		return nil
 	},
 }

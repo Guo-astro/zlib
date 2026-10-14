@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"charm.land/lipgloss/v2"
 	"context"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/huh"
 	"github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
 	"github.com/spf13/cobra"
@@ -25,34 +25,28 @@ var loginCmd = &cobra.Command{
 		password, _ := cmd.Flags().GetString("password")
 		cookieFile, _ := cmd.Flags().GetString("cookies")
 		domain, _ := cmd.Flags().GetString("domain")
-		eapi, _ := cmd.Flags().GetBool("eapi")
-		domain, err := resolveLoginDomain(domain, eapi)
+		domain, err := resolveLoginDomain(domain)
 		if err != nil {
 			return err
 		}
-		if eapi {
+		mode := string(zlib.ClientModeEAPI)
+		if cookieFile != "" {
+			if email != "" || password != "" {
+				return fmt.Errorf("--cookies cannot be combined with --email or --password")
+			}
 			resolved, err := resolveEAPIDomain(cmd.Context(), domain)
 			if err != nil {
 				return err
 			}
 			if resolved != domain {
-				fmt.Printf("%s %s redirects to %s; logging in there.\n", colorCyan(symbolInfo), domain, resolved)
+				lipgloss.Fprintf(os.Stdout, "%s %s redirects to %s; logging in there.\n", colorCyan(symbolInfo), domain, resolved)
 				domain = resolved
-			}
-		}
-		mode := ""
-		if eapi {
-			mode = string(zlib.ClientModeEAPI)
-		}
-		if cookieFile != "" {
-			if email != "" || password != "" {
-				return fmt.Errorf("--cookies cannot be combined with --email or --password")
 			}
 			count, err := importCookieSession(cookieFile, domain, time.Now(), mode)
 			if err != nil {
 				return fmt.Errorf("failed to import cookies: %w", err)
 			}
-			fmt.Printf("%s Imported %d cookies.\n", colorGreen(symbolSuccess), count)
+			lipgloss.Fprintf(os.Stdout, "%s Imported %d cookies.\n", colorGreen(symbolSuccess), count)
 			reportPersistedDomain(cmd.OutOrStdout(), cmd.ErrOrStderr(), domain)
 			return nil
 		}
@@ -66,32 +60,31 @@ var loginCmd = &cobra.Command{
 		}
 
 		if promptNeeded {
-			form := huh.NewForm(
-				huh.NewGroup(
-					huh.NewInput().
-						Title("Email").
-						Value(&email),
-					huh.NewInput().
-						Title("Password").
-						EchoMode(huh.EchoModePassword).
-						Value(&password),
-				),
-			).WithTheme(huhTheme())
-			if err := form.Run(); err != nil {
+			fields, accepted, err := runInlineForm(newInlineForm("Log in", "Log in", []formField{
+				{label: "Email", value: email, hint: "Your Z-Library email address", validate: requiredField("email")},
+				{label: "Password", value: password, secret: true, hint: "Password is not saved", validate: requiredField("password")},
+			}))
+			if err != nil {
 				return err
 			}
+			if !accepted {
+				return nil
+			}
+			email, password = fields[0].value, fields[1].value
 		}
 
+		resolved, err := resolveEAPIDomain(cmd.Context(), domain)
+		if err != nil {
+			return err
+		}
+		if resolved != domain {
+			lipgloss.Fprintf(os.Stdout, "%s %s redirects to %s; logging in there.\n", colorCyan(symbolInfo), domain, resolved)
+			domain = resolved
+		}
 		c := zlib.NewClient()
 		c.SetDomain(domain)
-		var loginErr error
-		if eapi {
-			loginErr = c.LoginEAPI(email, password)
-		} else {
-			loginErr = c.Login(email, password)
-		}
-		if loginErr != nil {
-			return fmt.Errorf("login failed: %w", loginErr)
+		if err := c.LoginEAPI(email, password); err != nil {
+			return fmt.Errorf("login failed: %w", err)
 		}
 
 		if err := config.SaveSession(config.Session{
@@ -102,10 +95,10 @@ var loginCmd = &cobra.Command{
 			return fmt.Errorf("failed to save session: %w", err)
 		}
 		if err := rememberLoginEmail(email); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Could not remember login email: %v\n", err)
+			lipgloss.Fprintf(cmd.ErrOrStderr(), "Could not remember login email: %v\n", err)
 		}
 
-		fmt.Printf("%s Logged in successfully.\n", colorGreen(symbolSuccess))
+		lipgloss.Fprintf(os.Stdout, "%s Logged in successfully.\n", colorGreen(symbolSuccess))
 		reportPersistedDomain(cmd.OutOrStdout(), cmd.ErrOrStderr(), c.Domain())
 		return nil
 	},
@@ -117,11 +110,11 @@ var loginCmd = &cobra.Command{
 func reportPersistedDomain(stdout, stderr io.Writer, domain string) {
 	path, changed, err := persistDotEnvDomain(domain)
 	if err != nil {
-		fmt.Fprintf(stderr, "Could not record %s: %v\n", zlib.EnvDomain, err)
+		lipgloss.Fprintf(stderr, "Could not record %s: %v\n", zlib.EnvDomain, err)
 		return
 	}
 	if changed {
-		fmt.Fprintf(stdout, "%s Wrote %s=%s to %s\n", colorCyan(symbolInfo), zlib.EnvDomain, domain, path)
+		lipgloss.Fprintf(stdout, "%s Wrote %s=%s to %s\n", colorCyan(symbolInfo), zlib.EnvDomain, domain, path)
 	}
 }
 
@@ -140,7 +133,7 @@ const eapiProbePath = "/eapi/info/domains"
 func resolveEAPIDomain(ctx context.Context, domain string) (string, error) {
 	check := zlib.ProbeDomainWithOptions(ctx, domain, zlib.DomainProbeOptions{Path: eapiProbePath})
 	if check.Status != zlib.DomainStatusHealthy {
-		return "", fmt.Errorf("%s is not usable for EAPI (%s): set %s to a domain reported healthy by `zlib doctor --eapi`, or pass --domain", domain, check.Status, zlib.EnvDomain)
+		return "", fmt.Errorf("%s is not usable for EAPI (%s): set %s to a domain reported healthy by `zlib doctor`, or pass --domain", domain, check.Status, zlib.EnvDomain)
 	}
 
 	requested, err := url.Parse(domain)
@@ -160,10 +153,10 @@ func resolveEAPIDomain(ctx context.Context, domain string) (string, error) {
 	return resolved, nil
 }
 
-func resolveLoginDomain(flagDomain string, eapi bool) (string, error) {
+func resolveLoginDomain(flagDomain string) (string, error) {
 	if domain := strings.TrimSpace(flagDomain); domain != "" {
 		allowed, err := zlib.ParseAllowedDomain(domain)
-		if err != nil && eapi {
+		if err != nil {
 			return "", fmt.Errorf("EAPI requires an allowed Z-Library domain: %w", err)
 		}
 		return allowed, err
@@ -171,16 +164,13 @@ func resolveLoginDomain(flagDomain string, eapi bool) (string, error) {
 
 	if domain := strings.TrimSpace(os.Getenv(zlib.EnvDomain)); domain != "" {
 		allowed, err := zlib.ParseAllowedDomain(domain)
-		if err != nil && eapi {
+		if err != nil {
 			return "", fmt.Errorf("EAPI requires an allowed Z-Library domain in %s: %w", zlib.EnvDomain, err)
 		}
 		return allowed, err
 	}
 
-	example := "https://z-lib.sk"
-	if eapi {
-		example = zlib.DefaultEAPIDomain
-	}
+	example := zlib.DefaultEAPIDomain
 	return "", fmt.Errorf("domain is not configured: pass --domain %s or set %s=%s (for example in ~/.config/zlib/.env)", example, zlib.EnvDomain, example)
 }
 
@@ -213,5 +203,6 @@ func init() {
 	loginCmd.Flags().String("password", "", "Z-Library password")
 	loginCmd.Flags().String("cookies", "", "Import a Netscape-format cookie file")
 	loginCmd.Flags().String("domain", "", "Login domain (otherwise ZLIB_DOMAIN)")
-	loginCmd.Flags().Bool("eapi", false, "Use the unofficial mobile-app EAPI")
+	loginCmd.Flags().Bool("eapi", false, "Use EAPI (now the only mode)")
+	loginCmd.Flags().MarkHidden("eapi")
 }

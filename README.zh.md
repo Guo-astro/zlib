@@ -6,409 +6,131 @@
 
 Z-Library 命令行客户端。
 
-![Go version](https://img.shields.io/badge/go-1.25%2B-blue)
 [![CI](https://img.shields.io/github/actions/workflow/status/heartleo/zlib/release.yml)](https://github.com/heartleo/zlib/actions)
 [![Release](https://img.shields.io/github/v/release/heartleo/zlib)](https://github.com/heartleo/zlib/releases)
 [![Downloads](https://img.shields.io/github/downloads/heartleo/zlib/total)](https://github.com/heartleo/zlib/releases)
-![License](https://img.shields.io/badge/license-MIT-green)
-
-<a href="https://trendshift.io/repositories/135168?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-135168" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/135168/daily?language=Go" alt="heartleo%2Fzlib | Trendshift" width="250" height="55"/></a>
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 [English](README.md) | 中文
 
+[安装](#安装) · [快速开始](#快速开始) · [Agent 接入](#agent-接入) · [文档](#文档)
+
 </div>
 
-![search demo](docs/demo-search.gif)
+搜索和下载图书，浏览收藏与推荐，把文件发送到 Kindle。
+可以在终端里选择图书，也可以让 Agent 通过 JSON 输出调用 CLI。
 
-## 功能
-
-🔍 **交互式搜索** — `↑/↓` 浏览结果，`←/→` 翻页  
-📥 **书籍下载** — 通过 ID 或搜索结果直接下载，实时进度显示  
-📚 **下载历史** — 分页浏览历史记录，支持重新下载  
-📖 **发送到 Kindle** — 通过 SMTP 投递文件到 Kindle  
-🕒 **用量查看** — 查看每日下载配额  
-🎨 **主题** — auto、mocha、latte、dracula、tokyo、nord、gruvbox  
-🌐 **代理和自定义域名** — 支持受限网络环境  
+![交互式搜索演示](docs/demo-search.gif)
 
 ## 安装
 
-**Homebrew**（macOS / Linux）：
+macOS / Linux（Homebrew）：
 
 ```bash
 brew install heartleo/tap/zlib
 ```
 
-**winget**（Windows）：
+Windows（PowerShell）：
 
 ```powershell
-winget install heartleo.zlib
+winget install --id heartleo.zlib --exact
 ```
 
-**curl**（macOS / Linux）：
+macOS / Linux（安装脚本）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/heartleo/zlib/main/install.sh | sh
 ```
 
-**Go install**（需要 Go 1.25+）：
+也可以[下载可执行文件](https://github.com/heartleo/zlib/releases/latest)，或
+[通过 Go 安装 / 从源码构建](docs/installation.md)。
 
-```bash
-go install github.com/heartleo/zlib/cmd/zlib@latest
+## 快速开始
+
+你需要一个 Z-Library 账号。先查找当前网络可用的域名：
+
+```sh
+zlib doctor
 ```
 
-**从源码构建：**
+选择标为 `Available` 的域名，替换下面的示例地址，然后登录并打开搜索界面。
+这些命令在 Bash 和 PowerShell 中都可使用：
 
-```bash
-git clone https://github.com/heartleo/zlib
-cd zlib
-go build -o zlib ./cmd/zlib
+```sh
+zlib login --domain https://z-lib.gd
+zlib search
 ```
 
-### Claude Code 插件
+输入关键词，用 `↑/↓` 选择图书、`←/→` 翻页，按 `Enter` 下载。
+文件默认保存到当前目录。
 
-zlib 提供 [Claude Code](https://claude.com/claude-code) 插件，让 Claude 帮你搜书、下书、传书到Kindle。
+登录后会保存会话和域名，后续无需重复设置。如果登录返回 `Authorization failed`，
+可[导入浏览器 Cookie](docs/troubleshooting.md#login-returns-authorization-failed)。
+如果 `doctor` 没有找到可用域名，请看[连接排障](docs/troubleshooting.md#no-available-domains)。
 
-```
+## Agent 接入
+
+先安装 CLI，并在自己的终端完成上面的登录。插件提供调用本机 `zlib` 的技能，
+会复用已保存的会话。
+
+### Claude Code
+
+在 Claude Code 中执行：
+
+```text
 /plugin marketplace add heartleo/zlib
 /plugin install zlib@zlib-plugin-cc
 ```
 
-`/zlib "the pragmatic programmer"` 搜索并下载。  
-`/zlib:kindle` 把书发送到你的 Kindle。
+用 `/zlib "the pragmatic programmer"` 搜书，或用 `/zlib:kindle` 发送本地文件。
 
-### Codex 插件
+### Codex
 
-zlib 同时提供仅包含技能的 Codex 插件：
+在终端执行：
 
-```bash
+```sh
 codex plugin marketplace add heartleo/zlib
 codex plugin add zlib@zlib
 ```
 
-安装后可让 Codex 通过 zlib 搜索或下载图书；需要把本地文件发送到 Kindle 时，
-使用插件内置的 Kindle 技能。
-
-## 快速开始
-
-> **请先设置 `ZLIB_DOMAIN`。** Z-Library 镜像变动频繁，且大多数被 DiamWall 挡住，
-> 因此不存在一个长期正确的默认值。所有命令都优先从 `ZLIB_DOMAIN` 解析镜像，
-> 该值错误或过期，是「登录成功但下一条命令报错」最常见的原因。
-
-目前大多数 Z-Library 域名都对自动请求启用了 DiamWall，推荐使用 EAPI。
-先探测候选域名，再把 `ZLIB_DOMAIN` 设为结果为 `healthy` 或 `challenged` 的域名：
-
-```bash
-zlib doctor --eapi
-export ZLIB_DOMAIN=https://z-lib.gd     # 选一个 doctor 报告可用的
-zlib login --eapi
-zlib search "dune"
-```
-
-登录成功后，该域名会被写入 `~/.config/zlib/.env` 的 `ZLIB_DOMAIN`，换一个 shell
-也依然生效，无需再手动记忆。该文件中的其他键不受影响。但有两处优先级仍然高于它，
-其中任意一处存有旧值都会盖掉登录写入的值：真实环境变量，以及工作目录下的 `.env`。
-
-`challenged` 表示该域名返回的是 Z-Library 自带的 JS 计算题页面。这类域名**可以正常使用**，
-客户端会自动求解，选它和选 `healthy` 一样稳妥。只有 `diamwall_blocked`、`http_error`、
-`redirect_loop`、`network_error` 才是不可用的。
-
-输入账号前，EAPI 登录会再次检查该域名。如果没有可用域名，请参考
-[DiamWall 排障](#diamwall-排障issue-16)。
-
-## 命令
-
-### login
-
-![login demo](docs/demo-login.gif)
-
-```bash
-zlib login
-zlib login --email you@example.com --password secret
-zlib login --cookies ~/Downloads/cookies.txt --domain https://z-lib.gd
-zlib login --eapi --domain https://z-lib.gd
-# 或先设置 ZLIB_DOMAIN=https://z-lib.gd，再执行：
-zlib login --eapi
-```
-
-会话保存至 `~/.config/zlib/session.json`，同时把所用域名写入
-`~/.config/zlib/.env` 的 `ZLIB_DOMAIN`，后续命令无需再设置即可访问同一镜像。
-交互式登录会记住并预填最近一次成功登录的邮箱，但不会保存密码。
-`--cookies` 用于导入用户主动提供的 Netscape/Mozilla 格式 Cookie 文件；
-只有与 `--domain` 匹配、未过期且作用于根路径的 Cookie 才会写入会话。
-Cookie 文件包含可复用凭据，请妥善保护导出的文件。
-
-省略 `--domain` 时，HTML 和 EAPI 登录都读取 `ZLIB_DOMAIN`。两者都没有设置，
-命令会打印设置方法并退出。EAPI 登录会先检查所选域名，再要求输入账号；检查失败
-时会提示更换域名。导入 Cookie 也遵循这套规则。
-
-`--eapi` 选择非官方移动端 API，并把选择写入会话。搜索、profile、history、
-图书详情、下载和 Kindle 投递会按需走 EAPI。图书引用格式为 `id:hash`，例如
-`zlib download 115066162:e9f13b --send-to-kindle`。端点和稳定性说明见
-[EAPI 模式](docs/eapi.md)。
-
-若 `/eapi/user/login` 拒绝下发凭证，`--eapi` 登录会回退到 HTML 登录表单，并继续
-以 EAPI 模式运行。EAPI 只认 `remix_userid`/`remix_userkey` 这一对，HTML 表单下发
-的正是同一对，因此回退得到的会话没有任何功能缺失。参见
-[EAPI 登录报 `Authorization failed`](#eapi-登录报-authorization-failed)。
-
-### logout
-
-```bash
-zlib logout
-```
-
-### search
-
-![search demo static](docs/demo-search-static.gif)
-
-不带参数时进入交互模式：
-
-- 输入关键词并确认
-- `↑/↓` 浏览结果
-- `←/→` 切换页面
-- `Enter` 下载
-
-```bash
-zlib search # 交互模式
-zlib search "dune" --page 2 # 静态表格
-zlib search "dune" --json   # 机器可读输出，供脚本和插件使用
-```
-
-用 `--ext`(别名 `--format`)按文件格式过滤,可重复指定。
-
-```bash
-zlib search "python crash course" --ext epub --ext pdf
-```
-
-使用 `--full-title` 关闭标题字符截断:
-
-```bash
-zlib search "civilized to death" --full-title
-```
-
-### download
-
-```bash
-zlib download Gz31nyAV5E
-zlib download Gz31nyAV5E --dir ./books --send-to-kindle
-zlib download Gz31nyAV5E --dir "~/Downloads"
-```
-
-`--dir` 会自行展开开头的 `~`，加不加引号效果一致。
-
-不想每次都写同一个目录，可以设置一次 `ZLIB_DOWNLOAD_DIR`，之后省略该参数即可。`download`、`search`、`history` 都会回退到它，而显式传入的 `--dir` 仍对当次生效：
-
-```bash
-echo 'ZLIB_DOWNLOAD_DIR=~/Downloads' >> ~/.config/zlib/.env
-zlib download Gz31nyAV5E              # 保存到 ~/Downloads
-zlib download Gz31nyAV5E --dir .      # 这一次改存到当前目录
-```
-
-参数和变量都不会自动创建目录，请先确认目录存在。
-
-按 `Ctrl+C` 取消下载，未完成的文件会自动删除。
-
-### history
-
-![history demo](docs/demo-history.gif)
-
-不带参数时进入交互模式：
-
-- `↑/↓` 浏览，`←/→` 翻页
-- `Enter` 重新下载
-
-```bash
-zlib history
-zlib history --download Gz31nyAV5E --dir ./books
-zlib history --format epub
-zlib history --json   # 机器可读，始终非交互
-```
-
-### profile
-
-![profile demo](docs/demo-profile.gif)
-
-```bash
-zlib profile
-zlib profile --json
-```
-
-### doctor
-
-在不登录、不修改当前域名的情况下检查所有已知域名。
-`--proxy` 仅对此次检查生效，并覆盖 `ZLIB_PROXY`。
-
-```bash
-zlib doctor
-zlib doctor --eapi
-zlib doctor --proxy http://127.0.0.1:7890
-zlib doctor --proxy socks5://127.0.0.1:9050 --json
-```
-
-`--eapi` 检查 `/eapi/info/domains`，不检查首页。网站和 EAPI 的结果可能不同：
-首页被 DiamWall 拦截时，EAPI 仍可能可用。
-
-### DiamWall 排障（issue #16）
-
-[Issue #16](https://github.com/heartleo/zlib/issues/16) 中，镜像返回的是
-DiamWall 挑战页，CLI 因此拿不到预期的 HTML 或 JSON。错误可能是 HTTP `307`
-重定向循环、HTTP `517` 或 `Access Denied | DiamWall`。旧版 CLI 可能只显示
-`searchResultBox not found`、`dstats-info not found`，或在解析登录 JSON 时报告
-`invalid character '<'`。
-
-1. 分别检查网页和 EAPI：
-
-   ```bash
-   zlib doctor --json
-   zlib doctor --eapi --json
-   ```
-
-2. 将 `ZLIB_DOMAIN` 设为结果为 `healthy` 或 `challenged` 的域名，再用 EAPI 登录：
-
-   ```bash
-   export ZLIB_DOMAIN=https://z-lib.gd
-   zlib login --eapi
-   zlib search "golang"
-   ```
-
-3. 网络需要代理时，先通过该代理探测，确认可用后再供其他命令使用：
-
-   ```bash
-   zlib doctor --eapi --proxy http://127.0.0.1:7890
-   export ZLIB_PROXY=http://127.0.0.1:7890
-   ```
-
-`challenged` 表示该域名返回的是 Z-Library 自带的 JS 计算题页面，客户端会自动求解，
-因此该域名可用。`diamwall_blocked` 表示 DiamWall 截获了请求，`redirect_loop` 表示
-重定向没有到达真实内容，`http_error` 包含 `403` 等响应，`network_error` 包含
-DNS、TLS、超时、连接重置和 EOF。更换 User-Agent 或导入登录 Cookie 无法解决
-DiamWall 的 JS/TLS 挑战。此时应改用 `healthy` 或 `challenged` 的 EAPI 域名，
-或更换网络出口。
-
-### EAPI 登录报 `Authorization failed`
-
-```text
-Error: login failed: zlibrary: login failed: Authorization failed
-```
-
-Z-Library 把 `/eapi/user/login` 与 EAPI 的其余部分分开管控。被它这样拒绝的账号，
-访问 `/eapi/user/profile`、`/eapi/book/search`、`/eapi/user/book/downloaded`
-依然完全正常。这条消息也不代表密码错误：密码错误返回的是
-`Incorrect email or password`。
-
-CLI 会自行处理：改用 HTML 表单登录并继续以 EAPI 模式运行，因此在当前版本上登录
-会直接成功。如果你仍看到这条消息，说明所用版本早于该回退逻辑 —— 请升级，或改用
-浏览器导出的 Cookie 文件：
-
-```bash
-zlib login --cookies ~/Downloads/cookies.txt --domain https://z-lib.gd
-```
-
-`Incorrect email or password` 才是真正的凭证错误。另外，密码中若含 shell 特殊
-字符，用 `--password` 传递可能被 shell 改写；省略该参数，改由交互提示输入。
-
-### 登录成功后命令仍然失败
-
-```text
-Error: zlibrary: blocked by anti-bot protection (HTTP 517) at https://z-lib.sk/...
-Error: zlibrary: unexpected HTTP status 503 at https://z-lib.gd/users/downloads
-```
-
-早先配置遗留的 `ZLIB_DOMAIN` 会覆盖登录刚刚保存的域名，于是
-`zlib login --domain https://z-lib.gd` 明明成功，紧接着的命令却仍然打向旧镜像。
-在怀疑其他原因之前先确认生效值 —— 工作目录和 `~/.config/zlib/` 下的 `.env`
-都会写入它：
-
-```bash
-echo "$ZLIB_DOMAIN"
-grep -r ZLIB_DOMAIN .env ~/.config/zlib/.env 2>/dev/null
-```
-
-把它指向 `zlib doctor --eapi` 报告为 `healthy` 或 `challenged` 的域名，或者直接
-删除该项，回落到会话中保存的域名。
-
-若 `healthy` 或 `challenged` 的域名返回裸 `503`，说明所用版本早于挑战页修复，
-把 Z-Library 自己的 proof-of-work 页面当成了错误。请升级。
-
-### 推荐访问域名
-
-2026-09-04 实测：逐个探测各主机的 `/eapi/user/login`。该列表按实测维护，而非照抄
-Z-Library 自己的 `/eapi/info/domains` —— 后者既列出了被 DiamWall 挡住的主机，也
-漏掉了若干可用主机。
-
-| 允许的域名     | EAPI（2026-09-04 实测）              |
-| -------------- | ------------------------------------ |
-| `z-lib.gd`     | 可用（EAPI 默认域名）                |
-| `z-lib.gl`     | 可用                                 |
-| `z-library.ec` | 仅 EAPI 可用；HTML 站点被 Cloudflare 拦截 |
-| `zlib.bz`      | 可用                                 |
-| `article.sk`   | 可用                                 |
-| `articles.sk`  | 可用                                 |
-| `zliba.ru`     | 跳转到 `zlib.bz`，`login --eapi` 会自动跟随 |
-| `1lib.sk`      | 被 DiamWall 拦截                     |
-| `z-lib.fm`     | 被 DiamWall 拦截                     |
-| `z-lib.sk`     | 被 DiamWall 拦截                     |
-
-`z-library.gs` 已移除：TLS 握手失败。此表会过时，请以 `zlib doctor --eapi`
-的实时结果为准。
-
-### kindle
-
-![kindle demo](docs/demo-kindle.gif)
-
-配置 Kindle 投递设置：
-
-- 收件 Kindle 邮箱
-- 发件邮箱
-- SMTP 服务器和端口
-
-SMTP 密码不会存储在磁盘上，请通过 `ZLIB_SMTP_PWD` 环境变量设置。
-
-```bash
-zlib kindle                  # 配置
-zlib kindle send             # 交互式选择文件
-zlib kindle send ./dune.epub # 发送指定文件
-```
-
-支持的格式：`EPUB` `PDF` `MOBI` `TXT` `DOC` `DOCX` `RTF` `HTML`
-
-### theme
-
-```bash
-zlib theme           # 查看当前主题
-zlib theme auto      # 跟随终端背景
-zlib theme nord      # 设置主题
-```
-
-可选：`auto` · `mocha` · `latte` · `dracula` · `tokyo` · `nord` · `gruvbox`
-
-## 配置
-
-敏感值（如 `ZLIB_SMTP_PWD`）请写入 `.env` 文件，别用 `export` 内联以免留在 shell 历史里。zlib 读取环境变量的优先级：**真实环境变量 > 工作目录 `.env` > `~/.config/zlib/.env`**。全局文件是机器级配置的推荐存放处。
-
-HTML 和 EAPI 都读取 `ZLIB_DOMAIN`。它的优先级高于 `~/.config/zlib/session.json` 中保存的域名；清空后，CLI 使用 session 域名。新登录省略 `--domain` 时必须设置 `ZLIB_DOMAIN`。EAPI 登录会先检查该域名，再要求输入账号。
-
-登录成功后会把 `ZLIB_DOMAIN` 写入 `~/.config/zlib/.env`：替换其中已有的赋值行，其余行保持不变。这是三个来源里优先级最低的一个，因此已 export 的环境变量或工作目录下的 `.env` 仍会盖过它 —— 命令打向了你没选的镜像时，先查这两处。
-
-| 变量                    | 说明                                       |
-| ----------------------- | ------------------------------------------ |
-| `ZLIB_DOMAIN`           | HTML/EAPI 共用域名；省略 `--domain` 时使用 |
-| `ZLIB_PROXY`            | 代理地址，如 `http://127.0.0.1:7890`       |
-| `ZLIB_SMTP_PWD`         | Kindle 投递的 SMTP 密码                    |
-| `ZLIB_THEME`            | 覆盖主题，无需修改配置文件                 |
-| `ZLIB_DOWNLOAD_DIR`     | 省略 `--dir` 时的默认下载目录              |
-| `ZLIB_DOWNLOAD_RETRIES` | 连接中断与 `502`/`503`/`504` 的重试次数    |
-
-`ZLIB_DOWNLOAD_RETRIES` 默认 `3`。
-
-`ZLIB_DOWNLOAD_DIR` 对 `download`、`search`、`history` 均生效，并会展开开头的 `~`。显式传入的 `--dir` 始终优先，因此 `--dir .` 仍表示当前目录。未设置或为空时，下载位置与以前一样是当前目录。
-
-**编辑全局 env 文件**（`~/.config/zlib/.env`，每行一个 `KEY=value`）：
-
-```bash
-mkdir -p ~/.config/zlib && touch ~/.config/zlib/.env && chmod 600 ~/.config/zlib/.env
-# 用编辑器打开：
-notepad "$env:USERPROFILE\.config\zlib\.env"   # Windows (PowerShell)
-open -t ~/.config/zlib/.env                       # macOS
-${EDITOR:-nano} ~/.config/zlib/.env               # Linux
-```
+然后说：“用 zlib 搜索《程序员修炼之道》的 EPUB 版本，先列出结果让我选。”
+
+[Agent 使用流程与 JSON 示例](docs/agents.md) · [Kindle 配置](docs/kindle.md)
+
+通用技能位于 [`.agents/skills/`](.agents/skills)，可在仓库内直接使用。
+
+## 常用命令
+
+| 用途 | 命令 |
+| --- | --- |
+| 交互式搜索 | `zlib search` |
+| 以表格显示搜索结果 | `zlib search "dune" --ext epub` |
+| 输出 JSON | `zlib search "dune" --json --count 10` |
+| 浏览已收藏图书 | `zlib saved` 或 `zlib favorites` |
+| 浏览推荐 / 热门图书 | `zlib recommended` / `zlib most-popular` |
+| 浏览下载历史 | `zlib history` |
+| 查看账号和每日配额 | `zlib profile` |
+| 发送本地文件到 Kindle | `zlib kindle send ./book.epub` |
+| 切换主题 | `zlib theme nord` |
+
+下载指定图书时，复制结果中的完整 `id:hash` 引用，执行 `zlib download "id:hash"`。
+分页、下载目录和键盘操作见[使用指南](docs/usage.md)。
+
+完整参数请运行 `zlib --help` 或 `zlib <command> --help`。
+
+## 文档
+
+以下使用指南以英文维护；EAPI 笔记为中文。
+
+| 指南 | 内容 |
+| --- | --- |
+| [安装](docs/installation.md) | 可执行文件、Go 安装、源码构建和升级 |
+| [使用](docs/usage.md) | 搜索、下载、收藏、历史和主题 |
+| [配置](docs/configuration.md) | 域名、代理、下载目录和配置文件 |
+| [Agent](docs/agents.md) | 插件接入、非交互调用和 JSON 输出 |
+| [Kindle](docs/kindle.md) | SMTP 配置和文件投递 |
+| [排障](docs/troubleshooting.md) | 登录、连接和下载失败 |
+| [EAPI 笔记](docs/eapi.md) | 已接入的端点和接口限制 |
+
+遇到问题请提交 [Issue](https://github.com/heartleo/zlib/issues)，附上 `zlib version`、
+操作系统、命令和错误信息。请勿附上密码、Cookie 或会话文件。

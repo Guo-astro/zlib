@@ -2,31 +2,32 @@ package cli
 
 import (
 	"fmt"
+	"image/color"
 	"os"
 	"sort"
 	"strings"
 
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/heartleo/zlib/internal/config"
 	"github.com/spf13/cobra"
 )
 
 // Theme defines the color palette for the CLI.
 type Theme struct {
-	Accent  lipgloss.Color // borders, headers, titles, spinners
-	Link    lipgloss.Color // ID columns, clickable elements
-	Title   lipgloss.Color // book titles, primary content
-	Success lipgloss.Color // ✓ checkmarks
-	Error   lipgloss.Color // ✗ errors, cancellation
-	Warning lipgloss.Color // remaining ≤ 3
-	Info    lipgloss.Color // ▸ hints, default format color
-	Muted   lipgloss.Color // secondary text, labels
-	Surface lipgloss.Color // progress bar empty, subtle backgrounds
-	ExtEPUB lipgloss.Color
-	ExtPDF  lipgloss.Color
-	ExtMOBI lipgloss.Color
-	ExtFB2  lipgloss.Color
+	Accent  color.Color // borders, headers, titles, spinners
+	Link    color.Color // ID columns, clickable elements
+	Title   color.Color // book titles, primary content
+	Success color.Color // ✓ checkmarks
+	Error   color.Color // ✗ errors, cancellation
+	Warning color.Color // remaining ≤ 3
+	Info    color.Color // ▸ hints, default format color
+	Muted   color.Color // secondary text, labels
+	Surface color.Color // progress bar empty, subtle backgrounds
+	ExtEPUB color.Color
+	ExtPDF  color.Color
+	ExtMOBI color.Color
+	ExtFB2  color.Color
 }
 
 // Built-in themes
@@ -123,110 +124,24 @@ var themes = map[string]Theme{
 	},
 }
 
-// autoThemeName maps a detected terminal background to a built-in theme.
-func autoThemeName(dark bool) string {
-	if dark {
-		return "mocha"
-	}
-	return "latte"
-}
-
-// detectAutoTheme resolves "auto" by querying the terminal background via
-// OSC 11. Detection falls back to a dark background (mocha) when it fails —
-// non-TTY output, multiplexers, or terminals that ignore the query.
-func detectAutoTheme() string {
-	return autoThemeName(lipgloss.HasDarkBackground())
-}
-
 // currentTheme is the active theme, set during init via resolveTheme().
 var currentTheme = themes["mocha"]
 
 const themeEnvVar = "ZLIB_THEME"
 
-// themeAuto is the sentinel that resolves to a light/dark palette from the
-// terminal background rather than naming a fixed built-in theme.
-const themeAuto = "auto"
-
-// huhTheme builds a huh.Theme from the current CLI theme.
-func huhTheme() *huh.Theme {
-	t := huh.ThemeBase()
-
-	t.Focused.Base = lipgloss.NewStyle().
-		PaddingLeft(1).
-		BorderStyle(lipgloss.ThickBorder()).
-		BorderLeft(true).
-		BorderForeground(currentTheme.Accent)
-	t.Focused.Title = lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
-	t.Focused.Description = lipgloss.NewStyle().Foreground(currentTheme.Muted)
-	t.Focused.ErrorIndicator = lipgloss.NewStyle().Foreground(currentTheme.Error).SetString(" *")
-	t.Focused.ErrorMessage = lipgloss.NewStyle().Foreground(currentTheme.Error)
-	t.Focused.SelectSelector = lipgloss.NewStyle().Foreground(currentTheme.Accent).SetString("> ")
-	t.Focused.Option = lipgloss.NewStyle().Foreground(currentTheme.Title)
-	t.Focused.SelectedOption = lipgloss.NewStyle().Foreground(currentTheme.Success)
-	t.Focused.SelectedPrefix = lipgloss.NewStyle().Foreground(currentTheme.Success).SetString("[✓] ")
-	t.Focused.UnselectedPrefix = lipgloss.NewStyle().Foreground(currentTheme.Muted).SetString("[ ] ")
-	t.Focused.FocusedButton = lipgloss.NewStyle().
-		Foreground(currentTheme.Surface).
-		Background(currentTheme.Accent).
-		Padding(0, 2).MarginRight(1)
-	t.Focused.BlurredButton = lipgloss.NewStyle().
-		Foreground(currentTheme.Muted).
-		Padding(0, 2).MarginRight(1)
-	t.Focused.TextInput.Cursor = lipgloss.NewStyle().Foreground(currentTheme.Accent)
-	t.Focused.TextInput.Prompt = lipgloss.NewStyle().Foreground(currentTheme.Accent)
-	t.Focused.TextInput.Placeholder = lipgloss.NewStyle().Foreground(currentTheme.Muted)
-	t.Focused.TextInput.Text = lipgloss.NewStyle().Foreground(currentTheme.Title)
-	t.Focused.Directory = lipgloss.NewStyle().Foreground(currentTheme.Link)
-	t.Focused.File = lipgloss.NewStyle().Foreground(currentTheme.Title)
-
-	t.Focused.Card = t.Focused.Base
-	t.Focused.NoteTitle = t.Focused.Title
-	t.Focused.Next = lipgloss.NewStyle().Foreground(currentTheme.Muted)
-
-	t.Blurred = t.Focused
-	t.Blurred.Base = t.Blurred.Base.BorderStyle(lipgloss.HiddenBorder())
-	t.Blurred.Card = t.Blurred.Base
-	t.Blurred.Title = lipgloss.NewStyle().Foreground(currentTheme.Muted)
-	t.Blurred.TextInput.Text = lipgloss.NewStyle().Foreground(currentTheme.Muted)
-	t.Blurred.NextIndicator = lipgloss.NewStyle()
-	t.Blurred.PrevIndicator = lipgloss.NewStyle()
-
-	return t
-}
-
-// configuredThemeName picks the configured theme name: env > config.json >
-// default ("auto").
+// configuredThemeName resolves valid preferences in priority order. Legacy auto
+// values are treated as unset; installations without a fixed theme use mocha.
 func configuredThemeName() string {
-	if env, ok := os.LookupEnv(themeEnvVar); ok && env != "" {
+	if env := os.Getenv(themeEnvVar); isSelectableTheme(env) {
 		return env
 	}
-	if cfg, err := config.LoadConfig(); err == nil && cfg.Theme != "" {
+	if cfg, err := config.LoadConfig(); err == nil && isSelectableTheme(cfg.Theme) {
 		return cfg.Theme
 	}
-	return themeAuto
+	return "mocha"
 }
 
-func resolvedThemeName(name string) string {
-	if name == themeAuto {
-		return detectAutoTheme()
-	}
-	return name
-}
-
-func themeDisplayLabel(name string) string {
-	if name == themeAuto {
-		return fmt.Sprintf("%s (%s)", themeAuto, detectAutoTheme())
-	}
-	return name
-}
-
-// resolveTheme picks theme: env > config.json > default ("auto").
-// "auto" selects a light or dark palette from the terminal background.
-func resolveTheme() {
-	if t, ok := themes[resolvedThemeName(configuredThemeName())]; ok {
-		currentTheme = t
-	}
-}
+func resolveTheme() { currentTheme = themes[configuredThemeName()] }
 
 // themeNames returns sorted list of available theme names.
 func themeNames() []string {
@@ -238,17 +153,10 @@ func themeNames() []string {
 	return names
 }
 
-// selectableThemes lists everything the user may set, including the "auto"
-// sentinel, with auto first.
-func selectableThemes() []string {
-	return append([]string{themeAuto}, themeNames()...)
-}
+func selectableThemes() []string { return themeNames() }
 
 // isSelectableTheme reports whether name is a settable theme value.
 func isSelectableTheme(name string) bool {
-	if name == themeAuto {
-		return true
-	}
 	_, ok := themes[name]
 	return ok
 }
@@ -256,17 +164,31 @@ func isSelectableTheme(name string) bool {
 var themeCmd = &cobra.Command{
 	Use:   "theme [name]",
 	Short: "Show or set color theme",
-	Long:  fmt.Sprintf("Show current theme or set it globally.\n\nAvailable: %s\n", strings.Join(selectableThemes(), ", ")),
+	Long:  fmt.Sprintf("Choose a theme from a list, or set it directly by name.\nWithout a terminal, show the current theme.\n\nAvailable: %s\n", strings.Join(selectableThemes(), ", ")),
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var name string
 		if len(args) == 0 {
 			current := configuredThemeName()
-			fmt.Printf("Current theme: %s\n", colorBold(themeDisplayLabel(current)))
-			fmt.Printf("Available: %s\n", strings.Join(selectableThemes(), ", "))
-			return nil
+			if !isInteractive() {
+				lipgloss.Fprintf(cmd.OutOrStdout(), "Current theme: %s\n", colorBold(current))
+				lipgloss.Fprintf(cmd.OutOrStdout(), "Available: %s\n", strings.Join(selectableThemes(), ", "))
+				return nil
+			}
+			picker := newThemePicker(current, themeOverride())
+			result, err := tea.NewProgram(picker).Run()
+			if err != nil {
+				return err
+			}
+			selected := result.(themePickerModel)
+			if !selected.accepted {
+				return nil
+			}
+			name = selected.selected()
+		} else {
+			name = strings.ToLower(args[0])
 		}
 
-		name := strings.ToLower(args[0])
 		if !isSelectableTheme(name) {
 			return fmt.Errorf("unknown theme %q, available: %s", name, strings.Join(selectableThemes(), ", "))
 		}
@@ -277,14 +199,21 @@ var themeCmd = &cobra.Command{
 			return fmt.Errorf("failed to save theme: %w", err)
 		}
 
-		resolved := resolvedThemeName(name)
-		currentTheme = themes[resolved]
+		currentTheme = themes[configuredThemeName()]
 		msg := colorBold(name)
-		if name == themeAuto {
-			msg = colorBold(fmt.Sprintf("%s (%s)", themeAuto, resolved))
+		lipgloss.Fprintf(cmd.OutOrStdout(), "%s Theme set to %s\n", colorGreen(symbolSuccess), msg)
+		lipgloss.Fprintf(cmd.OutOrStdout(), "%s Saved to: %s\n", colorFaint(symbolInfo), tildePath(config.ConfigPath()))
+		if override := themeOverride(); override != "" && override != name {
+			lipgloss.Fprintf(cmd.OutOrStdout(), "ZLIB_THEME=%s overrides this saved preference.\n", override)
 		}
-		fmt.Printf("%s Theme set to %s\n", colorGreen(symbolSuccess), msg)
-		fmt.Printf("%s Saved to: %s\n", colorFaint(symbolInfo), tildePath(config.ConfigPath()))
 		return nil
 	},
+}
+
+func themeOverride() string {
+	value := os.Getenv(themeEnvVar)
+	if isSelectableTheme(value) {
+		return value
+	}
+	return ""
 }

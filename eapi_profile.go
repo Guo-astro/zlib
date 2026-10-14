@@ -6,48 +6,89 @@ import (
 	"strconv"
 )
 
-func (c *Client) getLimitsEAPI() (DownloadLimit, error) {
+func (c *Client) getProfileEAPI() (UserProfile, error) {
 	body, err := c.eapiGet("/eapi/user/profile", nil)
 	if err != nil {
-		return DownloadLimit{}, err
+		return UserProfile{}, err
 	}
 	var result struct {
 		Success int    `json:"success"`
 		Error   string `json:"error"`
-		User    struct {
-			DownloadsToday      any `json:"downloads_today"`
-			DownloadsLimit      any `json:"downloads_limit"`
-			DailyDownloadsCount any `json:"dailyDownloadsCount"`
-			DailyDownloadLimit  any `json:"dailyDownloadLimit"`
+		User    *struct {
+			ID                  any      `json:"id"`
+			Name                string   `json:"name"`
+			Email               string   `json:"email"`
+			KindleEmail         string   `json:"kindle_email"`
+			Premium             any      `json:"isPremium"`
+			Confirmed           any      `json:"confirmed"`
+			DonationsActive     any      `json:"donations_active"`
+			DonationsExpire     string   `json:"donations_expire"`
+			PersonalDomains     []string `json:"personalDomains"`
+			DownloadsToday      any      `json:"downloads_today"`
+			DownloadsLimit      any      `json:"downloads_limit"`
+			DailyDownloadsCount any      `json:"dailyDownloadsCount"`
+			DailyDownloadLimit  any      `json:"dailyDownloadLimit"`
 		} `json:"user"`
 	}
 	if err := decodeEAPIJSON(body, &result); err != nil {
-		return DownloadLimit{}, fmt.Errorf("zlibrary: invalid EAPI profile response: %w", err)
+		return UserProfile{}, fmt.Errorf("zlibrary: invalid EAPI profile response: %w", err)
 	}
 	if result.Success != 1 {
 		if result.Error == "" {
 			result.Error = "profile request was rejected"
 		}
-		return DownloadLimit{}, fmt.Errorf("zlibrary: EAPI profile failed: %s", result.Error)
+		return UserProfile{}, fmt.Errorf("zlibrary: EAPI profile failed: %s", result.Error)
+	}
+	if result.User == nil {
+		return UserProfile{}, fmt.Errorf("zlibrary: EAPI profile response is missing user")
 	}
 
-	daily := eapiInt(result.User.DownloadsToday)
-	if daily == 0 {
-		daily = eapiInt(result.User.DailyDownloadsCount)
+	today := result.User.DownloadsToday
+	if today == nil {
+		today = result.User.DailyDownloadsCount
 	}
-	allowed := eapiInt(result.User.DownloadsLimit)
-	if allowed == 0 {
-		allowed = eapiInt(result.User.DailyDownloadLimit)
+	limit := result.User.DownloadsLimit
+	if limit == nil {
+		limit = result.User.DailyDownloadLimit
 	}
+	daily := eapiInt(today)
+	allowed := eapiInt(limit)
 	remaining := allowed - daily
 	if remaining < 0 {
 		remaining = 0
 	}
-	return DownloadLimit{
-		DailyAmount:    daily,
-		DailyAllowed:   allowed,
-		DailyRemaining: remaining,
+	return UserProfile{
+		DownloadLimit: DownloadLimit{
+			DailyAmount:    daily,
+			DailyAllowed:   allowed,
+			DailyRemaining: remaining,
+		},
+		ID:              eapiString(result.User.ID),
+		Name:            result.User.Name,
+		Email:           result.User.Email,
+		KindleEmail:     result.User.KindleEmail,
+		Premium:         eapiFlag(result.User.Premium),
+		Confirmed:       eapiFlag(result.User.Confirmed),
+		DonationsActive: eapiFlag(result.User.DonationsActive),
+		DonationsExpire: result.User.DonationsExpire,
+		PersonalDomains: result.User.PersonalDomains,
+		QuotaKnown:      limit != nil,
 	}, nil
+}
+
+func eapiFlag(value any) *bool {
+	if value == nil {
+		return nil
+	}
+	if flag, ok := value.(bool); ok {
+		return &flag
+	}
+	n, err := strconv.Atoi(eapiString(value))
+	if err != nil {
+		return nil
+	}
+	flag := n != 0
+	return &flag
 }
 
 func (c *Client) downloadHistoryEAPI(page int) (DownloadHistoryResult, error) {

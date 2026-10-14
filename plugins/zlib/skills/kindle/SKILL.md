@@ -1,80 +1,49 @@
 ---
 name: kindle
-description: Send a downloaded book file to a Kindle via the zlib CLI, and walk the user through the one-time SMTP/Amazon setup it needs. Use when the user wants to deliver an ebook to their Kindle, configure Kindle delivery, or fix a failed Kindle send.
+description: Send a local ebook to Kindle with the zlib CLI, configure its SMTP delivery, or diagnose a failed send. Use the bundled zlib skill to search or download a book first.
 license: MIT
 ---
 
 # Kindle delivery
 
-Deliver an already-downloaded file to the user's Kindle through the `zlib` CLI, and handle the one-time configuration it depends on. To find or download the book first, use the `zlib` skill; this skill takes it from a local file to the Kindle.
+Use `zlib kindle send` for a local file. It uses SMTP and does not need a
+Z-Library login. If a book must be found or downloaded first, use the bundled
+[zlib skill](../zlib/SKILL.md).
 
-## Preflight
+## Send
 
-Confirm that `zlib` is on `PATH` with the current shell (`command -v zlib` on POSIX or `Get-Command zlib` in PowerShell). Sending itself doesn't need a Z-Library session, only Kindle config. If the binary is missing, tell the user to install it with `go install github.com/heartleo/zlib/cmd/zlib@latest`.
+1. Confirm `zlib version` succeeds and the requested file exists. Resolve an
+   ambiguous file choice before sending. Reuse the user's existing choice.
+2. If the user requested delivery and settings are already configured, run the
+   command below without a TTY. Let the CLI resolve `ZLIB_SMTP_PWD` from its
+   environment and `.env` files; checking only the shell variable is insufficient.
+3. If settings are missing or the user requests setup, read
+   [SMTP setup](references/setup.md), complete the missing settings, then send.
 
-## Send — `zlib kindle send <file>`
-
-**Always pass the file path** — bare `zlib kindle send` opens an interactive file picker you can't answer. With a path and no terminal it sends directly and exits, printing success or a clear SMTP error:
-
-```bash
-zlib kindle send ./books/dune.epub
+```sh
+zlib kindle send "./books/book.epub"
 ```
 
-`zlib download <id> --send-to-kindle` delivers in one step once Kindle is configured.
+Pass the actual file path. Bare `zlib kindle` and `zlib kindle send` open terminal
+prompts. Sending mail requires the user's request; an existing instruction to send
+this file is sufficient, so do not ask for another confirmation.
 
-## First check the config
+Report the CLI result and file name. SMTP success means the sending server
+accepted the message, not that the Kindle received it. After a timeout or uncertain
+result, check the failure before retrying to avoid duplicate messages.
 
-Before sending, read `~/.config/zlib/kindle.json` and check `ZLIB_SMTP_PWD`. If the file is missing, holds placeholder-looking values (e.g. `mykindle@kindle.com`, `sender@gmail.com`), or the password is unset, run the setup walkthrough below before sending. If it looks configured, just send and relay the result.
+## Failures
 
-## Configuring Kindle delivery — walk the user through it in conversation
+| Result | Next action |
+| --- | --- |
+| Missing configuration or SMTP password | Follow [setup](references/setup.md); never request a password in chat |
+| SMTP authentication rejected | Check sender account, provider authentication requirements and settings precedence |
+| SMTP timeout / connection failure | Check the host, port and network; `ZLIB_PROXY` affects HTTP requests, not SMTP |
+| Unsupported attachment | Report the CLI rejection; do not rename an extension to bypass validation |
+| Attachment too large | Report the size error; encoding adds overhead to the SMTP message |
+| Send succeeded, book missing | Check recipient, Amazon's approved sender list and any delivery response email |
 
-**Guide the user step by step — ask one question at a time and wait for each answer**, then write the non-secret config with the available filesystem or shell tool. The user only edits the secret env file in step 4.
-
-1. **Ask for the Kindle receive address.** "What's your Kindle address (`xxx@kindle.com`)? Find it under Amazon → Manage Your Content and Devices → Preferences → Personal Document Settings." It must be the Amazon-assigned address, not their normal email.
-2. **Ask for the sender email.** Remind them it must be on Amazon's approved-sender list (same Personal Document Settings page) — otherwise Amazon silently drops the file even though SMTP reports success.
-3. **Derive SMTP from the sender domain** — gmail.com → `smtp.gmail.com:587`, outlook/hotmail → `smtp-mail.outlook.com:587`, qq.com → `smtp.qq.com:587`, 163.com → `smtp.163.com:465`; anything else, ask. Then write the config yourself (create the directory if needed):
-
-   ```json
-   // ~/.config/zlib/kindle.json
-   {"to":"<kindle-address>","from":"<sender-email>","smtp_host":"<host>","smtp_port":<port>}
-   ```
-
-4. **Set the SMTP app password — the user edits the env file directly. Never ask for, paste, or echo the password in the chat, and never put it on a command line.** zlib reads `ZLIB_SMTP_PWD` from `~/.config/zlib/.env` at startup. Prepare the file and hand the user the exact path plus a one-click open command, then wait for them to confirm they saved it.
-
-   Create the file (if missing) with a template line and print its absolute path. Use the commands for the current shell.
-
-   POSIX shell:
-
-   ```bash
-   mkdir -p ~/.config/zlib
-   [ -f ~/.config/zlib/.env ] || printf '# zlib secrets — one KEY=value per line\nZLIB_SMTP_PWD=\n' > ~/.config/zlib/.env
-   chmod 600 ~/.config/zlib/.env
-   echo "Open and edit: $(cd ~/.config/zlib && pwd)/.env"
-   ```
-
-   PowerShell:
-
-   ```powershell
-   $configDir = Join-Path $env:USERPROFILE '.config\zlib'
-   New-Item -ItemType Directory -Force $configDir | Out-Null
-   $envFile = Join-Path $configDir '.env'
-   if (-not (Test-Path $envFile)) {
-     Set-Content -Encoding utf8 $envFile "# zlib secrets — one KEY=value per line`nZLIB_SMTP_PWD="
-   }
-   $envFile
-   ```
-
-   Tell the user to set `ZLIB_SMTP_PWD=<app-password>` on its own line and save. It must be an **app password**, not the account password — for Gmail: enable 2FA, generate at <https://myaccount.google.com/apppasswords> (16 chars; strip spaces). Give them a ready open command for their OS:
-
-   - Windows: `notepad "$env:USERPROFILE\.config\zlib\.env"`
-   - macOS: `open -t ~/.config/zlib/.env`
-   - Linux: `${EDITOR:-nano} ~/.config/zlib/.env`
-
-Once the config and the saved password are in place, run the send and relay the result.
-
-## Errors
-
-- **`535` / `454` SMTP error** — almost always a real account password (or none) instead of an app password, or the sender isn't allowed. Re-check step 4.
-- **SMTP connection timeout** — the network can't reach the SMTP host (e.g. Gmail blocked). `ZLIB_PROXY` does *not* cover SMTP (it's a direct connection); the user needs a system-level VPN/TUN, or should switch to a reachable provider (QQ/163). Probe with `Test-NetConnection <host> -Port <port>` in PowerShell or `timeout 8 bash -c 'echo > /dev/tcp/<host>/<port>'` on POSIX.
-- **"Sent" but nothing arrives** — the sender email isn't on Amazon's approved-sender list (step 2).
-- **Password reported missing after editing `~/.config/zlib/.env`** — check no stale `ZLIB_SMTP_PWD` in a *working-directory* `.env` is overriding it (working-dir wins over the global file); have the user fix whichever file applies. Older zlib builds load only the working-directory `.env`, so on those the user must put `ZLIB_SMTP_PWD=` in the `.env` of the directory the command runs in, and should upgrade.
+The current CLI validates file types and size before sending. It rejects MOBI.
+Its SMTP transport supports STARTTLS when offered, not implicit TLS on port 465;
+use a provider endpoint compatible with that transport. Do not guess SMTP settings
+from the email domain or promise that switching ports will fix an error.

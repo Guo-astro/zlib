@@ -1,6 +1,26 @@
 package cli
 
-import "testing"
+import (
+	"testing"
+
+	zlib "github.com/heartleo/zlib"
+)
+
+func TestAvailableDomains(t *testing.T) {
+	results := []zlib.DomainCheck{
+		{Domain: "https://z-lib.gd", Status: zlib.DomainStatusHealthy, FinalURL: "https://z-lib.gd/eapi/info/domains"},
+		{Domain: "https://challenge.example", Status: zlib.DomainStatusChallenged},
+		{Domain: "https://blocked.example", Status: zlib.DomainStatusDiamWallBlocked},
+		{Domain: "https://zliba.ru", Status: zlib.DomainStatusHealthy, FinalURL: "https://z-lib.by/eapi/info/domains"},
+	}
+	got := availableDomains(results)
+	if len(got) != 1 || got[0].Domain != "https://z-lib.gd" {
+		t.Fatalf("availableDomains() = %+v", got)
+	}
+	if got := availableDomains(nil); got == nil || len(got) != 0 {
+		t.Fatalf("availableDomains(nil) = %+v, want empty JSON array", got)
+	}
+}
 
 func TestValidateDoctorProxy(t *testing.T) {
 	tests := []struct {

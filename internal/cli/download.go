@@ -3,11 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/progress"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/heartleo/zlib"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +24,7 @@ var downloadCmd = &cobra.Command{
 		}
 		sendToKindle, _ := cmd.Flags().GetBool("send-to-kindle")
 		c := newClient()
-		return runDownload(newDownloadModel(args[0], dir, c), sendToKindle)
+		return runDownload(newDownloadModel(args[0], dir, c), sendToKindle, cmd)
 	},
 }
 
@@ -31,7 +32,15 @@ var downloadCmd = &cobra.Command{
 // progress UI on an interactive terminal, or a plain text path otherwise (see
 // isInteractive) — then prints the saved path and optionally delivers to
 // Kindle. Shared by the download, search, and history commands.
-func runDownload(m downloadModel, sendToKindle bool) error {
+func runDownload(m downloadModel, sendToKindle bool, cmd *cobra.Command) error {
+	dir, proceed, err := chooseDownloadDirectory(cmd, m.dir)
+	if err != nil {
+		return err
+	}
+	if !proceed {
+		return nil
+	}
+	m.dir = dir
 	dm, err := runDownloadModel(m)
 	if err != nil {
 		return err
@@ -43,8 +52,8 @@ func runDownload(m downloadModel, sendToKindle bool) error {
 		return dm.err
 	}
 
-	fmt.Println()
-	fmt.Printf("%s Saved to: %s (%d bytes)\n",
+	lipgloss.Fprintln(os.Stdout)
+	lipgloss.Fprintf(os.Stdout, "%s Saved to: %s (%d bytes)\n",
 		colorGreen(symbolSuccess),
 		colorGreen(tildePath(dm.savedPath)),
 		dm.savedSize,
@@ -86,7 +95,7 @@ func (m downloadModel) runPlain() (downloadModel, error) {
 		downloadURL, name = book.DownloadURL, book.Name
 	}
 
-	fmt.Printf("  Downloading: %s\n", name)
+	lipgloss.Fprintf(os.Stdout, "  Downloading: %s\n", name)
 	result, err := m.client.Download(downloadURL, m.dir, nil)
 	if err != nil {
 		return m, err
@@ -114,21 +123,22 @@ const (
 )
 
 type downloadModel struct {
-	id         string
-	dir        string
-	client     *zlib.Client
-	state      downloadState
-	bookName   string
-	directURL  string // set to skip fetch and download immediately
-	spinner    spinner.Model
-	progress   progress.Model
-	written    int64
-	total      int64
-	savedPath  string
-	savedSize  int64
-	err        error
-	downloadCh chan tea.Msg
-	cancel     context.CancelFunc
+	width, height int
+	id            string
+	dir           string
+	client        *zlib.Client
+	state         downloadState
+	bookName      string
+	directURL     string // set to skip fetch and download immediately
+	spinner       spinner.Model
+	progress      progress.Model
+	written       int64
+	total         int64
+	savedPath     string
+	savedSize     int64
+	err           error
+	downloadCh    chan tea.Msg
+	cancel        context.CancelFunc
 }
 
 type fetchDoneMsg struct{ book zlib.Book }
@@ -145,7 +155,7 @@ func newDownloadModel(id, dir string, c *zlib.Client) downloadModel {
 	s.Style = lipgloss.NewStyle().Foreground(currentTheme.Accent)
 
 	p := progress.New(
-		progress.WithDefaultGradient(),
+		progress.WithDefaultBlend(),
 		progress.WithWidth(40),
 	)
 
@@ -197,6 +207,10 @@ func waitForMsg(ch <-chan tea.Msg) tea.Cmd {
 
 func (m downloadModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+		m.progress.SetWidth(max(1, min(60, msg.Width-8)))
+		return m, nil
 
 	case errMsg:
 		m.err = msg.err
@@ -210,20 +224,26 @@ func (m downloadModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ctx, cancel := context.WithCancel(context.Background())
 		m.cancel = cancel
 		go func() {
+			emit := func(msg tea.Msg) {
+				select {
+				case ch <- msg:
+				case <-ctx.Done():
+				}
+			}
 			result, err := m.client.DownloadWithContext(ctx, msg.book.DownloadURL, m.dir, func(w, t int64) {
-				ch <- progressMsg{w, t}
+				emit(progressMsg{w, t})
 			})
 			if err != nil {
-				ch <- errMsg{err}
+				emit(errMsg{err})
 			} else {
-				ch <- downloadDoneMsg{result.FilePath, result.Size}
+				emit(downloadDoneMsg{result.FilePath, result.Size})
 			}
 			close(ch)
 		}()
 		return m, waitForMsg(ch)
 
-	case tea.KeyMsg:
-		if msg.Type == tea.KeyCtrlC {
+	case tea.KeyPressMsg:
+		if msg.String() == "ctrl+c" || msg.String() == "esc" {
 			if m.cancel != nil {
 				m.cancel()
 			}
@@ -249,7 +269,7 @@ func (m downloadModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case progress.FrameMsg:
 		pm, cmd := m.progress.Update(msg)
-		m.progress = pm.(progress.Model)
+		m.progress = pm
 		return m, cmd
 
 	case spinner.TickMsg:
@@ -262,7 +282,11 @@ func (m downloadModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m downloadModel) View() string {
+func (m downloadModel) View() tea.View {
+	return screenView(m.width, m.height, "Download", bookCell(m.bookName), m.viewContent(), "Directory: "+bookCell(m.dir), uiKey("esc", "cancel"))
+}
+
+func (m downloadModel) viewContent() string {
 	switch m.state {
 	case stateFetching:
 		return fmt.Sprintf("  %s Fetching book %s...\n",

@@ -1,18 +1,15 @@
 package zlib
 
-func (c *Client) GetLimits() (DownloadLimit, error) {
+func (c *Client) GetProfile() (UserProfile, error) {
 	if !c.loggedIn {
-		return DownloadLimit{}, ErrNotLoggedIn
+		return UserProfile{}, ErrNotLoggedIn
 	}
-	if c.mode == ClientModeEAPI {
-		return c.getLimitsEAPI()
-	}
+	return c.getProfileEAPI()
+}
 
-	html, err := c.get(BuildDownloadsURL(c.domain))
-	if err != nil {
-		return DownloadLimit{}, err
-	}
-	return parseDownloadLimits(html)
+func (c *Client) GetLimits() (DownloadLimit, error) {
+	profile, err := c.GetProfile()
+	return profile.DownloadLimit, err
 }
 
 func (c *Client) DownloadHistory(page int) (DownloadHistoryResult, error) {
@@ -22,44 +19,5 @@ func (c *Client) DownloadHistory(page int) (DownloadHistoryResult, error) {
 	if page <= 0 {
 		page = 1
 	}
-	if c.mode == ClientModeEAPI {
-		return c.downloadHistoryEAPI(page)
-	}
-
-	urls := []string{
-		BuildHistoryURL(c.domain, page),
-		BuildDownloadsPageURL(c.domain, page),
-	}
-
-	var (
-		items   []DownloadHistoryItem
-		lastErr error
-	)
-	for _, u := range urls {
-		html, err := c.get(u)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-
-		var totalPages int
-		items, totalPages, err = parseDownloadHistory(html, c.domain)
-		if err == nil {
-			return DownloadHistoryResult{
-				Items:      items,
-				Page:       page,
-				TotalPages: totalPages,
-			}, nil
-		}
-		lastErr = err
-	}
-
-	if lastErr != nil {
-		return DownloadHistoryResult{}, lastErr
-	}
-
-	return DownloadHistoryResult{
-		Items: items,
-		Page:  page,
-	}, nil
+	return c.downloadHistoryEAPI(page)
 }

@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	zlib "github.com/heartleo/zlib"
-	"github.com/mattn/go-runewidth"
 )
 
 // — interactive search bubbletea model —
@@ -25,21 +23,42 @@ const (
 )
 
 type searchSelectModel struct {
-	client     *zlib.Client
-	query      string
-	opts       *zlib.SearchOptions
-	books      []zlib.Book
-	page       int
-	totalPages int
-	cursor     int
-	state      searchState
-	spinner    spinner.Model
-	selectedID string // set when user presses Enter
-	err        error
-	quitting   bool
-	fullTitle  bool            // do not truncate titles
-	width      int             // terminal width, from tea.WindowSizeMsg
-	input      textinput.Model // inline query editor, shown in searchStateFilter
+	client          *zlib.Client
+	query           string
+	feedTitle       string
+	feed            func() ([]zlib.Book, error)
+	feedPage        func(int) (zlib.SearchResult, error)
+	opts            *zlib.SearchOptions
+	books           []zlib.Book
+	page            int
+	totalPages      int
+	cursor          int
+	state           searchState
+	spinner         spinner.Model
+	selectedID      string // set when user presses Enter
+	confirmDownload bool
+	downloadFocused bool
+	err             error
+	retryPage       int
+	quitting        bool
+	fullTitle       bool // do not truncate titles
+	width           int  // terminal width, from tea.WindowSizeMsg
+	height          int
+	input           textinput.Model // inline query editor, shown in searchStateFilter
+}
+
+func newBookFeedSelectModel(title string, load func() ([]zlib.Book, error)) searchSelectModel {
+	m := newSearchSelectModel("", nil, nil, false)
+	m.feedTitle = title
+	m.feed = load
+	return m
+}
+
+func newSavedBooksSelectModel(load func(int) (zlib.SearchResult, error)) searchSelectModel {
+	m := newSearchSelectModel("", nil, nil, false)
+	m.feedTitle = "Saved books"
+	m.feedPage = load
+	return m
 }
 
 // messages
@@ -47,6 +66,11 @@ type searchResultMsg struct {
 	books      []zlib.Book
 	page       int
 	totalPages int
+}
+
+type listLoadError struct {
+	err  error
+	page int
 }
 
 func newSearchSelectModel(query string, c *zlib.Client, opts *zlib.SearchOptions, fullTitle bool) searchSelectModel {
@@ -57,9 +81,13 @@ func newSearchSelectModel(query string, c *zlib.Client, opts *zlib.SearchOptions
 	ti := textinput.New()
 	ti.Prompt = "/ "
 	ti.Placeholder = "refine search…"
-	ti.PromptStyle = lipgloss.NewStyle().Foreground(currentTheme.Accent)
-	ti.TextStyle = lipgloss.NewStyle().Foreground(currentTheme.Title)
-	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	styles := ti.Styles()
+	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(currentTheme.Accent)
+	styles.Focused.Text = lipgloss.NewStyle().Foreground(currentTheme.Title)
+	styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	styles.Blurred = styles.Focused
+	styles.Cursor.Color = currentTheme.Accent
+	ti.SetStyles(styles)
 
 	return searchSelectModel{
 		client:    c,
@@ -79,9 +107,23 @@ func (m searchSelectModel) Init() tea.Cmd {
 
 func (m searchSelectModel) fetchPage(page int) tea.Cmd {
 	return func() tea.Msg {
+		if m.feedPage != nil {
+			result, err := m.feedPage(page)
+			if err != nil {
+				return listLoadError{err, page}
+			}
+			return searchResultMsg{books: result.Books, page: result.Page, totalPages: result.TotalPages}
+		}
+		if m.feed != nil {
+			books, err := m.feed()
+			if err != nil {
+				return listLoadError{err, page}
+			}
+			return searchResultMsg{books: books, page: 1, totalPages: 1}
+		}
 		result, err := m.client.Search(m.query, page, 25, m.opts)
 		if err != nil {
-			return errMsg{err}
+			return listLoadError{err, page}
 		}
 		return searchResultMsg{
 			books:      result.Books,
@@ -96,13 +138,18 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
+		m.height = msg.Height
+		m.input.SetWidth(max(1, msg.Width-3))
 		return m, nil
 
-	case errMsg:
+	case listLoadError:
 		m.err = msg.err
-		return m, tea.Quit
+		m.retryPage = msg.page
+		m.state = searchStateResults
+		return m, nil
 
 	case searchResultMsg:
+		m.err = nil
 		m.books = msg.books
 		m.page = msg.page
 		m.totalPages = msg.totalPages
@@ -110,10 +157,49 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = searchStateResults
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
+		if m.err != nil && msg.String() != "r" && msg.String() != "esc" && msg.String() != "q" && msg.String() != "ctrl+c" {
+			return m, nil
+		}
+		if m.confirmDownload {
+			switch msg.String() {
+			case "left", "right", "tab", "shift+tab":
+				m.downloadFocused = !m.downloadFocused
+			case "esc", "ctrl+c", "n":
+				m.confirmDownload = false
+			case "enter":
+				m.confirmDownload = false
+				if m.downloadFocused {
+					m.selectedID = bookCommandID(m.books[m.cursor])
+					return m, tea.Quit
+				}
+			}
+			return m, nil
+		}
 		switch m.state {
 		case searchStateResults:
 			switch msg.String() {
+			case "r":
+				page := m.page
+				if m.err != nil {
+					page = max(1, m.retryPage)
+				}
+				m.err = nil
+				m.state = searchStateLoading
+				return m, tea.Batch(m.spinner.Tick, m.fetchPage(page))
+			case "pgdown", "pgup", "home", "end":
+				if len(m.books) > 0 {
+					switch msg.String() {
+					case "pgdown":
+						m.cursor = min(len(m.books)-1, m.cursor+m.feedRows())
+					case "pgup":
+						m.cursor = max(0, m.cursor-m.feedRows())
+					case "home":
+						m.cursor = 0
+					case "end":
+						m.cursor = len(m.books) - 1
+					}
+				}
 			case "up", "k":
 				if m.cursor > 0 {
 					m.cursor--
@@ -123,12 +209,12 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.cursor++
 				}
 			case "left", "h":
-				if m.page > 1 {
+				if m.feed == nil && m.page > 1 {
 					m.state = searchStateLoading
 					return m, tea.Batch(m.spinner.Tick, m.fetchPage(m.page-1))
 				}
 			case "right", "l":
-				if m.page < m.totalPages {
+				if m.feed == nil && m.page < m.totalPages {
 					m.state = searchStateLoading
 					return m, tea.Batch(m.spinner.Tick, m.fetchPage(m.page+1))
 				}
@@ -136,11 +222,15 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(m.books) > 0 && m.cursor < len(m.books) {
 					id := bookCommandID(m.books[m.cursor])
 					if id != "" {
-						m.selectedID = id
-						return m, tea.Quit
+						m.confirmDownload = true
+						m.downloadFocused = false
+						return m, nil
 					}
 				}
 			case "/":
+				if m.feed != nil || m.feedPage != nil {
+					return m, nil
+				}
 				// Enter inline query editing, pre-filled with the current
 				// query so it can be tweaked rather than retyped.
 				m.state = searchStateFilter
@@ -148,6 +238,7 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.CursorEnd()
 				return m, m.input.Focus()
 			case "q", "esc", "ctrl+c":
+				m.err = nil
 				m.quitting = true
 				return m, tea.Quit
 			}
@@ -202,162 +293,52 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m searchSelectModel) View() string {
-	var b strings.Builder
-
-	// Header
-	headerStyle := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
-	pageStyle := lipgloss.NewStyle().Foreground(currentTheme.Muted)
-
-	b.WriteString(fmt.Sprintf("  %s %s",
-		headerStyle.Render("Search:"),
-		lipgloss.NewStyle().Foreground(currentTheme.Title).Render(fmt.Sprintf("%q", m.query)),
-	))
-	if m.totalPages > 0 {
-		b.WriteString(fmt.Sprintf("  %s", pageStyle.Render(fmt.Sprintf("Page %d / %d", m.page, m.totalPages))))
+func (m searchSelectModel) View() tea.View {
+	v := m.listView()
+	if m.err != nil {
+		title := m.feedTitle
+		if title == "" {
+			title = "Search: " + bookCell(m.query)
+		}
+		v = screenView(m.width, m.height, title, "Could not load books", bookCell(m.err.Error()), "", uiKey("esc", "close"), uiKey("r", "retry"))
 	}
-	b.WriteString("\n")
-	if m.state == searchStateFilter {
-		// Show the inline editor above the current (stale) results.
-		b.WriteString("  " + m.input.View() + "\n")
+	if m.confirmDownload {
+		book := m.books[m.cursor]
+		v.Content = confirmationDialog(v.Content, m.width, m.height, "Download book?", book.Name, bookCommandID(book), "Download the selected book.", "Download", m.downloadFocused, false)
+		v.AltScreen = true
 	}
-	b.WriteString("\n")
-
-	if m.state == searchStateLoading {
-		b.WriteString(fmt.Sprintf("  %s Searching...\n", m.spinner.View()))
-		return b.String()
-	}
-
-	if len(m.books) == 0 {
-		b.WriteString(fmt.Sprintf("  %s No results found.\n", colorRed(symbolError)))
-		return b.String()
-	}
-
-	// Column widths
-	const (
-		colNum    = 2
-		colID     = 10
-		colTitle  = 40
-		colAuthor = 15
-		colFmt    = 4
-		colSize   = 10
-		colRating = 6
-	)
-
-	// Title column width: fixed by default, widened to the longest
-	// title when --full-title is set so nothing gets truncated.
-	titleWidth := colTitle
-	if m.fullTitle {
-		for _, book := range m.books {
-			if w := runewidth.StringWidth(book.Name); w > titleWidth {
-				titleWidth = w
-			}
-		}
-		// Cap to the terminal width so the table doesn't wrap and break
-		// alignment. fixedCols is the width of everything except the title.
-		const fixedCols = 61
-		if maxTitle := m.width - fixedCols; m.width > 0 && titleWidth > maxTitle && maxTitle >= colTitle {
-			titleWidth = maxTitle
-		}
-	}
-
-	// Table header
-	hdrStyle := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
-	sepStyle := lipgloss.NewStyle().Foreground(currentTheme.Surface)
-
-	header := fmt.Sprintf("    %-*s  %-*s  %-*s  %-*s  %-*s  %*s  %*s",
-		colNum, "#", colID, "ID", titleWidth, "Title", colAuthor, "Author", colFmt, "Fmt", colSize, "Size", colRating, "Rating")
-	b.WriteString(hdrStyle.Render(header))
-	b.WriteString("\n")
-
-	sepLen := 4 + colNum + 2 + colID + 2 + titleWidth + 2 + colAuthor + 2 + colFmt + 2 + colSize + 2 + colRating
-	b.WriteString(sepStyle.Render("  " + strings.Repeat("─", sepLen)))
-	b.WriteString("\n")
-
-	// Rows
-	cursorStyle := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
-	selectedBg := lipgloss.NewStyle().Background(currentTheme.Surface)
-
-	for i, book := range m.books {
-		id := bookCommandID(book)
-		if id == "" {
-			id = "-"
-		}
-		authors := strings.Join(book.Authors, ", ")
-		ext := strings.ToUpper(book.Extension)
-		if ext == "" {
-			ext = "-"
-		}
-		size := book.Size
-		if size == "" {
-			size = "-"
-		}
-		rating := book.Rating
-		if rating == "" {
-			rating = "-"
-		}
-
-		selected := i == m.cursor
-		cursor := "  "
-		if selected {
-			cursor = cursorStyle.Render("❯ ")
-		}
-
-		numStyle := lipgloss.NewStyle().Foreground(currentTheme.Muted)
-		idStyle := lipgloss.NewStyle().Foreground(currentTheme.Link)
-		titleStyle := lipgloss.NewStyle().Foreground(currentTheme.Title)
-		authorStyle := lipgloss.NewStyle().Foreground(currentTheme.Muted)
-		extStyle := lipgloss.NewStyle().Foreground(extLipglossColor(ext))
-		sizeStyle := lipgloss.NewStyle().Foreground(currentTheme.Muted)
-		ratingStyle := lipgloss.NewStyle().Foreground(currentTheme.Success)
-		if selected {
-			numStyle = numStyle.Background(currentTheme.Surface)
-			idStyle = idStyle.Background(currentTheme.Surface)
-			titleStyle = titleStyle.Background(currentTheme.Surface)
-			authorStyle = authorStyle.Background(currentTheme.Surface)
-			extStyle = extStyle.Background(currentTheme.Surface)
-			sizeStyle = sizeStyle.Background(currentTheme.Surface)
-			ratingStyle = ratingStyle.Background(currentTheme.Surface)
-		}
-
-		content := fmt.Sprintf("%s  %s  %s  %s  %s  %s  %s",
-			numStyle.Render(fmt.Sprintf("%-*d", colNum, i+1)),
-			idStyle.Render(runewidth.FillRight(runewidth.Truncate(id, colID, ""), colID)),
-			titleStyle.Render(runewidth.FillRight(runewidth.Truncate(book.Name, titleWidth, ""), titleWidth)),
-			authorStyle.Render(runewidth.FillRight(runewidth.Truncate(authors, colAuthor, ""), colAuthor)),
-			extStyle.Render(runewidth.FillRight(runewidth.Truncate(ext, colFmt, ""), colFmt)),
-			sizeStyle.Render(fmt.Sprintf("%*s", colSize, runewidth.Truncate(size, colSize, ""))),
-			ratingStyle.Render(fmt.Sprintf("%*s", colRating, runewidth.Truncate(rating, colRating, ""))),
-		)
-		if selected {
-			// Pad trailing space with background color for full-row highlight
-			content = selectedBg.Render(content)
-		}
-
-		b.WriteString(cursor + content + "\n")
-	}
-
-	// Help bar
-	b.WriteString("\n")
-	helpStyle := lipgloss.NewStyle().Foreground(currentTheme.Muted)
-	helpKeys := lipgloss.NewStyle().Foreground(currentTheme.Accent)
-	var help string
-	if m.state == searchStateFilter {
-		help = fmt.Sprintf("  %s search  %s cancel",
-			helpKeys.Render("enter"), helpKeys.Render("esc"))
-	} else {
-		help = fmt.Sprintf("  %s select  %s page  %s search  %s download  %s quit",
-			helpKeys.Render("↑/↓"), helpKeys.Render("←/→"), helpKeys.Render("/"),
-			helpKeys.Render("enter"), helpKeys.Render("q"))
-	}
-	b.WriteString(helpStyle.Render(help))
-	b.WriteString("\n")
-
-	return b.String()
+	return v
 }
 
-// interactiveSearch prompts for a query then runs the interactive search model.
-// Returns the selected book ID or "" if cancelled.
+func (m searchSelectModel) listView() tea.View {
+	if m.feed == nil && m.feedPage == nil {
+		list := m
+		list.feedTitle = "Search: " + bookCell(m.query)
+		status := fmt.Sprintf("Page %d", m.page)
+		if m.totalPages > 0 {
+			status += fmt.Sprintf(" / %d", m.totalPages)
+		}
+		if m.state == searchStateFilter {
+			status = m.input.View()
+		}
+		v := tea.NewView(list.feedViewWith("Author", "No books found.", status, "/ search · ←/→ page · "))
+		v.AltScreen = true
+		return v
+	}
+	if m.feed != nil {
+		v := tea.NewView(m.feedView())
+		v.AltScreen = true
+		return v
+	}
+	status := fmt.Sprintf("Page %d", m.page)
+	if m.totalPages > 0 {
+		status += fmt.Sprintf(" / %d", m.totalPages)
+	}
+	v := tea.NewView(m.feedViewWith("Author", "No saved books on this page.", status, "←/→ page · "))
+	v.AltScreen = true
+	return v
+}
+
 func interactiveSearch(c *zlib.Client, opts *zlib.SearchOptions, fullTitle bool) (string, error) {
 	var query string
 	var selectedExts []string
@@ -369,36 +350,23 @@ func interactiveSearch(c *zlib.Client, opts *zlib.SearchOptions, fullTitle bool)
 		}
 	}
 
-	inputForm := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Search books").
-				Placeholder("enter title, author, or ISBN...").
-				Value(&query),
-			huh.NewMultiSelect[string]().
-				Title("Filter extensions").
-				Description("(skip to search all formats)").
-				Options(
-					huh.NewOption("EPUB", "EPUB"),
-					huh.NewOption("AZW", "AZW"),
-					huh.NewOption("AZW3", "AZW3"),
-					huh.NewOption("MOBI", "MOBI"),
-					huh.NewOption("PDF", "PDF"),
-					huh.NewOption("RTF", "RTF"),
-					huh.NewOption("TXT", "TXT"),
-				).
-				Value(&selectedExts),
-		),
-	).WithTheme(huhTheme())
-	if err := inputForm.Run(); err != nil {
+	fields, accepted, err := runInlineForm(newInlineForm("Search books", "Search", []formField{
+		{label: "Query", hint: "Title, author, or ISBN", validate: requiredField("query")},
+		{label: "Formats", options: []string{"EPUB", "AZW", "AZW3", "MOBI", "PDF", "RTF", "TXT"}, selected: selectedExts, hint: "Choose formats or leave all unchecked"},
+	}))
+	if err != nil {
 		return "", err
 	}
+	if !accepted {
+		return "", nil
+	}
+	query, selectedExts = fields[0].value, fields[1].selected
 	if strings.TrimSpace(query) == "" {
 		return "", nil
 	}
 
 	// Merge selected extensions into opts
-	if len(selectedExts) > 0 {
+	if len(selectedExts) > 0 || opts != nil {
 		if opts == nil {
 			opts = &zlib.SearchOptions{}
 		}
@@ -408,6 +376,9 @@ func interactiveSearch(c *zlib.Client, opts *zlib.SearchOptions, fullTitle bool)
 		}
 	}
 
+	if c == nil {
+		c = newClient()
+	}
 	p := tea.NewProgram(newSearchSelectModel(query, c, opts, fullTitle))
 	result, err := p.Run()
 	if err != nil {

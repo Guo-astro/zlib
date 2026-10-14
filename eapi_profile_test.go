@@ -1,11 +1,51 @@
 package zlib
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
+
+func TestGetProfileMapsAccountWithoutCredentials(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"success":1,"user":{"id":42,"name":"Reader","email":"reader@example.com","kindle_email":"reader@kindle.com","remix_userkey":"private-key","isPremium":1,"confirmed":0,"donations_active":1,"donations_expire":"2026-12-31","personalDomains":["reader.example"],"downloads_today":0,"dailyDownloadsCount":5,"downloads_limit":10}}`)
+	}))
+	defer server.Close()
+	profile, err := newLoggedInEAPITestClient(server.URL).GetProfile()
+	if err != nil {
+		t.Fatalf("GetProfile() error = %v", err)
+	}
+	if profile.ID != "42" || profile.Name != "Reader" || profile.Email != "reader@example.com" || profile.KindleEmail != "reader@kindle.com" {
+		t.Fatalf("account fields = %+v", profile)
+	}
+	if profile.Premium == nil || !*profile.Premium || profile.Confirmed == nil || *profile.Confirmed || profile.DonationsActive == nil || !*profile.DonationsActive {
+		t.Fatalf("account flags = %+v", profile)
+	}
+	if !profile.QuotaKnown || profile.DailyAmount != 0 || profile.DailyAllowed != 10 || profile.DailyRemaining != 10 {
+		t.Fatalf("quota = %+v", profile)
+	}
+	encoded, err := json.Marshal(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(encoded, []byte("remix_userkey")) {
+		t.Fatal("serialized profile contains credentials")
+	}
+}
+
+func TestGetProfileWithoutQuotaDoesNotImplyZeroLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"success":1,"user":{"name":"Reader"}}`)
+	}))
+	defer server.Close()
+	profile, err := newLoggedInEAPITestClient(server.URL).GetProfile()
+	if err != nil || profile.QuotaKnown {
+		t.Fatalf("profile = %+v, error = %v", profile, err)
+	}
+}
 
 func newLoggedInEAPITestClient(serverURL string) *Client {
 	c := NewClient(WithDomain(serverURL))

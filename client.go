@@ -1,10 +1,7 @@
 package zlib
 
 import (
-	"compress/gzip"
-	"encoding/json"
 	"fmt"
-	"io"
 	"mime"
 	"net/http"
 	"net/http/cookiejar"
@@ -20,35 +17,12 @@ const (
 	defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 	defaultTimeout   = 180 * time.Second
 	maxRedirects     = 10
-
-	// maxChallengeAttempts bounds how many times get() re-requests a URL after
-	// solving the JS challenge.
-	//
-	// Clearing the challenge is probabilistic, so this budget is sized from
-	// measurement rather than taste. Sampled against the live site with a 5s
-	// gap, the attempt that finally succeeded was 2, 2, 2, 3, 5, 5, 6, 7, and
-	// twice not within 8. A budget near the median fails about half the time,
-	// which is why it is 10 and not 4.
-	//
-	// It must stay bounded. This retry was once plain recursion, and because
-	// each retry restarts the HTTP timeout, a stubborn endpoint turned into a
-	// command that printed nothing and never returned.
-	maxChallengeAttempts = 10
-)
-
-// Challenge retry backoff. Vars, not consts, so tests can shorten them.
-var (
-	challengeRetryBase    = 1500 * time.Millisecond
-	challengeRetryMaxWait = 15 * time.Second
 )
 
 type Client struct {
-	httpClient  *http.Client
-	domain      string
-	loginDomain string
-	// cookiesMu guards cookies. A Client is shared across the goroutines
-	// FetchBookDetails fans out, and every request can rewrite c_token, so the
-	// map is never touched directly — go through cookieSnapshot/setCookie.
+	httpClient *http.Client
+	domain     string
+	// cookiesMu guards cookies shared by concurrent book-detail requests.
 	cookiesMu sync.RWMutex
 	cookies   map[string]string
 	loggedIn  bool
@@ -58,11 +32,10 @@ type Client struct {
 	downloadRetries int
 }
 
-// ClientMode selects the upstream transport used by high-level operations.
+// ClientMode identifies the upstream transport used by high-level operations.
 type ClientMode string
 
 const (
-	ClientModeHTML ClientMode = "html"
 	ClientModeEAPI ClientMode = "eapi"
 )
 
@@ -75,10 +48,9 @@ func NewClient(opts ...ClientOption) *Client {
 			Timeout:       defaultTimeout,
 			CheckRedirect: checkRedirect,
 		},
-		domain:      domain,
-		loginDomain: buildLoginURL(domain),
-		cookies:     make(map[string]string),
-		mode:        ClientModeHTML,
+		domain:  domain,
+		cookies: make(map[string]string),
+		mode:    ClientModeEAPI,
 		// Read at construction, not package init: the CLI loads .env after
 		// all init functions have run.
 		downloadRetries: resolveDownloadRetries(os.Getenv(EnvRetries)),
@@ -133,58 +105,7 @@ func WithOnion(proxyURL string) ClientOption {
 }
 
 func (c *Client) Login(email, password string) error {
-	data := url.Values{
-		"isModal":       {"true"},
-		"email":         {email},
-		"password":      {password},
-		"site_mode":     {"books"},
-		"action":        {"login"},
-		"isSingleLogin": {"1"},
-		"redirectUrl":   {""},
-		"gg_json_mode":  {"1"},
-	}
-
-	req, err := http.NewRequest("POST", c.loginDomain, strings.NewReader(data.Encode()))
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrLoginFailed, err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", defaultUserAgent)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrLoginFailed, err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrLoginFailed, err)
-	}
-	if err := validateResponse(resp, body); err != nil {
-		return fmt.Errorf("%w: %w", ErrLoginFailed, err)
-	}
-
-	var result struct {
-		Response struct {
-			ValidationError interface{} `json:"validationError"`
-		} `json:"response"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return fmt.Errorf("%w: invalid response: %v", ErrLoginFailed, err)
-	}
-	if result.Response.ValidationError != nil {
-		return fmt.Errorf("%w: %v", ErrLoginFailed, result.Response.ValidationError)
-	}
-
-	// Extract cookies
-	u, _ := url.Parse(c.loginDomain)
-	for _, cookie := range c.httpClient.Jar.Cookies(u) {
-		c.setCookie(cookie.Name, cookie.Value)
-	}
-
-	c.loggedIn = true
-	return nil
+	return c.LoginEAPI(email, password)
 }
 
 func (c *Client) Logout() {
@@ -205,11 +126,7 @@ func (c *Client) Mode() ClientMode {
 }
 
 func (c *Client) SetMode(mode ClientMode) {
-	if mode == ClientModeEAPI {
-		c.mode = ClientModeEAPI
-		return
-	}
-	c.mode = ClientModeHTML
+	c.mode = ClientModeEAPI
 }
 
 func (c *Client) SetDomain(domain string) {
@@ -219,7 +136,6 @@ func (c *Client) SetDomain(domain string) {
 	}
 
 	c.domain = domain
-	c.loginDomain = buildLoginURL(domain)
 
 	if c.httpClient == nil || c.httpClient.Jar == nil {
 		return
@@ -251,15 +167,6 @@ func (c *Client) cookieSnapshot() map[string]string {
 	return snapshot
 }
 
-func (c *Client) setCookie(name, value string) {
-	c.cookiesMu.Lock()
-	defer c.cookiesMu.Unlock()
-	if c.cookies == nil {
-		c.cookies = make(map[string]string)
-	}
-	c.cookies[name] = value
-}
-
 func (c *Client) Cookies() map[string]string {
 	return c.cookieSnapshot()
 }
@@ -284,6 +191,8 @@ func (c *Client) SetCookies(cookies map[string]string) {
 func isChallengePage(html string) bool {
 	return len(html) < 20000 && challengeRe.MatchString(html)
 }
+
+var challengeRe = regexp.MustCompile(`'([0-9A-Fa-f]{40})','c_token=`)
 
 // diamWallTitleRe matches DiamWall's interstitial <title>. The title is the
 // only body marker that reliably separates a block page from ordinary content,
@@ -383,129 +292,4 @@ func stripEAPICredentialsOffAllowlist(req *http.Request) {
 	}
 	req.Header.Del("remix-userid")
 	req.Header.Del("remix-userkey")
-}
-
-// isLoginPage reports whether html is Z-Library's login page, which the server
-// returns (with status 200) for authenticated requests once the session has
-// expired. The login form carries a stable id we can match on.
-func isLoginPage(html string) bool {
-	return strings.Contains(html, `id="loginForm"`)
-}
-
-// get fetches rawURL as a browser would, transparently clearing the JS
-// challenge when the server serves it instead of the page.
-//
-// Clearing the challenge is probabilistic, so the request is reissued with a
-// freshly solved c_token until it succeeds or maxChallengeAttempts is reached.
-// The budget must stay bounded: each retry restarts the HTTP timeout, so an
-// unbounded loop turns a stubborn endpoint into a command that never returns.
-func (c *Client) get(rawURL string) (string, error) {
-	wait := challengeRetryBase
-	for attempt := 1; ; attempt++ {
-		html, challenged, err := c.fetchOnce(rawURL)
-		if err != nil {
-			return "", err
-		}
-		if !challenged {
-			return html, nil
-		}
-		if attempt >= maxChallengeAttempts {
-			return "", fmt.Errorf("%w: still challenged after %d attempts at %s", ErrChallengeFailed, attempt, rawURL)
-		}
-		token, err := solveChallenge(html)
-		if err != nil {
-			return "", fmt.Errorf("%w: %w", ErrChallengeFailed, err)
-		}
-		c.setCookie("c_token", token)
-
-		time.Sleep(wait)
-		if wait *= 2; wait > challengeRetryMaxWait {
-			wait = challengeRetryMaxWait
-		}
-	}
-}
-
-// fetchOnce performs a single GET. It reports challenged=true, along with the
-// interstitial HTML, when the server answered with the JS challenge instead of
-// the requested page.
-func (c *Client) fetchOnce(rawURL string) (html string, challenged bool, err error) {
-	req, err := http.NewRequest("GET", rawURL, nil)
-	if err != nil {
-		return "", false, err
-	}
-	req.Header.Set("User-Agent", defaultUserAgent)
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	req.Header.Set("Accept-Encoding", "gzip")
-	req.Header.Set("Sec-Fetch-Dest", "document")
-	req.Header.Set("Sec-Fetch-Mode", "navigate")
-	req.Header.Set("Sec-Fetch-Site", "none")
-	req.Header.Set("Sec-Fetch-User", "?1")
-	req.Header.Set("Upgrade-Insecure-Requests", "1")
-	for k, v := range c.cookieSnapshot() {
-		req.AddCookie(&http.Cookie{Name: k, Value: v})
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", false, err
-	}
-	defer resp.Body.Close()
-
-	if isUnexpectedBookRedirect(req.URL, resp.Request.URL) {
-		return "", false, fmt.Errorf("%w: requested %s but received %s", ErrParseFailed, req.URL.Path, resp.Request.URL.Path)
-	}
-
-	var reader io.Reader = resp.Body
-	if resp.Header.Get("Content-Encoding") == "gzip" {
-		gz, err := gzip.NewReader(resp.Body)
-		if err != nil {
-			return "", false, err
-		}
-		defer gz.Close()
-		reader = gz
-	}
-
-	body, err := io.ReadAll(reader)
-	if err != nil {
-		return "", false, err
-	}
-
-	// DiamWall refuses the request outright: there is no challenge to solve and
-	// no content to parse, so this is checked first.
-	if isBotProtectionResponse(resp.StatusCode, resp.Header, body) {
-		return "", false, &BotProtectionError{StatusCode: resp.StatusCode, URL: resp.Request.URL.String()}
-	}
-
-	html = string(body)
-
-	// Z-Library serves the "Checking your browser" interstitial with HTTP 503,
-	// so the challenge must be recognised BEFORE the status check below. Doing
-	// it the other way round makes the solver unreachable and fails every
-	// request to the primary mirror with an opaque 503.
-	if isChallengePage(html) {
-		return html, true, nil
-	}
-
-	// Once the session expires, the server serves the login page (HTTP 200)
-	// in place of the requested authenticated page.
-	if isLoginPage(html) {
-		return "", false, ErrSessionExpired
-	}
-
-	if err := validateStatus(resp); err != nil {
-		return "", false, err
-	}
-
-	return html, false, nil
-}
-
-func isUnexpectedBookRedirect(requested, received *url.URL) bool {
-	if requested == nil || received == nil {
-		return false
-	}
-	if !strings.HasPrefix(requested.Path, bookPathPrefix) {
-		return false
-	}
-	return !strings.HasPrefix(received.Path, bookPathPrefix)
 }

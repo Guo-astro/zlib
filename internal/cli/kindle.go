@@ -6,10 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
 	"github.com/spf13/cobra"
@@ -39,26 +38,34 @@ var kindleCmd = &cobra.Command{
 		}
 		portStr := strconv.Itoa(cfg.SMTPPort)
 
-		form := huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title("Kindle address").
-					Value(&cfg.To),
-				huh.NewInput().
-					Title("From address").
-					Value(&cfg.From),
-				huh.NewInput().
-					Title("SMTP host").
-					Value(&cfg.SMTPHost),
-				huh.NewInput().
-					Title("SMTP port").
-					Value(&portStr),
-			),
-		).WithTheme(huhTheme())
-		if err := form.Run(); err != nil {
+		form := newFormModel("Kindle settings", "Save", []formField{
+			{label: "Kindle address", value: cfg.To, hint: "Your Send to Kindle address", validate: requiredField("Kindle address")},
+			{label: "From address", value: cfg.From, hint: "An address approved in your Amazon settings", validate: requiredField("from address")},
+			{label: "SMTP host", value: cfg.SMTPHost, hint: "Outgoing mail server", validate: requiredField("SMTP host")},
+			{label: "SMTP port", value: portStr, hint: "Usually 587 (STARTTLS) or 465 (TLS)", validate: func(s string) error {
+				port, err := strconv.Atoi(strings.TrimSpace(s))
+				if err != nil || port < 1 || port > 65535 {
+					return fmt.Errorf("enter a port from 1 to 65535")
+				}
+				return nil
+			}},
+		})
+		form.validate = func(fields []formField) error {
+			draft := cfg
+			draft.To = fields[0].value
+			draft.From = fields[1].value
+			draft.SMTPHost = fields[2].value
+			draft.SMTPPort, _ = strconv.Atoi(strings.TrimSpace(fields[3].value))
+			return draft.Validate()
+		}
+		fields, accepted, err := runForm(form)
+		if err != nil {
 			return err
 		}
-
+		if !accepted {
+			return nil
+		}
+		cfg.To, cfg.From, cfg.SMTPHost, portStr = fields[0].value, fields[1].value, fields[2].value, fields[3].value
 		port, err := strconv.Atoi(strings.TrimSpace(portStr))
 		if err != nil || port <= 0 {
 			return fmt.Errorf("invalid SMTP port: %s", portStr)
@@ -72,8 +79,8 @@ var kindleCmd = &cobra.Command{
 			return fmt.Errorf("failed to save kindle config: %w", err)
 		}
 
-		fmt.Printf("%s Saved to: %s\n", colorGreen(symbolSuccess), tildePath(config.KindleConfigPath()))
-		fmt.Printf("%s SMTP password via: export %s=...\n", colorFaint(symbolInfo), kindleSMTPPasswordEnv)
+		lipgloss.Fprintf(os.Stdout, "%s Saved to: %s\n", colorGreen(symbolSuccess), tildePath(config.KindleConfigPath()))
+		lipgloss.Fprintf(os.Stdout, "%s SMTP password via: export %s=...\n", colorFaint(symbolInfo), kindleSMTPPasswordEnv)
 		return nil
 	},
 }
@@ -91,26 +98,14 @@ var kindleSendCmd = &cobra.Command{
 			}
 			filePath = expanded
 		} else {
-			cwd, _ := os.Getwd()
-			form := huh.NewForm(
-				huh.NewGroup(
-					huh.NewFilePicker().
-						Title("Select a file to send to Kindle").
-						Picking(true).
-						AllowedTypes(kindleAllowedTypes).
-						ShowHidden(true).
-						ShowSize(true).
-						CurrentDirectory(cwd).
-						Height(20).
-						Value(&filePath),
-				),
-			).WithTheme(huhTheme())
-			if err := form.Run(); err != nil {
+			selected, accepted, err := chooseKindleFile()
+			if err != nil {
 				return err
 			}
-			if filePath == "" {
+			if !accepted {
 				return nil
 			}
+			filePath = selected
 		}
 		return sendDownloadedFileToKindle(filePath)
 	},
@@ -145,27 +140,28 @@ func sendDownloadedFileToKindle(filePath string) error {
 			return sm.err
 		}
 	} else {
-		fmt.Println("  Sending to Kindle...")
+		lipgloss.Fprintln(os.Stdout, "  Sending to Kindle...")
 		if err := zlib.SendToKindle(filePath, cfg, password); err != nil {
 			return err
 		}
 	}
 
-	fmt.Println()
-	fmt.Printf("%s Email sent to Kindle address: %s\n", colorGreen(symbolSuccess), colorCyan(cfg.To))
-	fmt.Printf("%s Final delivery depends on Amazon approval and file compatibility.\n", colorFaint(symbolInfo))
+	lipgloss.Fprintln(os.Stdout)
+	lipgloss.Fprintf(os.Stdout, "%s Email sent to Kindle address: %s\n", colorGreen(symbolSuccess), colorCyan(cfg.To))
+	lipgloss.Fprintf(os.Stdout, "%s Final delivery depends on Amazon approval and file compatibility.\n", colorFaint(symbolInfo))
 	return nil
 }
 
 // — kindle send model (spinner during SMTP send) —
 
 type kindleSendModel struct {
-	filePath string
-	cfg      zlib.KindleConfig
-	password string
-	spinner  spinner.Model
-	err      error
-	done     bool
+	width, height int
+	filePath      string
+	cfg           zlib.KindleConfig
+	password      string
+	spinner       spinner.Model
+	err           error
+	done          bool
 }
 
 type kindleSendDoneMsg struct{}
@@ -197,15 +193,18 @@ func (m kindleSendModel) sendCmd() tea.Cmd {
 
 func (m kindleSendModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+		return m, nil
 	case errMsg:
 		m.err = msg.err
 		return m, tea.Quit
 	case kindleSendDoneMsg:
 		m.done = true
 		return m, tea.Quit
-	case tea.KeyMsg:
-		if msg.Type == tea.KeyCtrlC {
-			m.err = fmt.Errorf("cancelled")
+	case tea.KeyPressMsg:
+		if msg.String() == "ctrl+c" {
+			m.err = fmt.Errorf("stopped waiting; email delivery may still complete")
 			return m, tea.Quit
 		}
 	case spinner.TickMsg:
@@ -216,6 +215,10 @@ func (m kindleSendModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m kindleSendModel) View() string {
+func (m kindleSendModel) View() tea.View {
+	return screenView(m.width, m.height, "Send to Kindle", bookCell(m.filePath), m.viewContent(), "To: "+bookCell(m.cfg.To), uiKey("ctrl+c", "stop waiting"))
+}
+
+func (m kindleSendModel) viewContent() string {
 	return fmt.Sprintf("  %s Sending to Kindle...\n", m.spinner.View())
 }

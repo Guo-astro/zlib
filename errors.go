@@ -15,6 +15,7 @@ var (
 	ErrParseFailed    = errors.New("zlibrary: failed to parse page")
 	ErrSessionExpired = errors.New("zlibrary: session expired, run `zlib login` to re-authenticate")
 	ErrPhraseMinWords = errors.New("zlibrary: phrase search requires at least 2 words")
+	ErrUnsupported    = errors.New("zlibrary: feature unavailable in EAPI")
 	ErrDownloadFailed = errors.New("zlibrary: download failed")
 	// ErrBotProtection is returned when an upstream anti-bot page is served
 	// instead of the requested Z-Library response.

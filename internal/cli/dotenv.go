@@ -16,6 +16,7 @@ import (
 // already set, so precedence is: real environment > working-dir .env >
 // config-dir .env.
 func loadDotEnv() error {
+	captureSettingsEnvironment()
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to determine current directory for .env loading: %w", err)

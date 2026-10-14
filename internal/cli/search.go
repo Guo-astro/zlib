@@ -2,10 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 	zlib "github.com/heartleo/zlib"
 	"github.com/mattn/go-runewidth"
 	"github.com/spf13/cobra"
@@ -15,8 +16,6 @@ var searchCmd = &cobra.Command{
 	Use:   "search [query]",
 	Short: "Search for books",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := newClient()
-
 		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		if len(args) == 0 {
@@ -24,7 +23,7 @@ var searchCmd = &cobra.Command{
 				return fmt.Errorf("--json requires a search query (interactive mode has no JSON output)")
 			}
 			fullTitle, _ := cmd.Flags().GetBool("full-title")
-			selectedID, err := interactiveSearch(c, searchOptsFromFlags(cmd), fullTitle)
+			selectedID, err := interactiveSearch(nil, searchOptsFromFlags(cmd), fullTitle)
 			if err != nil {
 				return err
 			}
@@ -37,7 +36,7 @@ var searchCmd = &cobra.Command{
 			}
 			sendToKindle, _ := cmd.Flags().GetBool("send-to-kindle")
 
-			return runDownload(newDownloadModel(selectedID, dir, c), sendToKindle)
+			return runDownload(newDownloadModel(selectedID, dir, newClient()), sendToKindle, cmd)
 		}
 
 		query := strings.Join(args, " ")
@@ -46,15 +45,13 @@ var searchCmd = &cobra.Command{
 		fullTitle, _ := cmd.Flags().GetBool("full-title")
 		opts := searchOptsFromFlags(cmd)
 
-		result, err := c.Search(query, page, count, opts)
+		result, err := newClient().Search(query, page, count, opts)
 		if err != nil {
 			return err
 		}
 
 		if jsonOut {
-			// The parser's Book.ID is the site's numeric card id; overwrite it
-			// with the alphanumeric URL id, which is what `zlib download`
-			// accepts — the id consumers of --json actually need.
+			// Keep references accepted by `zlib download` in JSON output.
 			for i, b := range result.Books {
 				if id := bookCommandID(b); id != "" {
 					result.Books[i].ID = id
@@ -64,11 +61,11 @@ var searchCmd = &cobra.Command{
 		}
 
 		if len(result.Books) == 0 {
-			fmt.Printf("%s No results found for %q\n", colorRed(symbolError), query)
+			lipgloss.Fprintf(os.Stdout, "%s No results found for %q\n", colorRed(symbolError), query)
 			return nil
 		}
 
-		fmt.Printf("%s Found %s · Page %d / %d\n\n",
+		lipgloss.Fprintf(os.Stdout, "%s Found %s · Page %d / %d\n\n",
 			colorGreen(symbolSuccess),
 			colorBold(fmt.Sprintf("%d results", len(result.Books))),
 			result.Page, result.TotalPages,
@@ -134,7 +131,7 @@ var searchCmd = &cobra.Command{
 				return pad
 			})
 
-		fmt.Println(t)
+		lipgloss.Fprintln(os.Stdout, t)
 		return nil
 	},
 }
