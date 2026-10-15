@@ -13,26 +13,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var recommendedCmd = newBookFeedCommand("recommended", "Browse recommended books", func(c *zlib.Client) ([]zlib.Book, error) {
+var recommendedCmd = newBookFeedCommand("recommended", "Show recommended books", "Browse recommended books", func(c *zlib.Client) ([]zlib.Book, error) {
 	return c.RecommendedBooks()
 })
 
-var mostPopularCmd = newBookFeedCommand("most-popular", "Browse the most popular books", func(c *zlib.Client) ([]zlib.Book, error) {
+var mostPopularCmd = newBookFeedCommand("most-popular", "Show popular books", "Browse the most popular books", func(c *zlib.Client) ([]zlib.Book, error) {
 	return c.MostPopularBooks()
 })
 
-func newBookFeedCommand(name, summary string, load func(*zlib.Client) ([]zlib.Book, error)) *cobra.Command {
+func newBookFeedCommand(name, description, summary string, load func(*zlib.Client) ([]zlib.Book, error)) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   name,
-		Short: summary,
+		Short: description,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := newClient()
 			fetch := func() ([]zlib.Book, error) { return load(c) }
 			jsonOut, _ := cmd.Flags().GetBool("json")
 			if !jsonOut && isInteractive() {
-				model := newBookFeedSelectModel(summary, fetch)
-				model.showBookCard = name == "most-popular"
+				model := newBookFeedSelectModel(summary, fetch).withBookDetails(c)
 				p := tea.NewProgram(model)
 				result, err := p.Run()
 				if err != nil {

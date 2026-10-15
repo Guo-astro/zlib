@@ -8,7 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	keys "charm.land/bubbles/v2/key"
-	"charm.land/bubbles/v2/progress"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -17,52 +17,107 @@ import (
 var themePickerKeys = struct {
 	up, down, pageUp, pageDown, first, last, save, cancel keys.Binding
 }{
-	keys.NewBinding(keys.WithKeys("up", "k"), keys.WithHelp("↑/↓", "preview")),
-	keys.NewBinding(keys.WithKeys("down", "j")),
+	keys.NewBinding(keys.WithKeys("up"), keys.WithHelp("↑/↓", "preview")),
+	keys.NewBinding(keys.WithKeys("down")),
 	keys.NewBinding(keys.WithKeys("pgup"), keys.WithHelp("PgUp/PgDn", "scroll")),
 	keys.NewBinding(keys.WithKeys("pgdown")),
 	keys.NewBinding(keys.WithKeys("home"), keys.WithHelp("Home/End", "first/last")),
 	keys.NewBinding(keys.WithKeys("end")),
 	keys.NewBinding(keys.WithKeys("enter"), keys.WithHelp("enter", "save")),
-	keys.NewBinding(keys.WithKeys("esc", "q", "ctrl+c"), keys.WithHelp("esc", "cancel")),
+	keys.NewBinding(keys.WithKeys("esc", "ctrl+c"), keys.WithHelp("esc", "cancel")),
 }
 
 // Preview has its own palette. Moving the cursor never changes global state or
 // writes preferences, so cancellation and terminal errors need no rollback.
 type themePickerModel struct {
-	names                 []string
-	current, override     string
-	cursor, width, height int
-	accepted              bool
+	allNames          []string
+	names             []string
+	search            textinput.Model
+	current, override string
+	cursor, offset    int
+	width, height     int
+	accepted          bool
 }
 
 func newThemePicker(current, override string) themePickerModel {
 	names := selectableThemes()
-	return themePickerModel{names: names, current: current, override: override,
+	search := textinput.New()
+	search.Prompt = "> "
+	search.Placeholder = "Type to filter themes..."
+	search.SetWidth(72)
+	search.Focus()
+	m := themePickerModel{allNames: names, names: slices.Clone(names), search: search, current: current, override: override,
 		cursor: max(0, slices.Index(names, current)), width: 80, height: 24}
+	m.ensureVisible()
+	return m
 }
 
-func (m themePickerModel) Init() tea.Cmd    { return nil }
-func (m themePickerModel) selected() string { return m.names[m.cursor] }
+func (m themePickerModel) Init() tea.Cmd { return nil }
+func (m themePickerModel) selected() string {
+	if len(m.names) == 0 {
+		return ""
+	}
+	return m.names[m.cursor]
+}
 func (m themePickerModel) palette() Theme {
+	if len(m.names) == 0 {
+		if p, ok := themes[m.current]; ok {
+			return p
+		}
+		return themes[defaultTheme]
+	}
 	return themes[m.selected()]
 }
 func (m themePickerModel) visibleRows() int {
 	if m.width >= 90 {
 		return max(1, m.height-7)
 	}
-	return max(1, m.height-15)
+	return max(1, m.height-12)
+}
+
+func (m *themePickerModel) ensureVisible() {
+	rows := m.visibleRows()
+	m.offset = min(max(0, m.offset), max(0, len(m.names)-rows))
+	if m.cursor < m.offset {
+		m.offset = m.cursor
+	} else if m.cursor >= m.offset+rows {
+		m.offset = m.cursor - rows + 1
+	}
+}
+
+func (m *themePickerModel) filterNames() {
+	selected := m.selected()
+	query := strings.ToLower(strings.TrimSpace(m.search.Value()))
+	m.names = m.names[:0]
+	for _, name := range m.allNames {
+		if strings.Contains(strings.ToLower(name), query) {
+			m.names = append(m.names, name)
+		}
+	}
+	m.cursor = max(0, slices.Index(m.names, selected))
+	m.offset = 0
+	m.ensureVisible()
 }
 
 func (m themePickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.search.SetWidth(max(1, msg.Width-2))
+		m.ensureVisible()
 	case tea.KeyPressMsg:
 		switch {
 		case keys.Matches(msg, themePickerKeys.cancel):
+			if msg.String() == "esc" && m.search.Value() != "" {
+				m.search.SetValue("")
+				m.filterNames()
+				return m, nil
+			}
 			return m, tea.Quit
 		case keys.Matches(msg, themePickerKeys.save):
+			if len(m.names) == 0 {
+				return m, nil
+			}
 			m.accepted = true
 			return m, tea.Quit
 		case keys.Matches(msg, themePickerKeys.up):
@@ -77,8 +132,21 @@ func (m themePickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor = 0
 		case keys.Matches(msg, themePickerKeys.last):
 			m.cursor = len(m.names) - 1
+		default:
+			before := m.search.Value()
+			var cmd tea.Cmd
+			m.search, cmd = m.search.Update(msg)
+			if m.search.Value() != before {
+				m.filterNames()
+			}
+			return m, cmd
 		}
-		m.cursor = min(max(0, m.cursor), len(m.names)-1)
+		m.cursor = min(max(0, m.cursor), max(0, len(m.names)-1))
+		m.ensureVisible()
+	default:
+		var cmd tea.Cmd
+		m.search, cmd = m.search.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -86,9 +154,12 @@ func (m themePickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m themePickerModel) listView(width int) string {
 	p := m.palette()
 	rows := m.visibleRows()
-	start := max(0, m.cursor-rows+1)
+	start := m.offset
 	end := min(len(m.names), start+rows)
 	lines := make([]string, 0, rows)
+	if len(m.names) == 0 {
+		lines = append(lines, lipgloss.NewStyle().Foreground(p.Muted).Render("No matching themes"))
+	}
 	for i := start; i < end; i++ {
 		label := m.names[i]
 		if m.names[i] == m.current {
@@ -102,22 +173,43 @@ func (m themePickerModel) listView(width int) string {
 	return strings.Join(lines, "\n")
 }
 
-func themePreview(p Theme, width int) string {
-	paint := func(c color.Color, s string) string {
-		return lipgloss.NewStyle().Foreground(c).Render(ansi.Truncate(s, width, "…"))
+type themePreviewRow struct {
+	text  string
+	color color.Color
+}
+
+func themePreview(p Theme, width, height int, wide bool) string {
+	rows := []themePreviewRow{
+		{`zlib search "example"`, p.Accent},
+		{"> 1  Example Book", p.Title},
+		{"  EPUB · 4 MB", p.ExtEPUB},
+		{"✓ Download complete", p.Success},
 	}
-	bar := progress.New(progress.WithWidth(max(1, width-10)), progress.WithColors(p.Accent), progress.WithoutPercentage())
-	bar.EmptyColor = p.Surface
-	selected := lipgloss.NewStyle().Foreground(p.Title).Background(p.Surface).Bold(true).Width(width)
-	return strings.Join([]string{
-		paint(p.Accent, "Preview · Recommendations"),
-		selected.Render(ansi.Truncate("> 1 Pride and Prejudice", width, "…")),
-		paint(p.Title, "  2 The Time Machine"),
-		paint(p.Muted, "Jane Austen · English · 1813"),
-		paint(p.ExtEPUB, "EPUB") + "  " + paint(p.ExtPDF, "PDF") + "  " + paint(p.ExtMOBI, "MOBI") + "  " + paint(p.ExtFB2, "FB2"),
-		bar.ViewAs(0.65) + paint(p.Info, " 65%"),
-		paint(p.Success, "✓ Saved") + "  " + paint(p.Warning, "! Quota") + "  " + paint(p.Error, "× Error"),
-	}, "\n")
+	if wide {
+		rows = []themePreviewRow{
+			{`zlib search "example"`, p.Accent},
+			{"Search: example · Page 1 / 4", p.Muted},
+			{"> 1  Example Book", p.Title},
+			{"     Example Author · EPUB · 4 MB", p.ExtEPUB},
+			{"     Book details", p.Link},
+			{"Enter  Download", p.Warning},
+			{"Save to  ./books", p.Info},
+			{"✓ Download complete", p.Success},
+		}
+	}
+	lines := make([]string, 0, height)
+	blank := lipgloss.NewStyle().Background(p.Background).Render(strings.Repeat(" ", width))
+	for range max(0, (height-len(rows))/2) {
+		lines = append(lines, blank)
+	}
+	for _, row := range rows {
+		line := ansi.Truncate(row.text, width, "…")
+		lines = append(lines, lipgloss.NewStyle().Foreground(row.color).Background(p.Background).Width(width).Render(line))
+	}
+	for len(lines) < height {
+		lines = append(lines, blank)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m themePickerModel) View() tea.View {
@@ -125,21 +217,29 @@ func (m themePickerModel) View() tea.View {
 	v := tea.NewView("")
 	v.AltScreen = true
 	if w < 32 || h < 17 {
-		v.SetContent(ansi.Truncate("Enlarge terminal · Esc cancel", w, "…"))
+		v.SetContent(fullScreenView(w, h, ansi.Truncate("Enlarge terminal · Esc cancel", w, "…")).Content)
 		return v
 	}
+	m.ensureVisible()
 	p := m.palette()
 	accent := lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
 	muted := lipgloss.NewStyle().Foreground(p.Muted)
 	detail := "Preview: " + m.selected()
+	if m.selected() == "" {
+		detail = "No matching themes"
+	}
+	m.search.SetWidth(max(1, w-2))
 	body := ""
 	if w >= 90 {
-		listWidth := min(30, w/3)
-		body = lipgloss.JoinHorizontal(lipgloss.Top, m.listView(listWidth), "   ", themePreview(p, w-listWidth-3))
+		listWidth := max(40, min(44, (w-3)/2))
+		body = lipgloss.JoinHorizontal(lipgloss.Top, m.listView(listWidth), "   ", themePreview(p, w-listWidth-3, m.visibleRows(), true))
 	} else {
-		body = m.listView(w) + "\n\n" + themePreview(p, w)
+		body = m.listView(w) + "\n\n" + themePreview(p, w, 4, false)
 	}
-	status := fmt.Sprintf("%d/%d · Enter saves; preview is not saved", m.cursor+1, len(m.names))
+	status := fmt.Sprintf("%d/%d themes · Enter saves", m.cursor+1, len(m.names))
+	if len(m.names) == 0 {
+		status = "No matching themes"
+	}
 	if m.override != "" {
 		status = "ZLIB_THEME=" + bookCell(m.override) + " overrides the saved preference"
 	}
@@ -154,7 +254,7 @@ func (m themePickerModel) View() tea.View {
 	if w >= 90 {
 		bindings = append(bindings, themePickerKeys.pageUp, themePickerKeys.first)
 	}
-	content := accent.Render("Theme") + "\n" + muted.Render(ansi.Truncate(detail, w, "…")) + "\n\n" + body
+	content := accent.Render("Theme") + "\n" + muted.Render(ansi.Truncate(detail, w, "…")) + "\n" + m.search.View() + "\n" + body
 	lines := strings.Split(content, "\n")
 	for len(lines) < h-3 {
 		lines = append(lines, "")
@@ -163,6 +263,6 @@ func (m themePickerModel) View() tea.View {
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], w, "…")
 	}
-	v.SetContent(strings.Join(lines, "\n"))
+	v.SetContent(fullScreenView(w, h, strings.Join(lines, "\n")).Content)
 	return v
 }

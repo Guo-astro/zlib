@@ -92,7 +92,7 @@ func TestDownloadHistoryEAPI(t *testing.T) {
 		t.Fatalf("DownloadHistory() = %+v", result)
 	}
 	item := result.Items[0]
-	if item.ID != "42" || item.Hash != "abc123" || item.Extension != "epub" || item.Date != "2026-08-23" {
+	if item.ID != "42" || item.Hash != "abc123" || item.Extension != "epub" || item.Date != "2026-08-23" || len(item.Authors) != 1 || item.Authors[0] != "Reader" {
 		t.Errorf("history item = %+v", item)
 	}
 	if item.DownloadURL != server.URL+"/eapi/book/42/abc123/file" {

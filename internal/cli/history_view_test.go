@@ -108,6 +108,47 @@ func TestHistoryViewportAndSelection(t *testing.T) {
 	}
 }
 
+func TestHistorySharesListScrollAndBookCard(t *testing.T) {
+	m := newHistorySelectModel(nil)
+	m.state, m.width, m.height, m.inShell = historyStateResults, 80, 24, true
+	for i := range 30 {
+		m.items = append(m.items, zlib.DownloadHistoryItem{
+			ID: fmt.Sprint(i + 1), Hash: "abcdef", Name: fmt.Sprintf("Book %d", i+1), Authors: []string{"An Author"}, Date: "2026-10-13",
+		})
+	}
+	view := ansi.Strip(m.View().Content)
+	lines := strings.Split(view, "\n")
+	header := -1
+	for i, line := range lines {
+		if strings.Contains(line, "#") && strings.Contains(line, "Title") {
+			header = i
+			break
+		}
+	}
+	if header < 0 || !strings.Contains(lines[header], "Author") || !strings.Contains(lines[1], "Downloaded 2026-10-13") {
+		t.Fatal("history header or selected download date is missing")
+	}
+	card := strings.Join(lines[2:header], "\n")
+	if !strings.Contains(card, "An Author") || strings.Contains(card, "2026-10-13") || !strings.Contains(view, "d delete · q back") {
+		t.Fatal("history card or actions differ from other book lists")
+	}
+	m.width = 30
+	if !strings.Contains(ansi.Strip(m.View().Content), "Page 1 · 2026-10-13") {
+		t.Fatal("narrow history view hides the selected download date")
+	}
+	m.width = 80
+	next, _ := m.Update(key("pgdown"))
+	m = next.(historySelectModel)
+	if m.listOffset != 1 {
+		t.Fatalf("page down list offset = %d, want 1", m.listOffset)
+	}
+	next, _ = m.Update(key("up"))
+	m = next.(historySelectModel)
+	if m.listOffset != 1 {
+		t.Fatal("moving within the visible rows scrolled the history list")
+	}
+}
+
 func TestHistoryEmptyPageCanGoBack(t *testing.T) {
 	m := newHistorySelectModel(nil)
 	next, _ := m.Update(historyResultMsg{page: 2})

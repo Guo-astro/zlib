@@ -18,7 +18,7 @@ func themePickerKey(m themePickerModel, code rune) themePickerModel {
 
 func TestThemePickerPreviewDoesNotSave(t *testing.T) {
 	isolateConfigHome(t)
-	if err := config.SaveConfig(config.Config{Theme: "mocha"}); err != nil {
+	if err := config.SaveConfig(config.Config{Theme: defaultTheme}); err != nil {
 		t.Fatal(err)
 	}
 	before, err := os.ReadFile(config.ConfigPath())
@@ -26,8 +26,8 @@ func TestThemePickerPreviewDoesNotSave(t *testing.T) {
 		t.Fatal(err)
 	}
 	palette := currentTheme
-	m := newThemePicker("mocha", "")
-	if m.selected() != "mocha" {
+	m := newThemePicker(defaultTheme, "")
+	if m.selected() != defaultTheme {
 		t.Fatal("current theme not selected")
 	}
 	m = themePickerKey(m, tea.KeyHome)
@@ -60,12 +60,76 @@ func TestThemePickerNavigationAndAcceptance(t *testing.T) {
 		t.Fatal("cursor went past final theme")
 	}
 	m = themePickerKey(m, tea.KeyPgUp)
-	if m.cursor != 0 {
-		t.Fatal("page up did not reach start")
+	if m.cursor != len(m.names)-1-m.visibleRows() {
+		t.Fatal("page up did not move by one visible page")
 	}
+	m = themePickerKey(m, tea.KeyHome)
 	m = themePickerKey(m, tea.KeyEnter)
 	if !m.accepted || m.selected() != m.names[0] {
 		t.Fatal("Enter did not accept selection")
+	}
+}
+
+func TestThemePickerFiltersAndRestoresList(t *testing.T) {
+	m := newThemePicker("catppuccin-mocha", "")
+	for _, r := range "snazzy" {
+		next, _ := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+		m = next.(themePickerModel)
+	}
+	if len(m.names) != 1 || m.selected() != "sublime-snazzy" || !strings.Contains(ansi.Strip(m.View().Content), "Preview: sublime-snazzy") {
+		t.Fatalf("filter did not select matching theme: %v", m.names)
+	}
+	m = themePickerKey(m, tea.KeyEscape)
+	if m.accepted || len(m.names) != len(m.allNames) {
+		t.Fatal("Esc did not clear the filter")
+	}
+	m = themePickerKey(m, tea.KeyEscape)
+	if m.accepted {
+		t.Fatal("Esc accepted a theme")
+	}
+}
+
+func TestThemePickerBookPreviewAdaptsToWidth(t *testing.T) {
+	m := newThemePicker("dracula", "")
+	m.width, m.height = 100, 24
+	wide := ansi.Strip(m.View().Content)
+	if !strings.Contains(wide, `zlib search "example"`) || !strings.Contains(wide, "Example Author") || !strings.Contains(wide, "Save to  ./books") {
+		t.Fatal("wide picker did not show the full zlib preview")
+	}
+	m.width, m.height = 40, 17
+	narrow := ansi.Strip(m.View().Content)
+	if !strings.Contains(narrow, `zlib search "example"`) || !strings.Contains(narrow, "EPUB · 4 MB") || !strings.Contains(narrow, "Download complete") || strings.Contains(narrow, "Example Author") {
+		t.Fatal("narrow picker did not use its compact zlib preview")
+	}
+}
+
+func TestThemePreviewRowsFillThePanel(t *testing.T) {
+	for _, name := range selectableThemes() {
+		p := themes[name]
+		if p.Background == nil {
+			t.Fatalf("%s has no preview background", name)
+		}
+		for _, wide := range []bool{false, true} {
+			preview := themePreview(p, 38, 10, wide)
+			for _, line := range strings.Split(preview, "\n") {
+				if got := ansi.StringWidth(line); got != 38 {
+					t.Fatalf("%s wide=%t: preview row width %d, want 38", name, wide, got)
+				}
+			}
+		}
+	}
+}
+
+func TestThemePickerEmptyFilterCannotSave(t *testing.T) {
+	m := newThemePicker("dracula", "")
+	m.search.SetValue("missing-theme-name")
+	m.filterNames()
+	if m.selected() != "" || !strings.Contains(ansi.Strip(m.View().Content), "No matching themes") {
+		t.Fatal("empty filter did not show recovery text")
+	}
+	m = themePickerKey(m, tea.KeyEnter)
+	if m.accepted {
+		t.Fatal("empty filter accepted a theme")
 	}
 }
 

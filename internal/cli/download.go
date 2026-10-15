@@ -15,7 +15,7 @@ import (
 
 var downloadCmd = &cobra.Command{
 	Use:   "download <book-id>",
-	Short: "Download book",
+	Short: "Download a book by ID",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir, err := destDirFlag(cmd)

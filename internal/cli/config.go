@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func settingsCommand(name, page, key string) *cobra.Command {
-	return &cobra.Command{Use: name, Short: "Configure " + name, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+func settingsCommand(name, page, key, description string) *cobra.Command {
+	return &cobra.Command{Use: name, Short: description, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		store, err := newSettingsStore()
 		if err != nil {
 			return err
@@ -28,7 +28,9 @@ func settingsCommand(name, page, key string) *cobra.Command {
 			if page == "network" || page == "domain" {
 				values = values[:2]
 			} else if page == "download" {
-				values = values[2:]
+				values = values[2:4]
+			} else if page == "kindle" {
+				values = values[4:]
 			}
 			var output []settingValue
 			for _, v := range values {
@@ -70,13 +72,14 @@ type settingsStart struct {
 func (m settingsStart) Init() tea.Cmd { return m.initial }
 
 func init() {
-	root := settingsCommand("config", "home", "")
-	root.Short = "Configure network and download settings"
-	root.PersistentFlags().Bool("json", false, "Show settings and sources as JSON without opening the TUI")
-	network := settingsCommand("network", "network", "")
-	network.AddCommand(settingsCommand("domain", "domain", ""), settingsCommand("proxy", "network", zlib.EnvProxy))
-	download := settingsCommand("download", "download", "")
-	download.AddCommand(settingsCommand("directory", "download", downloadDirEnvVar), settingsCommand("retries", "download", zlib.EnvRetries))
-	root.AddCommand(network, download)
+	root := settingsCommand("config", "home", "", "Edit network, download, and Kindle settings")
+	root.PersistentFlags().Bool("json", false, "Print settings and sources as JSON")
+	network := settingsCommand("network", "network", "", "Set domain and proxy")
+	network.AddCommand(settingsCommand("domain", "domain", "", "Set EAPI domain"), settingsCommand("proxy", "network", zlib.EnvProxy, "Set proxy URL"))
+	download := settingsCommand("download", "download", "", "Set download directory and retries")
+	download.AddCommand(settingsCommand("directory", "download", downloadDirEnvVar, "Set default download directory"), settingsCommand("retries", "download", zlib.EnvRetries, "Set download retries"))
+	kindle := settingsCommand("kindle", "kindle", "", "Set Kindle address and SMTP")
+	kindle.AddCommand(settingsCommand("to", "kindle", kindleToKey, "Set Kindle address"), settingsCommand("from", "kindle", kindleFromKey, "Set sender address"), settingsCommand("host", "kindle", kindleHostKey, "Set SMTP host"), settingsCommand("port", "kindle", kindlePortKey, "Set SMTP port"))
+	root.AddCommand(network, download, kindle)
 	rootCmd.AddCommand(root)
 }

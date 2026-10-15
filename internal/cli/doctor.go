@@ -14,8 +14,8 @@ import (
 
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
-	Short: "Check Z-Library domain connectivity",
-	Long:  "Check configured Z-Library candidate domains without logging in or changing your active domain.",
+	Short: "Find available EAPI domains",
+	Long:  "Probe EAPI domains without logging in or changing your selected domain.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		proxyValue, _ := cmd.Flags().GetString("proxy")
 		proxyURL, err := validateDoctorProxy(proxyValue)

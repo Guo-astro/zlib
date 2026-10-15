@@ -37,8 +37,27 @@ func screenView(width, height int, title, subtitle, body, status string, binding
 		lines = []string{title, "Enlarge terminal", footer}
 		lines = lines[:min(height, len(lines))]
 	}
-	for i := range lines {
-		lines[i] = ansi.Truncate(lines[i], width, "…")
+	return fullScreenView(width, height, strings.Join(lines, "\n"))
+}
+
+// fullScreenView gives every page the same terminal-sized canvas. Keep each
+// line's own styling; repainting styled text with an outer background can
+// leave gaps when an inner ANSI reset clears that background.
+func fullScreenView(width, height int, content string) tea.View {
+	if width <= 0 {
+		width = 80
+	}
+	if height <= 0 {
+		height = 24
+	}
+	lines := strings.Split(content, "\n")
+	lines = lines[:min(len(lines), height)]
+	for len(lines) < height {
+		lines = append(lines, "")
+	}
+	for i, line := range lines {
+		line = ansi.Truncate(line, width, "…")
+		lines[i] = line + strings.Repeat(" ", max(0, width-ansi.StringWidth(line)))
 	}
 	v := tea.NewView(strings.Join(lines, "\n"))
 	v.AltScreen = true

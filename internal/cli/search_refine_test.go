@@ -2,13 +2,37 @@ package cli
 
 import (
 	"fmt"
-	"github.com/charmbracelet/x/ansi"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	zlib "github.com/heartleo/zlib"
 )
+
+func TestInteractiveSearchUsesFiftyBooksPerPage(t *testing.T) {
+	request := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/eapi/book/search" || r.ParseForm() != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		request <- r.Form.Get("page") + ":" + r.Form.Get("limit")
+		fmt.Fprint(w, `{"success":1,"books":[],"pagination":{"current":2,"total_pages":3}}`)
+	}))
+	defer server.Close()
+	client := zlib.NewClient(zlib.WithDomain(server.URL))
+	client.SetCookies(map[string]string{"remix_userid": "1", "remix_userkey": "fixture"})
+	m := newSearchSelectModel("books", client, nil, false)
+	if _, ok := m.fetchPage(2)().(searchResultMsg); !ok {
+		t.Fatal("interactive search did not return an EAPI result")
+	}
+	if got := <-request; got != "2:50" {
+		t.Fatalf("interactive search requested page:limit %q, want 2:50", got)
+	}
+}
 
 func TestSearchViewportAndInlineEditor(t *testing.T) {
 	for _, width := range []int{30, 40, 80, 120} {

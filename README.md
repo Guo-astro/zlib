@@ -4,7 +4,7 @@
 
 # zlib
 
-A CLI for Z-Library.
+Command-line client and terminal UI for Z-Library.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/heartleo/zlib/release.yml)](https://github.com/heartleo/zlib/actions)
 [![Release](https://img.shields.io/github/v/release/heartleo/zlib)](https://github.com/heartleo/zlib/releases)
@@ -13,16 +13,26 @@ A CLI for Z-Library.
 
 English | [中文](README.zh.md)
 
-[Install](#install) · [Quick start](#quick-start) · [Agent setup](#agent-setup) · [Docs](#documentation)
+[Features](#features) · [Install](#install) · [Quick start](#quick-start) · [Commands](#commands) · [Agent setup](#agent-setup) · [Docs](#documentation)
 
 </div>
 
-Search and download books, browse saved books and recommendations, and send files
-to Kindle. Use the terminal picker yourself, or let an agent use the CLI through JSON output.
+Search and download books, browse saved collections and recommendations, and send files to Kindle. Run the interactive terminal UI, or pipe JSON output to scripts and AI agents.
 
 ![Interactive book search](docs/demo-search.gif)
 
+## Features
+
+- **Terminal UI**: Bubble Tea shell with live search, book cards (ISBN, publisher, year, format), responsive layouts, and slash commands (`/search`, `/favorites`, `/theme`, `/doctor`, `/config`).
+- **Direct EAPI**: Talks to Z-Library's JSON API directly. No HTML scraping, browser challenge solving, or DiamWall blocks.
+- **Kindle delivery**: Built-in SMTP delivery to send downloaded books straight to your Kindle.
+- **Themes**: Over 20 built-in dark and light themes (Catppuccin, Dracula, Nord, Gruvbox, Tokyo Night, Solarized).
+- **Agent skills**: Bundled skills for Claude Code and Codex, plus machine-readable `--json` across all query commands.
+- **Network doctor**: Probes official mirrors in parallel to find working domains and test latency.
+
 ## Install
+
+### Package managers
 
 macOS / Linux (Homebrew):
 
@@ -30,48 +40,99 @@ macOS / Linux (Homebrew):
 brew install heartleo/tap/zlib
 ```
 
-Windows (PowerShell):
+Windows (winget):
 
 ```powershell
 winget install --id heartleo.zlib --exact
 ```
 
-macOS / Linux (install script):
+### Install script
+
+macOS / Linux:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/heartleo/zlib/main/install.sh | sh
 ```
 
-[Download a binary](https://github.com/heartleo/zlib/releases/latest) or
-[install with Go / build from source](docs/installation.md).
+### Pre-built binaries
+
+Download archives for macOS, Linux, and Windows (x86_64, ARM64) from [Releases](https://github.com/heartleo/zlib/releases/latest). Extract the binary into a directory on your `PATH`.
+
+### Go install
+
+Requires Go 1.26 or later:
+
+```bash
+go install github.com/heartleo/zlib/cmd/zlib@latest
+```
+
+Ensure `$GOPATH/bin` (or `%USERPROFILE%\go\bin` on Windows) is in your `PATH`.
+
+### Build from source
+
+Requires Go:
+
+```bash
+git clone https://github.com/heartleo/zlib.git
+cd zlib
+go build -o zlib ./cmd/zlib
+```
+
+On Windows (PowerShell):
+
+```powershell
+go build -o zlib.exe ./cmd/zlib
+```
+
+Run `zlib update` to update to the latest release using your detected installation method. For checksum verification and build flags, see [Installation](docs/installation.md).
 
 ## Quick start
 
-You need a Z-Library account. Find a reachable domain first:
+You need a Z-Library account.
 
-```sh
-zlib doctor
-```
+1. Find a reachable domain:
+   ```bash
+   zlib doctor
+   ```
 
-Choose a domain marked `Available`. Replace the example below with that domain,
-then log in and open the search picker. These commands work in Bash and PowerShell:
+2. Log in using a domain marked `Available` (saves session for future commands):
+   ```bash
+   zlib login --domain https://z-lib.gd
+   ```
+   If Cloudflare blocks login, [import your browser cookies](docs/troubleshooting.md#login-returns-authorization-failed).
 
-```sh
-zlib login --domain https://z-lib.gd
-zlib search
-```
+3. Launch the terminal shell:
+   ```bash
+   zlib tui
+   ```
+   - Type a title and press `Enter` to search.
+   - Use `↑/↓` to select a book, `←/→` to switch pages, and `Enter` to download.
+   - Type `/` to open the command palette (`/theme`, `/favorites`, `/doctor`), or `/quit` to exit.
 
-Enter a query, use `↑/↓` to select a book and `←/→` to change pages, then press
-`Enter` to download. Files go to the current directory by default.
+## Commands
 
-Login saves your session and domain for later commands. If login returns
-`Authorization failed`, [import your browser cookies](docs/troubleshooting.md#login-returns-authorization-failed).
-If `doctor` finds no usable domain, see [connection troubleshooting](docs/troubleshooting.md#no-available-domains).
+| Goal | Command | Output / Notes |
+| --- | --- | --- |
+| Open interactive shell | `zlib tui` | Fullscreen terminal UI |
+| Search with terminal picker | `zlib search` | Interactive selection |
+| Search books | `zlib search "dune" --ext epub` | Plain text table |
+| Search books as JSON | `zlib search "dune" --json --count 10` | JSON object (`books`, `page`, `total_pages`) |
+| Download by ID | `zlib download "id:hash"` | Saves file locally |
+| Browse saved books | `zlib favorites` | Interactive list or `--json` |
+| Browse recommendations | `zlib recommended` | Curated books |
+| Browse popular books | `zlib most-popular` | Top downloaded books |
+| Browse download history | `zlib history` | Paginated download log |
+| Check quota and profile | `zlib profile` | Daily limit and account status |
+| Send book to Kindle | `zlib kindle send ./book.epub` | Sends via configured SMTP |
+| Change theme | `zlib theme nord` | Sets active palette (`zlib theme` for picker) |
+| Probe domains | `zlib doctor` | Latency and availability check |
+| Update binary | `zlib update` | Detects package manager and updates |
+
+Run `zlib <command> --help` to view all available flags. See [Usage](docs/usage.md) for pagination, custom directories, and filters.
 
 ## Agent setup
 
-Install the CLI and complete the login above in your own terminal first. The plugins
-provide skills that run your local `zlib` executable and reuse its saved session.
+The CLI supports non-interactive automation via `--json`. The repository also bundles local skills in [`.agents/skills/`](.agents/skills/).
 
 ### Claude Code
 
@@ -82,54 +143,50 @@ Run inside Claude Code:
 /plugin install zlib@zlib-plugin-cc
 ```
 
-Then use `/zlib "the pragmatic programmer"` to search, or `/zlib:kindle` to send a local file.
+Use `/zlib "the pragmatic programmer"` to search, or `/zlib:kindle ./book.epub` to deliver a file.
 
 ### Codex
 
 Run in your terminal:
 
-```sh
+```bash
 codex plugin marketplace add heartleo/zlib
 codex plugin add zlib@zlib
 ```
 
-Ask: “Use zlib to find The Pragmatic Programmer in EPUB. Show me the results first.”
+Ask Codex: "Use zlib to find The Pragmatic Programmer in EPUB and show the results before downloading."
 
-[Agent workflows and JSON examples](docs/agents.md) · [Kindle setup](docs/kindle.md)
+See [Agents](docs/agents.md) for non-interactive scripting and JSON formats.
 
-The shared skills live in [`.agents/skills/`](.agents/skills) for repo-level use.
+## Configuration
 
-## Commands
+| Environment variable | Description | Default |
+| --- | --- | --- |
+| `ZLIB_DOWNLOAD_DIR` | Directory for downloaded books | Current working directory |
+| `ZLIB_THEME` | Color theme for current process | `catppuccin-mocha` |
+| `ZLIB_DOMAIN` | Override target mirror domain | Saved domain from login |
+| `HTTP_PROXY` / `HTTPS_PROXY` | HTTP or SOCKS5 proxy URL | None |
 
-| Task | Command |
-| --- | --- |
-| Search with a terminal picker | `zlib search` |
-| Print search results | `zlib search "dune" --ext epub` |
-| Get results as JSON | `zlib search "dune" --json --count 10` |
-| Browse saved books | `zlib favorites` |
-| Browse recommendations / popular books | `zlib recommended` / `zlib most-popular` |
-| Browse download history | `zlib history` |
-| View account and daily quota | `zlib profile` |
-| Send a local file to Kindle | `zlib kindle send ./book.epub` |
-| Change the theme | `zlib theme nord` |
+Configuration paths:
+- macOS / Linux: `~/.config/zlib/`
+- Windows: `%APPDATA%\zlib\`
 
-To download a specific result, copy its full `id:hash` reference and run
-`zlib download "id:hash"`. See [search and download workflows](docs/usage.md)
-for pagination, download folders and keyboard controls.
-
-Use `zlib --help` or `zlib <command> --help` for all flags.
+See [Configuration](docs/configuration.md) for details on proxy setup and config files.
 
 ## Documentation
 
-| Guide | Contents |
+| Guide | Description |
 | --- | --- |
-| [Installation](docs/installation.md) | Binary downloads, Go, source builds and upgrades |
-| [Usage](docs/usage.md) | Search, downloads, saved books, history and themes |
-| [Configuration](docs/configuration.md) | Domains, proxies, download folders and settings files |
-| [Agents](docs/agents.md) | Plugin setup, non-interactive commands and JSON output |
+| [Installation](docs/installation.md) | Package managers, Go install, source builds, upgrades |
+| [Usage](docs/usage.md) | Search filters, downloads, favorites, history |
+| [Terminal interface](docs/tui.md) | Shell commands, layout, keyboard shortcuts |
+| [Themes](docs/themes.md) | Palette list and preview controls |
+| [Configuration](docs/configuration.md) | Mirrors, proxies, directories, config files |
+| [Agents](docs/agents.md) | Plugins, skills, non-interactive commands, JSON shapes |
 | [Kindle](docs/kindle.md) | SMTP setup and file delivery |
-| [Troubleshooting](docs/troubleshooting.md) | Login, connection and download failures |
-| [EAPI notes](docs/eapi.md) | Supported endpoints and API limitations (Chinese) |
+| [Troubleshooting](docs/troubleshooting.md) | Login, domain availability, network recovery |
+| [EAPI notes](docs/eapi.md) | API endpoints and known limits (Chinese) |
 
-Report bugs in [Issues](https://github.com/heartleo/zlib/issues), including your
-`zlib version`, OS, command and error message. Omit passwords, cookies and session files.
+## Contributing
+
+Report bugs in [Issues](https://github.com/heartleo/zlib/issues). Include your `zlib version`, operating system, command, and error output. Do not share cookies, passwords, or session files.

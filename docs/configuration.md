@@ -15,14 +15,13 @@ is your user profile directory, usually `C:\Users\<name>`.
 
 ### Theme
 
-Run `zlib theme` to open the theme list. Move with ↑/↓ or j/k to preview
-book rows, format colors, download progress and status messages. Enter saves;
-Esc, q or Ctrl+C cancels. Wide terminals show the preview beside the list;
+Run `zlib theme` to open the theme list. Move with ↑/↓ to preview
+search results, format colors, and download status. Enter saves;
+Esc or Ctrl+C cancels. Wide terminals show the preview beside the list;
 narrow terminals show it below. PgUp/PgDn and Home/End navigate the list.
 
-The default theme is `mocha`. Legacy `auto` values are treated as unset.
-`zlib theme <name>`
-still sets a theme directly; without a terminal, `zlib theme` prints the current
+The default theme is `catppuccin-mocha`. Legacy `auto` values are treated as unset.
+`zlib theme <name>` sets a theme directly; without a terminal, `zlib theme` prints the current
 theme. `ZLIB_THEME` overrides the preference saved in `~/.config/zlib/config.json`.
 
 ### Interactive setup
@@ -35,17 +34,27 @@ zlib config network proxy
 zlib config download
 zlib config download directory
 zlib config download retries
+zlib config kindle
+zlib config kindle to
+zlib config kindle from
+zlib config kindle host
+zlib config kindle port
 ```
 
-These commands open the same settings TUI at different pages. Use arrow keys
-to select, Enter to open, and Esc to return. The domain page automatically
-checks candidates using the same EAPI probe as `doctor`; `r` refreshes results.
+`zlib config` shows network, download and Kindle settings together. The
+subcommands open the same TUI at a specific section or field. Use arrow keys
+or Tab to select, Enter to edit, and Esc to return to the selected setting.
+The settings list keeps its controls and save feedback next to the fields;
+it shows an override notice only when another source supplies the active value.
+The domain page automatically checks candidates using the same EAPI probe as
+`doctor`; `r` refreshes results.
 Enter saves the selected domain. An empty result leaves your configuration intact.
 
 Editors have Save, Cancel and Reset actions, reached with Tab. Enter in the
 input saves the value. Reset clears the global value after you save; higher
 priority environment settings still apply. Unsaved changes can be discarded
 when returning to the parent page.
+For Kindle, Reset clears an address or restores the default SMTP host or port.
 
 - **Proxy:** enter a URL; Ctrl+T tests it without saving. Input is masked.
   Clearing the global proxy returns to existing environment proxy behavior.
@@ -56,9 +65,12 @@ when returning to the parent page.
 - **Retries:** enter a non-negative integer. Zero disables retries; the default
   is three.
 
-Changes are saved to `~/.config/zlib/.env`, preserving unrelated settings.
-The UI shows each value's source and reports when process or working-directory
-settings override a saved value. It does not change login cookies.
+Network and download changes are saved to `~/.config/zlib/.env`, preserving unrelated settings.
+Kindle address and SMTP server settings are saved to `~/.config/zlib/kindle.json`.
+The UI reports when process or working-directory settings override a saved
+network or download value. It does not change login cookies. Set
+`ZLIB_SMTP_PWD` in the global `.env` with an editor; it is never stored in
+`kindle.json` or shown in the settings list.
 
 Without a terminal, these commands print a read-only summary. Add `--json` for
 values, sources and saved preferences; proxy credentials are redacted.

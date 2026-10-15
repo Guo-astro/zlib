@@ -14,8 +14,9 @@ your sender email to the approved sender list. Then run:
 zlib kindle
 ```
 
-Enter the Kindle address, sender address, SMTP host and port. The CLI saves these
-settings in `~/.config/zlib/kindle.json`.
+Enter the Kindle address, sender address, SMTP host and port. You can also edit
+each value with `zlib config kindle` or `/config kindle` in the shell. The CLI
+saves these settings in `~/.config/zlib/kindle.json`.
 
 Open the [global `.env` file](configuration.md#create-or-edit-the-global-file) in
 your editor and add `ZLIB_SMTP_PWD` with the password required by your mail

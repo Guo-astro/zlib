@@ -5,6 +5,10 @@
 Complete the [quick start](../README.md#quick-start) first. Book commands use your
 saved Z-Library session.
 
+Run `zlib tui` in a terminal for the persistent shell: type a query or use `/` to
+choose a command. See [terminal controls](tui.md). The commands below also work
+directly, including in scripts.
+
 ## Search
 
 Open the terminal picker without a query:
@@ -96,15 +100,14 @@ authentication keys but includes personal account fields; keep it private.
 
 ```sh
 zlib theme
-zlib theme mocha
-zlib theme nord
+zlib theme catppuccin-mocha
 ```
 
-Themes: `mocha` (default), `latte`, `dracula`, `tokyo`, `nord`, `gruvbox`.
-`zlib theme` opens a list with the current theme selected. Use ↑/↓ to choose,
-Enter to save, or Esc to cancel. With redirected output, it prints the current
-theme instead. `ZLIB_THEME` overrides
-the saved theme.
+`zlib theme` opens a searchable list with a zlib search and download preview. Use ↑/↓ to
+choose, type to filter, Enter to save, or Esc to clear the filter and close.
+With redirected output, it prints the current and available themes instead.
+`ZLIB_THEME` overrides the saved theme. See [Themes](themes.md) for the built-in
+names and preview controls.
 
 See [Terminal interface](tui.md) for interactive controls. For exact flags and
 defaults, run `zlib <command> --help`.

@@ -11,7 +11,7 @@ import (
 
 var profileCmd = &cobra.Command{
 	Use:   "profile",
-	Short: "Show profile",
+	Short: "Show profile and download quota",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c := newClient()
 		profile, err := c.GetProfile()

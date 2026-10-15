@@ -58,6 +58,11 @@ zlib download 115066162:e9f13b --send-to-kindle
 zlib history --download 115066162:e9f13b --send-to-kindle
 ```
 
+TUI 选中图书时按需请求 `/eapi/book/{id}/{hash}`，补充详情卡片并按
+`id:hash` 缓存。Android 的 `ZLibBook` 模型明确包含 `edition`、`pages` 和
+`identifier`；分类及独立的 ISBN 10/13 字段不能仅凭 APK 模型保证存在。
+客户端只展示响应中可用的分类，且只从有效 ISBN 推导对应的编号。
+
 ## 登录端点的单独管控
 
 Z-Library 把 `/eapi/user/login` 与 EAPI 的其余部分分开管控。2026-09-04 对一个真实

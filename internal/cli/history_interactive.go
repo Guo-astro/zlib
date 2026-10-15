@@ -7,7 +7,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 	zlib "github.com/heartleo/zlib"
 )
 
@@ -25,11 +24,14 @@ const (
 type historySelectModel struct {
 	client          *zlib.Client
 	items           []zlib.DownloadHistoryItem
+	details         bookDetailState
 	page            int
 	totalPages      int
 	hasNext         bool
 	cursor          int
+	listOffset      int
 	width, height   int
+	inShell         bool
 	state           historyState
 	spinner         spinner.Model
 	selected        *zlib.DownloadHistoryItem // set when user presses Enter
@@ -121,6 +123,7 @@ func (m historySelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.ensureCursorVisible()
 		return m, nil
 
 	case listLoadError:
@@ -136,7 +139,19 @@ func (m historySelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.totalPages = msg.totalPages
 		m.hasNext = msg.hasNext
 		m.cursor = 0
+		m.listOffset = 0
+		m.deleteError = nil
 		m.state = historyStateResults
+		return m, m.queueSelectedDetail()
+
+	case bookDetailReadyMsg:
+		if msg.sequence == m.details.sequence && msg.ref == m.selectedBookRef() && m.state == historyStateResults {
+			return m, m.details.fetch(m.client, msg.ref)
+		}
+		return m, nil
+
+	case bookDetailResultMsg:
+		m.details.store(msg)
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -177,6 +192,7 @@ func (m historySelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case historyStateDeleting:
 			return m, nil
 		case historyStateResults:
+			previousCursor := m.cursor
 			switch msg.String() {
 			case "r":
 				page := m.page
@@ -193,9 +209,9 @@ func (m historySelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = historyStateConfirmDelete
 				}
 			case "pgdown":
-				m.cursor = min(max(0, len(m.items)-1), m.cursor+(searchSelectModel{height: m.height}).feedRows())
+				m.cursor = min(max(0, len(m.items)-1), m.cursor+(searchSelectModel{width: m.width, height: m.height}).feedRows())
 			case "pgup":
-				m.cursor = max(0, m.cursor-(searchSelectModel{height: m.height}).feedRows())
+				m.cursor = max(0, m.cursor-(searchSelectModel{width: m.width, height: m.height}).feedRows())
 			case "home":
 				m.cursor = 0
 			case "end":
@@ -232,6 +248,10 @@ func (m historySelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.quitting = true
 				return m, tea.Quit
 			}
+			if m.cursor != previousCursor {
+				m.ensureCursorVisible()
+				return m, m.queueSelectedDetail()
+			}
 		case historyStateLoading:
 			if msg.String() == "q" || msg.String() == "esc" || msg.String() == "ctrl+c" {
 				m.quitting = true
@@ -256,60 +276,49 @@ func historyHasNext(result zlib.DownloadHistoryResult) bool {
 	return len(result.Items) > 0
 }
 
+func (m *historySelectModel) ensureCursorVisible() {
+	rows := (searchSelectModel{width: m.width, height: m.height}).feedRows()
+	m.listOffset = visibleListOffset(m.listOffset, m.cursor, len(m.items), rows)
+}
+
 func (m historySelectModel) View() tea.View {
 	if m.err != nil {
 		return screenView(m.width, m.height, "Download history", "Could not load history", bookCell(m.err.Error()), "", uiKey("esc", "back"), uiKey("r", "retry"))
 	}
-	list := searchSelectModel{feedTitle: "Download history", width: m.width, height: m.height, cursor: m.cursor, spinner: m.spinner, state: searchStateResults}
+	list := searchSelectModel{feedTitle: "Download history", width: m.width, height: m.height, cursor: m.cursor, listOffset: m.listOffset, listAction: "d delete", inShell: m.inShell, spinner: m.spinner, state: searchStateResults, details: m.details}
 	if m.state == historyStateLoading {
 		list.state = searchStateLoading
 	}
-	column := "Format / size"
 	for _, item := range m.items {
-		if item.Date != "" {
-			column = "Downloaded"
-			break
-		}
-	}
-	for _, item := range m.items {
-		detail := item.Date
-		if column == "Format / size" {
-			detail = strings.TrimSpace(strings.ToUpper(item.Extension) + " " + item.Size)
-		}
-		list.books = append(list.books, zlib.Book{ID: item.ID, Hash: item.Hash, URL: item.URL, Name: item.Name, Authors: []string{detail}, Extension: item.Extension, Size: item.Size})
+		book := zlib.Book{ID: item.ID, Hash: item.Hash, URL: item.URL, Name: item.Name, Authors: item.Authors, Extension: item.Extension, Size: item.Size}
+		list.books = append(list.books, m.details.book(historyCommandID(item), book))
 	}
 	status := fmt.Sprintf("Page %d", m.page)
 	if m.totalPages > 0 {
 		status += fmt.Sprintf(" / %d", m.totalPages)
 	}
-	v := tea.NewView(list.feedViewWith(column, "No history on this page.", status, "←/→ page · "))
-	v.AltScreen = true
-	lines := strings.Split(v.Content, "\n")
-	width := m.width
-	if width == 0 {
-		width = 80
-	}
-	help := "↑↓ select · ←→ page · enter download · d delete · q quit"
-	if width < 70 {
-		help = "↑↓ ←→ · enter · d delete · q"
-	}
-	if m.state == historyStateConfirmDelete {
-		help = "Delete selected history? y / n"
-	} else if m.state == historyStateDeleting {
-		help = "Deleting history…"
-	} else if m.deleteError != nil {
-		help = "Delete failed; d retry, q quit"
-		if len(lines) > 1 {
-			lines[1] = bookCell(m.deleteError.Error())
+	if m.state == historyStateResults && m.cursor < len(m.items) {
+		if date := bookCell(m.items[m.cursor].Date); date != "" {
+			if m.width > 0 && m.width < 40 {
+				status += " · " + date
+			} else {
+				status += " · Downloaded " + date
+			}
 		}
 	}
-	if len(lines) > 1 {
-		lines[len(lines)-1] = help
+	v := tea.NewView(list.feedViewWith("Author", "No history on this page.", status, "←/→ page · "))
+	v.AltScreen = true
+	if m.state == historyStateDeleting || m.deleteError != nil {
+		lines := strings.Split(v.Content, "\n")
+		muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
+		if m.state == historyStateDeleting {
+			lines[len(lines)-1] = muted.Render("Deleting history…")
+		} else {
+			lines[1] = bookCell(m.deleteError.Error())
+			lines[len(lines)-1] = muted.Render("Delete failed · d retry · " + list.exitHint())
+		}
+		v.Content = strings.Join(lines, "\n")
 	}
-	for i := range lines {
-		lines[i] = ansi.Truncate(lines[i], max(1, width), "…")
-	}
-	v.Content = strings.Join(lines, "\n")
 	if m.state == historyStateConfirmDelete {
 		v.Content = m.deleteDialog(v.Content)
 	}
@@ -317,7 +326,7 @@ func (m historySelectModel) View() tea.View {
 		book := m.items[m.cursor]
 		v.Content = confirmationDialog(v.Content, m.width, m.height, "Download book?", book.Name, historyCommandID(book), "Download the selected book.", "Download", m.downloadFocused, false)
 	}
-	return v
+	return fullScreenView(m.width, m.height, v.Content)
 }
 
 func (m historySelectModel) deleteDialog(background string) string {

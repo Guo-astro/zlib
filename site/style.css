@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────
    zlib.heartleo.dev
    Palette: Catppuccin Latte (light) / Catppuccin Mocha (dark) —
-   the same two themes the CLI ships as `zlib theme latte|mocha`.
+   the same two themes the CLI ships as catppuccin-latte and catppuccin-mocha.
    Terminal chrome follows the page theme through the --t-* tokens, so
    the replicas show the palette the CLI would actually render.
    Type: Literata (an ebook face) + JetBrains Mono (a terminal face).
@@ -18,7 +18,7 @@
   --green:#40a02b; --yellow:#df8e1d; --red:#d20f39; --blue:#1e66f5; --teal:#179299;
   --shadow:0 1px 2px rgba(76,79,105,.06), 0 12px 32px -18px rgba(76,79,105,.28);
 
-  /* Terminal chrome — Catppuccin Latte, matching `zlib theme latte` */
+  /* Terminal chrome — Catppuccin Latte, matching `zlib theme catppuccin-latte` */
   --t-bg:#e6e9ef; --t-base:#eff1f5; --t-surface:#ccd0da; --t-overlay:#bcc0cc;
   --t-text:#4c4f69; --t-title:#7287fd; --t-muted:#7c7f93; --t-edge:#dce0e8;
   --t-mauve:#8839ef; --t-blue:#1e66f5; --t-green:#40a02b;
@@ -41,7 +41,7 @@ html[data-theme="mocha"]{
   --green:#a6e3a1; --yellow:#f9e2af; --red:#f38ba8; --blue:#89b4fa; --teal:#94e2d5;
   --shadow:0 1px 2px rgba(0,0,0,.3), 0 16px 40px -20px rgba(0,0,0,.7);
 
-  /* Terminal chrome — Catppuccin Mocha, matching `zlib theme mocha` */
+  /* Terminal chrome — Catppuccin Mocha, matching `zlib theme catppuccin-mocha` */
   --t-bg:#181825; --t-base:#1e1e2e; --t-surface:#313244; --t-overlay:#45475a;
   --t-text:#cdd6f4; --t-title:#b4befe; --t-muted:#6c7086; --t-edge:#11111b;
   --t-mauve:#cba6f7; --t-blue:#89b4fa; --t-green:#a6e3a1;

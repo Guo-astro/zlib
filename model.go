@@ -4,6 +4,8 @@ type Book struct {
 	ID          string   `json:"id"`
 	Hash        string   `json:"hash,omitempty"`
 	ISBN        string   `json:"isbn,omitempty"`
+	ISBN10      string   `json:"isbn_10,omitempty"`
+	ISBN13      string   `json:"isbn_13,omitempty"`
 	URL         string   `json:"url"`
 	Cover       string   `json:"cover,omitempty"`
 	Name        string   `json:"name"`
@@ -18,6 +20,7 @@ type Book struct {
 	Description string   `json:"description,omitempty"`
 	Categories  string   `json:"categories,omitempty"`
 	Edition     string   `json:"edition,omitempty"`
+	Pages       string   `json:"pages,omitempty"`
 	DownloadURL string   `json:"download_url,omitempty"`
 }
 
@@ -52,14 +55,15 @@ type UserProfile struct {
 
 type DownloadHistoryItem struct {
 	// ID and Hash identify the downloaded book in EAPI responses.
-	ID          string `json:"id,omitempty"`
-	Hash        string `json:"hash,omitempty"`
-	Name        string `json:"name"`
-	URL         string `json:"url"`
-	DownloadURL string `json:"download_url,omitempty"`
-	Extension   string `json:"extension,omitempty"`
-	Size        string `json:"size,omitempty"`
-	Date        string `json:"date"`
+	ID          string   `json:"id,omitempty"`
+	Hash        string   `json:"hash,omitempty"`
+	Name        string   `json:"name"`
+	Authors     []string `json:"authors,omitempty"`
+	URL         string   `json:"url"`
+	DownloadURL string   `json:"download_url,omitempty"`
+	Extension   string   `json:"extension,omitempty"`
+	Size        string   `json:"size,omitempty"`
+	Date        string   `json:"date"`
 }
 
 type DownloadHistoryResult struct {

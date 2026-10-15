@@ -2,9 +2,17 @@
 
 See [Terminal interface](tui.md) for the shared layout, controls and verification.
 
-Scope: domain, proxy URL, download directory and retry count. All `config`
+Scope: domain, proxy URL, download directory, retry count and basic Kindle delivery settings. All `config`
 subcommands route into one Bubble Tea program. Existing environment precedence
 and configuration file locations remain in use.
+
+The main `config` screen groups network, downloads and Kindle settings. Each
+row shows its effective value. Save feedback and override notices appear just
+below the list; source and saved value are not repeated for every selection.
+Enter opens the editor or domain picker, and Esc returns to the selected row.
+Section subcommands remain available for direct access. Kindle address, sender,
+SMTP host and port use the existing `kindle.json`; SMTP password stays in
+`ZLIB_SMTP_PWD` and is never displayed in the settings list.
 
 ## Component references
 

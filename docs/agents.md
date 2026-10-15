@@ -88,9 +88,9 @@ with that value and use an existing destination directory:
 zlib download "id:hash" --dir ./books
 ```
 
-`zlib search` without a query, bare `history`, and `kindle send` without a file
-open interactive prompts. Use the JSON forms above for lists and an explicit file
-path for delivery:
+`zlib tui`, `zlib search` without a query, bare `history`, and `kindle send`
+without a file open interactive prompts. Bare `zlib` prints help. Use the JSON
+forms above for lists and an explicit file path for delivery:
 
 ```sh
 zlib kindle send ./books/book.epub

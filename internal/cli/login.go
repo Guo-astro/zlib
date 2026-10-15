@@ -18,8 +18,8 @@ import (
 
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "Log in to Z-Library",
-	Long:  `Log in to Z-Library and save session cookies`,
+	Short: "Log in or import cookies",
+	Long:  `Log in with email and password or import a Netscape cookie file. The session is saved locally.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		email, _ := cmd.Flags().GetString("email")
 		password, _ := cmd.Flags().GetString("password")

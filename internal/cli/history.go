@@ -16,7 +16,7 @@ import (
 var historyCmd = &cobra.Command{
 	Use:   "history",
 	Short: "Show download history",
-	Long:  "Show download history. Without flags, opens an interactive browser with pagination and selection.",
+	Long:  "Browse download history in a terminal. Use flags to print or edit entries.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		page, _ := cmd.Flags().GetInt("page")
 		downloadID, _ := cmd.Flags().GetString("download")

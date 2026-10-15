@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -18,10 +19,34 @@ func (m searchSelectModel) feedRows() int {
 	if height == 0 {
 		height = 24
 	}
-	if m.feed == nil || m.showBookCard {
-		return max(1, height-13)
+	if m.hasBookCard() {
+		cardRows := selectedBookCardRows(m.width, height)
+		if height >= 15 {
+			return max(1, height-cardRows-6)
+		}
+		return max(1, height-cardRows-5)
 	}
 	return max(1, height-12)
+}
+
+func (m searchSelectModel) hasBookCard() bool {
+	return m.feed == nil || m.showBookCard
+}
+
+// Keep the viewport still while the cursor moves within its visible rows.
+func (m *searchSelectModel) ensureCursorVisible() {
+	m.listOffset = visibleListOffset(m.listOffset, m.cursor, len(m.books), m.feedRows())
+}
+
+func visibleListOffset(offset, cursor, count, rows int) int {
+	offset = min(max(0, offset), max(0, count-rows))
+	if cursor < offset {
+		return cursor
+	}
+	if cursor >= offset+rows {
+		return cursor - rows + 1
+	}
+	return offset
 }
 
 func (m searchSelectModel) feedView() string {
@@ -45,24 +70,53 @@ func (m searchSelectModel) feedViewWith(column, empty, status, navigation string
 	if title != "" {
 		title = strings.ToUpper(title[:1]) + title[1:]
 	}
-	lines := []string{accent.Render(title), status}
+	lines := []string{accent.Render(title), muted.Render(status)}
 	if m.state == searchStateLoading {
-		return strings.Join(append(lines, m.spinner.View()+" Loading books…", "", "q quit"), "\n")
+		loading := "Loading books…"
+		if strings.Contains(navigation, "/ search") {
+			loading = fmt.Sprintf("Searching page %d…", max(1, m.loadingPage))
+		}
+		return strings.Join(append(lines,
+			ansi.Truncate(m.spinner.View()+" "+loading, width, "…"),
+			"",
+			muted.Render(m.exitHint())), "\n")
 	}
 	if len(m.books) == 0 {
-		help := navigation + "q quit"
+		help := navigation + m.exitHint()
+		if strings.Contains(navigation, "/ search") {
+			lines = append(lines, ansi.Truncate("No books found for this search.", width, "…"), ansi.Truncate("Try another title, author, or ISBN.", width, "…"), "")
+			help = "/ search · " + m.exitHint()
+			if m.inShell {
+				help = "Ctrl+F search · " + m.exitHint()
+			}
+			if m.state == searchStateFilter {
+				help = "enter search · esc cancel"
+			}
+			return strings.Join(append(lines, muted.Render(ansi.Truncate(help, width, "…"))), "\n")
+		}
 		if m.state == searchStateFilter {
 			help = "enter search · esc cancel"
 		}
 		return strings.Join(append(lines, empty, "", ansi.Truncate(help, width, "…")), "\n")
 	}
 	cursor := min(max(0, m.cursor), len(m.books)-1)
-	showCard := m.feed == nil || m.showBookCard
+	showCard := m.hasBookCard()
 	if showCard {
-		lines = append(lines, selectedBookCard(m.books[cursor], width), "")
+		border := currentTheme.Accent
+		if m.feed == nil && m.feedPage == nil && m.cardFlash > 1 {
+			border = currentTheme.Info
+		} else if m.feed == nil && m.feedPage == nil && m.cardFlash == 1 {
+			border = currentTheme.Link
+		}
+		lines = append(lines, selectedBookCardBorder(m.selectedBook(), width, height, border), "")
 	}
 	count := m.feedRows()
-	start := max(0, cursor-count+1)
+	start := min(max(0, m.listOffset), max(0, len(m.books)-count))
+	if cursor < start {
+		start = cursor
+	} else if cursor >= start+count {
+		start = cursor - count + 1
+	}
 	end := min(len(m.books), start+count)
 	numberWidth := len(fmt.Sprint(len(m.books)))
 	titleNeed, detailNeed := len("Title"), ansi.StringWidth(column)
@@ -85,6 +139,10 @@ func (m searchSelectModel) feedViewWith(column, empty, status, navigation string
 	}
 	lines = append(lines, muted.Render(row("#", "Title", column)))
 	for i := start; i < end; i++ {
+		if m.revealing && i >= m.revealRows {
+			lines = append(lines, "")
+			continue
+		}
 		book := m.books[i]
 		s := row(fmt.Sprint(i+1), book.Name, strings.Join(book.Authors, ", "))
 		if i == cursor {
@@ -114,28 +172,51 @@ func (m searchSelectModel) feedViewWith(column, empty, status, navigation string
 		lines = append(lines, muted.Render(ansi.Truncate(bookCell(strings.Join(book.Authors, ", ")), width, "…")))
 		lines = append(lines, ansi.Truncate(feedBookMetadata(book), width, "…"), "")
 	}
-	help := "↑/↓ select · PgUp/PgDn scroll · Home/End · enter download · q quit"
-	if width < 70 {
-		help = "↑/↓ · enter download · q quit"
-	}
+	help := "↑/↓ select · PgUp/PgDn scroll · enter download · " + m.exitHint()
 	lines[0] = accent.Render(ansi.Truncate(title, max(1, width-20), "…")) + muted.Render(fmt.Sprintf("  %d / %d", cursor+1, len(m.books)))
 	if navigation != "" {
-		help = "↑/↓ select · ←/→ page · enter download · q quit"
-		if width < 70 {
-			help = "↑↓ · ←→ page · enter · q quit"
-		}
+		help = "↑/↓ select · ←/→ page · enter download · " + m.exitHint()
 	}
 	if strings.Contains(navigation, "/ search") {
-		help = "↑/↓ select · ←/→ page · / search · enter download · q quit"
+		help = "↑/↓ select · ←/→ page · / search · enter download · " + m.exitHint()
+		if m.inShell {
+			help = strings.Replace(help, "/ search", "Ctrl+F search", 1)
+		}
+	}
+	if width < 70 {
+		switch {
+		case strings.Contains(navigation, "/ search") && m.inShell:
+			help = "↑↓ · enter · Ctrl+F · " + m.exitHint()
+		case strings.Contains(navigation, "/ search"):
+			help = "↑↓ · enter · / · " + m.exitHint()
+		case navigation != "":
+			help = "↑↓ · ←→ · enter · " + m.exitHint()
+		default:
+			help = "↑↓ · enter · " + m.exitHint()
+		}
+	}
+	if m.listAction != "" {
 		if width < 70 {
-			help = "↑↓ ←→ · / search · enter · q"
+			help = "↑↓ · enter · " + m.listAction + " · " + m.exitHint()
+		} else {
+			help = "↑/↓ select · ←/→ page · enter download · " + m.listAction + " · " + m.exitHint()
 		}
 	}
 	if m.state == searchStateFilter {
 		help = "enter search · esc cancel"
 	}
+	if showCard && height >= 15 {
+		lines = append(lines, "")
+	}
 	lines = append(lines, muted.Render(help))
 	return strings.Join(lines, "\n")
+}
+
+func (m searchSelectModel) exitHint() string {
+	if m.inShell {
+		return "q back"
+	}
+	return "q quit"
 }
 
 // Measure the whole page, not the selected row, to keep columns stationary.
@@ -162,7 +243,25 @@ func bookColumnWidths(width, numberWidth, titleNeed, detailNeed int) (int, int, 
 
 // Reserve the same space for every book so selection never moves the list.
 func selectedBookCard(book zlib.Book, width int) string {
-	inner := max(1, width-4)
+	return selectedBookCardBorder(book, width, 0, currentTheme.Accent)
+}
+
+func selectedBookCardRows(width, height int) int {
+	if width == 0 {
+		width = 80
+	}
+	if width < 78 {
+		if height >= 24 {
+			return 13
+		}
+	} else if height >= 20 {
+		return 11
+	}
+	return 8
+}
+
+func selectedBookCardBorder(book zlib.Book, width, height int, border color.Color) string {
+	inner := max(1, width-6)
 	accent := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
 	muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
 	title := strings.Split(ansi.Wrap(bookCell(book.Name), inner, ""), "\n")
@@ -179,14 +278,65 @@ func selectedBookCard(book zlib.Book, width int) string {
 	}
 	lines = append(lines, ansi.Truncate(bookCell(strings.Join(book.Authors, ", ")), inner, "…"))
 	var details []string
-	for _, value := range []string{strings.ToUpper(book.Extension), book.Size, book.Year, book.Language, book.Publisher} {
+	fileDetails := []string{strings.ToUpper(book.Extension), book.Size}
+	if selectedBookCardRows(width, height) == 8 {
+		fileDetails = append(fileDetails, book.Year)
+	}
+	for _, value := range fileDetails {
 		if value = bookCell(value); value != "" {
 			details = append(details, value)
 		}
 	}
 	lines = append(lines, muted.Render(ansi.Truncate(strings.Join(details, " · "), inner, "…")))
+	if selectedBookCardRows(width, height) == 8 {
+		details = details[:0]
+		for _, value := range []string{book.Language, book.Publisher} {
+			if value = bookCell(value); value != "" {
+				details = append(details, value)
+			}
+		}
+		lines = append(lines, muted.Render(ansi.Truncate(strings.Join(details, " · "), inner, "…")))
+	} else {
+		line := func(parts ...string) string {
+			var present []string
+			for _, part := range parts {
+				if part != "" {
+					present = append(present, part)
+				}
+			}
+			return muted.Render(ansi.Truncate(strings.Join(present, " · "), inner, "…"))
+		}
+		field := func(label, value string) string {
+			if value == "" {
+				return ""
+			}
+			return label + ": " + bookCell(value)
+		}
+		category := field("Categories", book.Categories)
+		if width < 78 {
+			lines = append(lines,
+				line(field("Year", book.Year), field("Ed", book.Edition), bookCell(book.Pages)),
+				line(bookCell(book.Language), field("Pub", book.Publisher)),
+			)
+			wrapped := strings.Split(ansi.Hardwrap(category, inner, false), "\n")
+			for i := range 2 {
+				value := ""
+				if i < len(wrapped) {
+					value = wrapped[i]
+				}
+				lines = append(lines, muted.Render(ansi.Truncate(value, inner, "…")))
+			}
+			lines = append(lines, line(field("ISBN 10", book.ISBN10)), line(field("ISBN 13", book.ISBN13)))
+		} else {
+			lines = append(lines,
+				line(field("Year", book.Year), field("Edition", book.Edition), field("Pages", book.Pages)),
+				line(field("Language", book.Language), field("Publisher", book.Publisher)),
+			)
+			lines = append(lines, line(category), line(field("ISBN 10", book.ISBN10), field("ISBN 13", book.ISBN13)))
+		}
+	}
 	lines = append(lines, muted.Render(ansi.Truncate("ID: "+bookCommandID(book), inner, "…")))
-	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(currentTheme.Accent).
+	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(border).
 		Padding(0, 1).Width(width - 2).Render(strings.Join(lines, "\n"))
 }
 

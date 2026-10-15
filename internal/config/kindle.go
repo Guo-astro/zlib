@@ -14,7 +14,11 @@ func KindleConfigPath() string {
 }
 
 func LoadKindleConfig() (zlib.KindleConfig, error) {
-	data, err := os.ReadFile(KindleConfigPath())
+	return LoadKindleConfigFrom(KindleConfigPath())
+}
+
+func LoadKindleConfigFrom(path string) (zlib.KindleConfig, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return zlib.KindleConfig{}, err
 	}
@@ -23,7 +27,10 @@ func LoadKindleConfig() (zlib.KindleConfig, error) {
 }
 
 func SaveKindleConfig(cfg zlib.KindleConfig) error {
-	path := KindleConfigPath()
+	return SaveKindleConfigTo(KindleConfigPath(), cfg)
+}
+
+func SaveKindleConfigTo(path string, cfg zlib.KindleConfig) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}

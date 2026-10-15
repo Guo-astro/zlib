@@ -23,7 +23,7 @@ var kindleAllowedTypes = []string{".epub", ".pdf", ".txt", ".doc", ".docx", ".ht
 
 var kindleCmd = &cobra.Command{
 	Use:   "kindle",
-	Short: "Kindle delivery",
+	Short: "Set up Kindle delivery",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadKindleConfig()
 		if err != nil && !os.IsNotExist(err) {

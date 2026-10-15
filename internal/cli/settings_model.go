@@ -2,20 +2,33 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
 	keys "charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	zlib "github.com/heartleo/zlib"
+	"github.com/heartleo/zlib/internal/config"
 )
+
+const (
+	kindleToKey   = "KINDLE_TO"
+	kindleFromKey = "KINDLE_FROM"
+	kindleHostKey = "KINDLE_SMTP_HOST"
+	kindlePortKey = "KINDLE_SMTP_PORT"
+)
+
+var kindleSettingKeys = []string{kindleToKey, kindleFromKey, kindleHostKey, kindlePortKey}
 
 type settingsProbeMsg struct {
 	generation int
@@ -24,6 +37,7 @@ type settingsProbeMsg struct {
 type settingsModel struct {
 	store          settingsStore
 	values         []settingValue
+	kindle         zlib.KindleConfig
 	page           string
 	cursor         int
 	width, height  int
@@ -42,6 +56,8 @@ type settingsModel struct {
 	discardFocused bool
 	editAction     int
 	original       string
+	returnPage     string
+	returnCursor   int
 }
 
 func newSettingsModel(ctx context.Context, store settingsStore, page string) (settingsModel, error) {
@@ -49,6 +65,11 @@ func newSettingsModel(ctx context.Context, store settingsStore, page string) (se
 	if err != nil {
 		return settingsModel{}, err
 	}
+	kindle, err := config.LoadKindleConfigFrom(store.kindle)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return settingsModel{}, err
+	}
+	values = append(values, kindleSettingValues(kindle)...)
 	input := textinput.New()
 	input.Prompt = ""
 	input.SetWidth(48)
@@ -56,7 +77,39 @@ func newSettingsModel(ctx context.Context, store settingsStore, page string) (se
 	styles.Focused.Text = lipgloss.NewStyle().Foreground(currentTheme.Title)
 	styles.Cursor.Color = currentTheme.Accent
 	input.SetStyles(styles)
-	return settingsModel{store: store, values: values, page: page, input: input, ctx: ctx, width: 80, height: 24}, nil
+	return settingsModel{store: store, values: values, kindle: kindle, page: page, input: input, ctx: ctx, width: 80, height: 24}, nil
+}
+
+func kindleSettingValues(cfg zlib.KindleConfig) []settingValue {
+	values := []settingValue{
+		{Key: kindleToKey, Value: cfg.To, Saved: cfg.To},
+		{Key: kindleFromKey, Value: cfg.From, Saved: cfg.From},
+		{Key: kindleHostKey, Value: cfg.SMTPHost, Saved: cfg.SMTPHost},
+		{Key: kindlePortKey, Saved: strconv.Itoa(cfg.SMTPPort)},
+	}
+	if cfg.SMTPPort > 0 {
+		values[3].Value = strconv.Itoa(cfg.SMTPPort)
+	} else {
+		values[3].Value, values[3].Saved = strconv.Itoa(defaultKindleSMTPPort), ""
+	}
+	if cfg.SMTPHost == "" {
+		values[2].Value = defaultKindleSMTPHost
+	}
+	for i := range values {
+		values[i].Source = "Kindle configuration"
+		if values[i].Saved == "" {
+			values[i].Source = "Default"
+		}
+	}
+	return values
+}
+
+func isKindleSetting(key string) bool {
+	switch key {
+	case kindleToKey, kindleFromKey, kindleHostKey, kindlePortKey:
+		return true
+	}
+	return false
 }
 
 func (m settingsModel) Init() tea.Cmd { return nil }
@@ -74,16 +127,20 @@ func (m settingsModel) rows() []string {
 		return []string{"Domain", "Proxy URL"}
 	case "download":
 		return []string{"Default directory", "Download retries"}
+	case "kindle":
+		return []string{"Kindle address", "From address", "SMTP host", "SMTP port"}
 	case "domain":
 		return m.domains
 	case "browse":
 		return append([]string{".."}, m.directories...)
 	default:
-		return []string{"Network", "Downloads"}
+		return []string{"Domain", "Proxy URL", "Default directory", "Download retries", "Kindle address", "From address", "SMTP host", "SMTP port"}
 	}
 }
 
 func (m *settingsModel) edit(key string) tea.Cmd {
+	m.returnPage = m.page
+	m.returnCursor = m.cursor
 	m.key = key
 	m.page = "edit"
 	m.message = ""
@@ -91,7 +148,7 @@ func (m *settingsModel) edit(key string) tea.Cmd {
 	m.editAction = 0
 	v := m.value(key)
 	value := v.Value
-	if v.Source == "Default" || (key == zlib.EnvDomain && v.Source == "Saved session") {
+	if (v.Source == "Default" && !isKindleSetting(key)) || (key == zlib.EnvDomain && v.Source == "Saved session") {
 		value = v.Saved
 	}
 	m.original = value
@@ -117,13 +174,17 @@ func (m *settingsModel) back() {
 	m.message = ""
 	switch m.page {
 	case "domain":
-		m.page = "network"
-	case "edit":
-		if m.key == zlib.EnvProxy {
+		m.page = m.returnPage
+		if m.page == "" {
 			m.page = "network"
-		} else {
-			m.page = "download"
 		}
+		m.cursor = m.returnCursor
+	case "edit":
+		m.page = m.returnPage
+		if m.page == "" {
+			m.page = "home"
+		}
+		m.cursor = m.returnCursor
 	case "browse":
 		m.page = "edit"
 		m.editAction = 0
@@ -177,6 +238,10 @@ func (m *settingsModel) effectiveProxy() string {
 }
 
 func (m *settingsModel) save(value string) {
+	if isKindleSetting(m.key) {
+		m.saveKindle(value)
+		return
+	}
 	if err := m.store.save(m.key, value); err != nil {
 		m.message = "Could not save: " + err.Error()
 		return
@@ -186,7 +251,7 @@ func (m *settingsModel) save(value string) {
 		m.message = "Saved; could not reload settings: " + err.Error()
 		return
 	}
-	m.values = values
+	m.values = append(values, kindleSettingValues(m.kindle)...)
 	v := m.value(m.key)
 	// Update only this process's derived settings. Preserve explicit overrides.
 	if v.Override != "" {
@@ -197,11 +262,53 @@ func (m *settingsModel) save(value string) {
 		_ = os.Unsetenv(m.key)
 	}
 	m.back()
-	m.message = "Saved to " + tildePath(m.store.global)
+	m.message = "Saved"
 	if v.Override != "" {
 		m.message = "Saved globally; overridden by " + v.Override
 	}
 	m.domains = nil
+}
+
+func (m *settingsModel) saveKindle(value string) {
+	if strings.ContainsAny(value, "\r\n\x00") {
+		m.message = "Enter a single-line value"
+		return
+	}
+	value = strings.TrimSpace(value)
+	cfg := m.kindle
+	switch m.key {
+	case kindleToKey:
+		cfg.To = value
+	case kindleFromKey:
+		cfg.From = value
+	case kindleHostKey:
+		cfg.SMTPHost = value
+	case kindlePortKey:
+		if value == "" {
+			cfg.SMTPPort = 0
+		} else {
+			port, err := strconv.Atoi(value)
+			if err != nil || port < 1 || port > 65535 {
+				m.message = "Enter a port from 1 to 65535"
+				return
+			}
+			cfg.SMTPPort = port
+		}
+	}
+	if cfg.SMTPHost == "" {
+		cfg.SMTPHost = defaultKindleSMTPHost
+	}
+	if cfg.SMTPPort == 0 {
+		cfg.SMTPPort = defaultKindleSMTPPort
+	}
+	if err := config.SaveKindleConfigTo(m.store.kindle, cfg); err != nil {
+		m.message = "Could not save: " + err.Error()
+		return
+	}
+	m.kindle = cfg
+	m.values = append(m.values[:4], kindleSettingValues(cfg)...)
+	m.back()
+	m.message = "Saved"
 }
 
 func (m *settingsModel) browse(path string) {
@@ -295,7 +402,7 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					delta = -1
 				}
 				m.editAction = (m.editAction + delta + 5) % 5
-				if m.key == zlib.EnvRetries && m.editAction == 1 {
+				if m.key != downloadDirEnvVar && m.key != zlib.EnvProxy && m.editAction == 1 {
 					m.editAction = (m.editAction + delta + 5) % 5
 				}
 				if m.editAction == 0 {
@@ -386,9 +493,9 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		rows := m.rows()
 		count := len(rows)
 		switch k {
-		case "up", "k":
+		case "up", "k", "shift+tab":
 			m.cursor = max(0, m.cursor-1)
-		case "down", "j":
+		case "down", "j", "tab":
 			m.cursor = min(max(0, count-1), m.cursor+1)
 		case "home":
 			m.cursor = 0
@@ -411,14 +518,26 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			switch m.page {
 			case "home":
-				if m.cursor == 0 {
-					m.page = "network"
-				} else {
-					m.page = "download"
+				switch m.cursor {
+				case 0:
+					m.returnPage = "home"
+					m.returnCursor = m.cursor
+					m.page = "domain"
+					m.cursor = 0
+					return m, m.probe(m.effectiveProxy(), "domain")
+				case 1:
+					return m, m.edit(zlib.EnvProxy)
+				case 2:
+					return m, m.edit(downloadDirEnvVar)
+				case 3:
+					return m, m.edit(zlib.EnvRetries)
+				default:
+					return m, m.edit(kindleSettingKeys[m.cursor-4])
 				}
-				m.cursor = 0
 			case "network":
 				if m.cursor == 0 {
+					m.returnPage = "network"
+					m.returnCursor = m.cursor
 					m.page = "domain"
 					m.cursor = 0
 					return m, m.probe(m.effectiveProxy(), "domain")
@@ -429,6 +548,8 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.edit(downloadDirEnvVar)
 				}
 				return m, m.edit(zlib.EnvRetries)
+			case "kindle":
+				return m, m.edit(kindleSettingKeys[m.cursor])
 			case "domain":
 				if count > 0 {
 					m.key = zlib.EnvDomain
@@ -450,21 +571,130 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m settingsModel) settingRows(width, available int) []string {
+	labels := m.rows()
+	start := 0
+	switch m.page {
+	case "download":
+		start = 2
+	case "kindle":
+		start = 4
+	}
+	labelWidth := min(18, max(12, width-14))
+	valueWidth := max(1, width-labelWidth-4)
+	section := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
+	lines := make([]string, 0, len(labels)+5)
+	selected := 0
+	for i, label := range labels {
+		if m.page == "home" && (i == 0 || i == 2 || i == 4) {
+			if i > 0 {
+				lines = append(lines, "")
+			}
+			group := []string{"NETWORK", "DOWNLOADS", "KINDLE"}[i/2]
+			lines = append(lines, section.Render("  "+group))
+		}
+		v := m.values[start+i]
+		value := displaySetting(v.Key, v.Value)
+		if value == "" {
+			if v.Key == kindleToKey || v.Key == kindleFromKey {
+				value = "Add address"
+			} else {
+				value = "Automatic"
+			}
+		}
+		name := ansi.Truncate(label, labelWidth, "…")
+		row := name + strings.Repeat(" ", max(0, labelWidth-ansi.StringWidth(name))+2)
+		row += ansi.Truncate(value, valueWidth, "…")
+		if i == m.cursor {
+			selected = len(lines)
+		}
+		lines = append(lines, styledListRow(row, i == m.cursor, width, currentTheme))
+	}
+	if len(lines) <= available {
+		return lines
+	}
+	from := max(0, selected-available+1)
+	return lines[from:min(len(lines), from+available)]
+}
+
+func (m settingsModel) selectedSetting() settingValue {
+	index := m.cursor
+	switch m.page {
+	case "download":
+		index += 2
+	case "kindle":
+		index += 4
+	}
+	if index >= 0 && index < len(m.values) {
+		return m.values[index]
+	}
+	return settingValue{}
+}
+
+func (m settingsModel) settingsListView(width, height int, title string) tea.View {
+	if height < 7 {
+		return fullScreenView(width, height, title+"\nEnlarge terminal")
+	}
+	helpModel := help.New()
+	helpModel.SetWidth(width)
+	helpModel.Styles.ShortKey = lipgloss.NewStyle().Foreground(currentTheme.Accent)
+	helpModel.Styles.ShortDesc = lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	footer := helpModel.ShortHelpView([]keys.Binding{uiKey("esc", "back"), uiKey("enter", "edit"), uiKey("↑/↓", "select")})
+	lines := []string{lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true).Render(title), ""}
+	reserved := 1
+	if m.message != "" || m.selectedSetting().Override != "" {
+		reserved = 2
+	}
+	lines = append(lines, m.settingRows(width, max(1, height-3-reserved))...)
+	if m.message != "" {
+		lines = append(lines, lipgloss.NewStyle().Foreground(currentTheme.Muted).Render(m.message))
+	} else if override := m.selectedSetting().Override; override != "" {
+		lines = append(lines, lipgloss.NewStyle().Foreground(currentTheme.Muted).Render("Using "+override))
+	}
+	lines = append(lines, "", footer)
+	return fullScreenView(width, height, strings.Join(lines, "\n"))
+}
+
+func settingsCompactView(width, height int, title, subtitle string, lines []string, status string, controls []keys.Binding) tea.View {
+	if height < 7 {
+		return fullScreenView(width, height, title+"\nEnlarge terminal")
+	}
+	helpModel := help.New()
+	helpModel.SetWidth(width)
+	helpModel.Styles.ShortKey = lipgloss.NewStyle().Foreground(currentTheme.Accent)
+	helpModel.Styles.ShortDesc = lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	content := []string{lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true).Render(title)}
+	if subtitle != "" {
+		content = append(content, lipgloss.NewStyle().Foreground(currentTheme.Muted).Render(subtitle))
+	}
+	content = append(content, "")
+	content = append(content, lines...)
+	if status != "" {
+		content = append(content, "", lipgloss.NewStyle().Foreground(currentTheme.Muted).Render(status))
+	}
+	content = append(content, "", helpModel.ShortHelpView(controls))
+	return fullScreenView(width, height, strings.Join(content, "\n"))
+}
+
 func (m settingsModel) View() tea.View {
 	w, h := max(1, m.width), max(1, m.height)
-	titles := map[string]string{"home": "Settings", "network": "Settings / Network", "download": "Settings / Downloads", "domain": "Settings / Domain", "browse": "Settings / Choose directory", "edit": "Settings / Edit"}
+	titles := map[string]string{"home": "Settings", "network": "Settings / Network", "download": "Settings / Downloads", "kindle": "Settings / Kindle", "domain": "Settings / Domain", "browse": "Settings / Choose directory", "edit": "Settings / Edit"}
 	subtitle := ""
 	status := m.message
-	if status == "" {
-		status = "Saved to: " + tildePath(m.store.global)
-	}
 	controls := []keys.Binding{uiKey("esc", "back"), uiKey("enter", "open"), uiKey("↑/↓", "select"), uiKey("q", "quit")}
 	var lines []string
-	if m.page == "edit" {
+	if m.page == "home" || m.page == "network" || m.page == "download" || m.page == "kindle" {
+		return m.settingsListView(w, h, titles[m.page])
+	} else if m.page == "edit" {
 		v := m.value(m.key)
-		labels := map[string]string{zlib.EnvProxy: "Proxy URL", downloadDirEnvVar: "Download directory", zlib.EnvRetries: "Download retries"}
-		subtitle = "Source: " + v.Source + " · Current: " + displaySetting(m.key, v.Value)
+		labels := map[string]string{zlib.EnvProxy: "Proxy URL", downloadDirEnvVar: "Download directory", zlib.EnvRetries: "Download retries", kindleToKey: "Kindle address", kindleFromKey: "From address", kindleHostKey: "SMTP host", kindlePortKey: "SMTP port"}
+		if v.Override != "" {
+			subtitle = "Using " + v.Override
+		}
 		lines = append(lines, labels[m.key], m.input.View(), "")
+		if isKindleSetting(m.key) {
+			lines = append(lines, "SMTP password: ZLIB_SMTP_PWD", "")
+		}
 		actions := []string{"", "Reset", "Cancel", "Save"}
 		if m.key == downloadDirEnvVar {
 			actions[0] = "Browse"
@@ -546,6 +776,9 @@ func (m settingsModel) View() tea.View {
 		}
 	}
 	v := screenView(w, h, titles[m.page], subtitle, strings.Join(lines, "\n"), status, controls...)
+	if m.page == "edit" {
+		v = settingsCompactView(w, h, titles[m.page], subtitle, lines, status, controls)
+	}
 	if m.discard {
 		v.Content = confirmationDialog(v.Content, w, h, "Discard changes?", m.key, "", "Unsaved changes will be lost.", "Discard", m.discardFocused, true)
 	}

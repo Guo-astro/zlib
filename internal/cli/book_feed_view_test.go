@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -9,6 +12,321 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	zlib "github.com/heartleo/zlib"
 )
+
+func TestSearchViewportMovesOnlyAtItsEdges(t *testing.T) {
+	m := feedTestModel()
+	m.feed = nil
+	m.width, m.height = 80, 24
+	for range m.feedRows() {
+		m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	}
+	if m.listOffset != 1 {
+		t.Fatalf("offset after leaving first viewport = %d, want 1", m.listOffset)
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyUp})
+	if m.listOffset != 1 {
+		t.Fatal("moving within visible rows shifted the viewport")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyHome})
+	if m.listOffset != 0 {
+		t.Fatal("Home did not bring the first result into view")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnd})
+	if m.listOffset != len(m.books)-m.feedRows() {
+		t.Fatal("End did not reveal the last result")
+	}
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 16})
+	m = next.(searchSelectModel)
+	if m.cursor < m.listOffset || m.cursor >= m.listOffset+m.feedRows() {
+		t.Fatal("resize hid the selected result")
+	}
+}
+
+func TestSearchResultPositionAppearsOnce(t *testing.T) {
+	m := resultsModel("鬼吹灯")
+	m.books = make([]zlib.Book, 50)
+	for i := range m.books {
+		m.books[i].Name = fmt.Sprintf("Book %d", i+1)
+	}
+	m.page, m.totalPages, m.cursor = 1, 6, 4
+	for _, width := range []int{80, 40} {
+		m.width, m.height = width, 24
+		view := ansi.Strip(m.View().Content)
+		if !strings.Contains(view, "Search: 鬼吹灯  5 / 50") || strings.Count(view, "5 / 50") != 1 {
+			t.Fatalf("width %d repeats or omits the selected position", width)
+		}
+		if !strings.Contains(view, "Page 1 / 6") {
+			t.Fatalf("width %d omits server pagination", width)
+		}
+	}
+}
+
+func TestSearchListSpacingFitsTerminal(t *testing.T) {
+	m := resultsModel("books")
+	m.books = make([]zlib.Book, 50)
+	for i := range m.books {
+		m.books[i].Name = fmt.Sprintf("Book %d", i+1)
+	}
+	for _, size := range [][2]int{{80, 24}, {80, 23}, {70, 24}, {40, 24}, {30, 24}, {40, 16}, {40, 15}, {30, 14}} {
+		m.width, m.height = size[0], size[1]
+		lines := strings.Split(ansi.Strip(m.View().Content), "\n")
+		if len(lines) > m.height {
+			t.Fatalf("search list has %d lines in a %d-row terminal", len(lines), m.height)
+		}
+		header := -1
+		for i, line := range lines {
+			if strings.Contains(line, "#") && strings.Contains(line, "Title") {
+				header = i
+				break
+			}
+		}
+		if header < 1 || strings.TrimSpace(lines[header-1]) != "" {
+			t.Fatalf("search list lacks space after the selected book at %v", size)
+		}
+		if m.height >= 15 && (strings.TrimSpace(lines[len(lines)-2]) != "" || strings.TrimSpace(lines[len(lines)-3]) == "") {
+			t.Fatalf("search list lacks space before footer at %v", size)
+		}
+		if m.height == 14 && m.feedRows() != 1 {
+			t.Fatal("compact terminal lost its visible result row")
+		}
+	}
+}
+
+func TestBookListSpacingMatchesSearchAcrossPages(t *testing.T) {
+	books := make([]zlib.Book, 50)
+	history := make([]zlib.DownloadHistoryItem, 50)
+	for i := range books {
+		books[i] = zlib.Book{ID: fmt.Sprint(i + 1), Name: fmt.Sprintf("Book %d", i+1)}
+		history[i] = zlib.DownloadHistoryItem{ID: fmt.Sprint(i + 1), Name: books[i].Name}
+	}
+	pages := []struct {
+		name string
+		view func(width, height int) string
+	}{
+		{"search", func(width, height int) string {
+			m := newSearchSelectModel("example", nil, nil, false)
+			m.state, m.books, m.width, m.height = searchStateResults, books, width, height
+			return ansi.Strip(m.View().Content)
+		}},
+		{"recommended", func(width, height int) string {
+			m := newBookFeedSelectModel("Recommended", nil)
+			m.state, m.books, m.width, m.height = searchStateResults, books, width, height
+			return ansi.Strip(m.View().Content)
+		}},
+		{"most-popular", func(width, height int) string {
+			m := newBookFeedSelectModel("Most popular", nil)
+			m.state, m.books, m.width, m.height = searchStateResults, books, width, height
+			return ansi.Strip(m.View().Content)
+		}},
+		{"favorites", func(width, height int) string {
+			m := newSavedBooksSelectModel(nil)
+			m.state, m.books, m.width, m.height = searchStateResults, books, width, height
+			return ansi.Strip(m.View().Content)
+		}},
+		{"history", func(width, height int) string {
+			m := newHistorySelectModel(nil)
+			m.state, m.items, m.width, m.height = historyStateResults, history, width, height
+			return ansi.Strip(m.View().Content)
+		}},
+	}
+	for _, size := range [][2]int{{80, 24}, {80, 23}, {70, 24}, {40, 24}, {30, 24}, {40, 16}, {40, 15}, {30, 14}} {
+		for _, page := range pages {
+			lines := strings.Split(page.view(size[0], size[1]), "\n")
+			if len(lines) != size[1] {
+				t.Fatalf("%s at %v has %d rows", page.name, size, len(lines))
+			}
+			header := -1
+			for i, line := range lines {
+				if strings.Contains(line, "#") && strings.Contains(line, "Title") {
+					header = i
+					break
+				}
+			}
+			if header != 3+selectedBookCardRows(size[0], size[1]) || strings.TrimSpace(lines[header-1]) != "" {
+				t.Fatalf("%s at %v has inconsistent space above the list", page.name, size)
+			}
+			if size[1] >= 15 && strings.TrimSpace(lines[len(lines)-2]) != "" {
+				t.Fatalf("%s at %v has no space below the list", page.name, size)
+			}
+			if !strings.Contains(lines[len(lines)-1], "q") {
+				t.Fatalf("%s at %v lost its footer", page.name, size)
+			}
+		}
+	}
+}
+
+func TestSearchCardKeepsMetadataReadable(t *testing.T) {
+	book := zlib.Book{Name: "A practical book", Authors: []string{"An Author"}, Extension: "epub", Size: "4 MB", Year: "2024", Language: "English", Publisher: "Example Press", ID: "42", Hash: "abc"}
+	card := ansi.Strip(selectedBookCard(book, 40))
+	if !strings.Contains(card, "EPUB · 4 MB · 2024") || !strings.Contains(card, "English · Example Press") || !strings.Contains(card, "ID: 42:abc") {
+		t.Fatal("selected book card lost metadata")
+	}
+	if len(strings.Split(card, "\n")) != 8 {
+		t.Fatal("selected book card changed height")
+	}
+}
+
+func TestExpandedBookCardShowsPublicationDetails(t *testing.T) {
+	book := zlib.Book{
+		ID: "42", Hash: "abc", Name: "亲密关系", Authors: []string{"Author"},
+		Categories: "Self-Help, Relationships & Lifestyle - Relationships",
+		Year:       "2015", Edition: "6", Publisher: "人民邮电出版社", Language: "Chinese",
+		Pages: "540", ISBN10: "7115390576", ISBN13: "9787115390578",
+	}
+	for _, size := range [][2]int{{80, 24}, {70, 24}, {40, 24}} {
+		card := ansi.Strip(selectedBookCardBorder(book, size[0], size[1], currentTheme.Accent))
+		if got, want := len(strings.Split(card, "\n")), selectedBookCardRows(size[0], size[1]); got != want {
+			t.Fatalf("card at %v has %d lines, want %d: %q", size, got, want, card)
+		}
+		for _, value := range []string{"Categories", "2015", "6", "人民邮电出版社", "Chinese", "540", "7115390576", "9787115390578"} {
+			if !strings.Contains(card, value) {
+				t.Errorf("card at %v omits %q", size, value)
+			}
+		}
+		if strings.Contains(card, "540 pp") || (size[0] >= 78 && !strings.Contains(card, "Pages: 540")) {
+			t.Errorf("card at %v formats pages incorrectly", size)
+		}
+		for _, line := range strings.Split(card, "\n") {
+			if ansi.StringWidth(line) > size[0] {
+				t.Fatalf("card at %v exceeds terminal width", size)
+			}
+		}
+	}
+}
+
+func TestSelectedBookDetailLoadsOnlyForCurrentSelection(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		fmt.Fprint(w, `{"success":1,"book":{"id":2,"hash":"second","title":"Second","categories":"Relationships","pages":540}}`)
+	}))
+	defer server.Close()
+	c := zlib.NewClient(zlib.WithDomain(server.URL))
+	c.SetMode(zlib.ClientModeEAPI)
+	c.SetCookies(map[string]string{"remix_userid": "1", "remix_userkey": "fixture"})
+	m := newBookFeedSelectModel("Recommended", nil).withBookDetails(c)
+	m.state = searchStateResults
+	m.books = []zlib.Book{{ID: "1", Hash: "first", Name: "First"}, {ID: "2", Hash: "second", Name: "Second"}}
+	if m.queueSelectedDetail() == nil {
+		t.Fatal("first selection did not schedule its detail")
+	}
+	firstSequence := m.details.sequence
+	m.cursor = 1
+	if m.queueSelectedDetail() == nil {
+		t.Fatal("second selection did not schedule its detail")
+	}
+	next, staleCmd := m.Update(bookDetailReadyMsg{ref: "1:first", sequence: firstSequence})
+	m = next.(searchSelectModel)
+	if staleCmd != nil {
+		t.Fatal("stale selection started a detail request")
+	}
+	next, fetch := m.Update(bookDetailReadyMsg{ref: "2:second", sequence: m.details.sequence})
+	m = next.(searchSelectModel)
+	if fetch == nil {
+		t.Fatal("current selection did not fetch its detail")
+	}
+	next, _ = m.Update(fetch())
+	m = next.(searchSelectModel)
+	if requests != 1 || m.selectedBook().Categories != "Relationships" || m.selectedBook().Pages != "540" {
+		t.Fatalf("selected detail = %+v, requests = %d", m.selectedBook(), requests)
+	}
+	m.cursor = 0
+	if m.selectedBook().Categories != "" {
+		t.Fatal("detail from the old selection appeared on another book")
+	}
+}
+
+func TestSearchEmptyAndErrorOfferRecovery(t *testing.T) {
+	m := resultsModel("golang")
+	m.width, m.height = 40, 16
+	m.books = nil
+	m.inShell = true
+	view := ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "Try another title") || !strings.Contains(view, "Ctrl+F search") || !strings.Contains(view, "q back") {
+		t.Fatal("empty search has no useful next action")
+	}
+	m.err = errors.New("request timed out")
+	m.retryPage = 2
+	view = ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "Could not load page 2") || !strings.Contains(view, "Retry or change the search") {
+		t.Fatal("search error has no recovery path")
+	}
+	m = step(m, key("/"))
+	if m.state != searchStateFilter || m.err == nil || !strings.Contains(ansi.Strip(m.View().Content), "golang") {
+		t.Fatal("search error cannot open the query editor")
+	}
+	m.input.SetValue("rust")
+	m = step(m, key("enter"))
+	if m.state != searchStateLoading || m.err != nil || m.query != "rust" {
+		t.Fatal("editing after an error did not restart search")
+	}
+}
+
+func TestSearchLoadingShowsRequestedPage(t *testing.T) {
+	m := resultsModel("golang")
+	m.width, m.height = 80, 24
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyRight})
+	if m.loadingPage != 3 || !strings.Contains(ansi.Strip(m.View().Content), "Searching page 3") || !strings.Contains(ansi.Strip(m.View().Content), "Page 3 / 3") {
+		t.Fatal("loading view shows the previous page number")
+	}
+	for _, size := range [][2]int{{80, 24}, {40, 16}, {30, 14}} {
+		m.width, m.height = size[0], size[1]
+		lines := strings.Split(m.View().Content, "\n")
+		if len(lines) > size[1] || strings.Contains(ansi.Strip(m.View().Content), "╭") || !strings.Contains(ansi.Strip(m.View().Content), "Searching page 3") {
+			t.Fatalf("loading status missing, overflowing, or showing a skeleton at %v", size)
+		}
+		for _, line := range lines {
+			if ansi.StringWidth(line) > size[0] {
+				t.Fatalf("loading status too wide at %v: %q", size, line)
+			}
+		}
+	}
+}
+
+func TestSearchResultRevealStopsAndCanBeSkipped(t *testing.T) {
+	m := newSearchSelectModel("books", nil, nil, false)
+	update := func(msg tea.Msg) { next, _ := m.Update(msg); m = next.(searchSelectModel) }
+	m.width, m.height = 80, 24
+	books := make([]zlib.Book, 25)
+	for i := range books {
+		books[i] = zlib.Book{ID: fmt.Sprint(i + 1), Name: fmt.Sprintf("Book %d", i+1)}
+	}
+	update(searchResultMsg{books: books, page: 1, totalPages: 2})
+	if !m.revealing || m.revealRows != 4 || strings.Contains(ansi.Strip(m.View().Content), "Book 10") {
+		t.Fatal("search results were not revealed in stages")
+	}
+	firstSequence := m.motionSeq
+	update(searchMotionMsg{sequence: firstSequence})
+	if m.revealRows != 10 {
+		t.Fatalf("reveal after first frame = %d, want 10", m.revealRows)
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnd})
+	if m.revealing || m.cursor != 24 || !strings.Contains(ansi.Strip(m.View().Content), "Book 25") {
+		t.Fatal("keyboard navigation did not reveal the selected result immediately")
+	}
+	sequence := m.motionSeq
+	update(searchMotionMsg{sequence: firstSequence})
+	if m.motionSeq != sequence || m.cardFlash != 3 {
+		t.Fatal("stale animation frame changed the new selection")
+	}
+	for range 3 {
+		update(searchMotionMsg{sequence: sequence})
+	}
+	if m.cardFlash != 0 || m.revealing {
+		t.Fatal("selection animation did not finish")
+	}
+}
+
+func TestSearchReducedMotionShowsResultsImmediately(t *testing.T) {
+	m := newSearchSelectModel("books", nil, nil, false)
+	m.reducedMotion = true
+	m.width, m.height = 80, 24
+	next, _ := m.Update(searchResultMsg{books: []zlib.Book{{Name: "First"}, {Name: "Second"}}, page: 1, totalPages: 1})
+	m = next.(searchSelectModel)
+	if m.revealing || m.cardFlash != 0 || !strings.Contains(ansi.Strip(m.View().Content), "Second") {
+		t.Fatal("reduced motion hid results or kept an animation running")
+	}
+}
 
 func feedTestModel() searchSelectModel {
 	m := newBookFeedSelectModel("Browse recommended books", nil)
@@ -148,7 +466,6 @@ func TestSavedCardAndColumnSpacing(t *testing.T) {
 
 func TestPopularCardTracksSelection(t *testing.T) {
 	m := feedTestModel()
-	m.showBookCard = true
 	m.feedTitle = "Browse the most popular books"
 	m.width, m.height = 80, 24
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnd})
@@ -159,6 +476,24 @@ func TestPopularCardTracksSelection(t *testing.T) {
 	}
 	if len(strings.Split(view, "\n")) > m.height || !strings.Contains(view, "> 100") {
 		t.Fatal("popular list overflowed or hid selection")
+	}
+}
+
+func TestRecommendedCardTracksSelection(t *testing.T) {
+	m := feedTestModel()
+	m.width, m.height = 80, 24
+	m.books[0].Authors = []string{"First author"}
+	m.books[1].Authors = []string{"Second author"}
+	m.books[1].Extension = "epub"
+	before := ansi.Strip(m.View().Content)
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	after := ansi.Strip(m.View().Content)
+	cardEnd := strings.Index(after, "╰")
+	if cardEnd < 0 || !strings.Contains(after[:cardEnd], "Second author") || !strings.Contains(after[:cardEnd], "EPUB") || strings.Contains(after[:cardEnd], "First author") {
+		t.Fatal("recommended card did not track selection")
+	}
+	if strings.Count(before[:strings.Index(before, "╰")], "\n") != strings.Count(after[:cardEnd], "\n") {
+		t.Fatal("recommended card height changed on selection")
 	}
 }
 

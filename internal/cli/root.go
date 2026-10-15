@@ -3,6 +3,7 @@ package cli
 import (
 	"charm.land/lipgloss/v2"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/url"
@@ -18,7 +19,7 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:               "zlib",
-	Short:             "A terminal client for Z-Library.",
+	Short:             "Search and download Z-Library books",
 	Version:           zlib.Version,
 	SilenceUsage:      true,
 	SilenceErrors:     true,
@@ -27,7 +28,7 @@ var rootCmd = &cobra.Command{
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Show version",
+	Short: "Show zlib version",
 	Run: func(cmd *cobra.Command, args []string) {
 		lipgloss.Fprintf(cmd.OutOrStdout(), "%s version %s\n", rootCmd.Name(), zlib.Version)
 	},
@@ -46,26 +47,32 @@ func resolveClientDomain(envDomain, sessionDomain string) string {
 
 // newClient loads session and returns an authenticated client.
 func newClient() *zlib.Client {
+	c, err := loadClient()
+	if err != nil {
+		lipgloss.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	return c
+}
+
+func loadClient() (*zlib.Client, error) {
 	session, err := config.LoadSession()
 	if err != nil || len(session.Cookies) == 0 {
-		lipgloss.Fprintln(os.Stderr, "Not logged in. Run: zlib login")
-		os.Exit(1)
+		return nil, fmt.Errorf("not logged in; use /login or zlib login")
 	}
 	c := zlib.NewClient()
 	// SetDomain before SetCookies: SetCookies seats the jar against c.domain.
 	domain := resolveClientDomain(os.Getenv(zlib.EnvDomain), session.Domain)
 	if domain == "" {
-		lipgloss.Fprintf(os.Stderr, "Domain is not configured. Set %s or run zlib login --domain URL again.\n", zlib.EnvDomain)
-		os.Exit(1)
+		return nil, fmt.Errorf("domain is not configured; use login or config")
 	}
 	allowedDomain, err := zlib.ParseAllowedDomain(domain)
 	if err != nil {
-		lipgloss.Fprintf(os.Stderr, "Invalid Z-Library domain: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("invalid domain: %w", err)
 	}
 	c.SetDomain(allowedDomain)
 	c.SetCookies(session.Cookies)
-	return c
+	return c, nil
 }
 
 func Execute() {
@@ -149,5 +156,7 @@ func init() {
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(kindleCmd)
 	rootCmd.AddCommand(themeCmd)
+	rootCmd.AddCommand(tuiCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(updateCmd)
 }

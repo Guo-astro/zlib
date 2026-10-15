@@ -28,6 +28,12 @@ type eapiBook struct {
 	Publisher      string `json:"publisher"`
 	Identifier     any    `json:"identifier"`
 	ISBN           any    `json:"isbn"`
+	ISBN10         any    `json:"isbn10"`
+	ISBN13         any    `json:"isbn13"`
+	Categories     any    `json:"categories"`
+	Category       any    `json:"category"`
+	Edition        any    `json:"edition"`
+	Pages          any    `json:"pages"`
 	Language       string `json:"language"`
 	Cover          string `json:"cover"`
 	Extension      string `json:"extension"`
@@ -246,6 +252,8 @@ func (c *Client) mapEAPIBook(item eapiBook) Book {
 		ID:          id,
 		Hash:        item.Hash,
 		ISBN:        isbn,
+		ISBN10:      normalizeISBN(eapiString(item.ISBN10)),
+		ISBN13:      normalizeISBN(eapiString(item.ISBN13)),
 		URL:         absolutizeURL(c.domain, item.Href),
 		Cover:       item.Cover,
 		Name:        item.Title,
@@ -257,6 +265,34 @@ func (c *Client) mapEAPIBook(item eapiBook) Book {
 		Rating:      eapiString(item.InterestScore),
 		Quality:     eapiString(item.QualityScore),
 		Description: item.Description,
+		Categories:  eapiCategoryText(item.Categories),
+		Edition:     eapiString(item.Edition),
+		Pages:       eapiString(item.Pages),
+	}
+	if book.Categories == "" {
+		book.Categories = eapiCategoryText(item.Category)
+	}
+	if !validISBN10(book.ISBN10) {
+		book.ISBN10 = ""
+	}
+	if !validISBN13(book.ISBN13) {
+		book.ISBN13 = ""
+	}
+	for _, value := range []string{eapiString(item.Identifier), eapiString(item.ISBN)} {
+		if normalized := normalizeISBN(value); validISBN10(normalized) && book.ISBN10 == "" {
+			book.ISBN10 = normalized
+		} else if validISBN13(normalized) && book.ISBN13 == "" {
+			book.ISBN13 = normalized
+		}
+	}
+	if book.ISBN10 == "" && strings.HasPrefix(book.ISBN13, "978") && validISBN13(book.ISBN13) {
+		book.ISBN10 = isbn10FromCore(book.ISBN13[3:12])
+	}
+	if book.ISBN13 == "" && validISBN10(book.ISBN10) {
+		book.ISBN13 = isbn13FromCore("978" + book.ISBN10[:9])
+	}
+	if book.Pages == "0" {
+		book.Pages = ""
 	}
 	if id != "" && item.Hash != "" {
 		book.DownloadURL = c.domain + "/eapi/book/" + url.PathEscape(id) + "/" + url.PathEscape(item.Hash) + "/file"
@@ -267,6 +303,96 @@ func (c *Client) mapEAPIBook(item eapiBook) Book {
 		book.Authors = []string{item.Author}
 	}
 	return book
+}
+
+func normalizeISBN(value string) string {
+	return strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(value, "-", ""), " ", ""))
+}
+
+func validISBN10(value string) bool {
+	if len(value) != 10 {
+		return false
+	}
+	sum := 0
+	for i := range 9 {
+		if value[i] < '0' || value[i] > '9' {
+			return false
+		}
+		sum += int(value[i]-'0') * (10 - i)
+	}
+	check := value[9]
+	if check == 'X' {
+		sum += 10
+	} else if check >= '0' && check <= '9' {
+		sum += int(check - '0')
+	} else {
+		return false
+	}
+	return sum%11 == 0
+}
+
+func validISBN13(value string) bool {
+	if len(value) != 13 {
+		return false
+	}
+	sum := 0
+	for i := range 13 {
+		if value[i] < '0' || value[i] > '9' {
+			return false
+		}
+		weight := 1
+		if i%2 == 1 {
+			weight = 3
+		}
+		sum += int(value[i]-'0') * weight
+	}
+	return sum%10 == 0
+}
+
+func isbn10FromCore(core string) string {
+	sum := 0
+	for i := range 9 {
+		sum += int(core[i]-'0') * (10 - i)
+	}
+	check := (11 - sum%11) % 11
+	if check == 10 {
+		return core + "X"
+	}
+	return core + strconv.Itoa(check)
+}
+
+func isbn13FromCore(core string) string {
+	sum := 0
+	for i := range 12 {
+		weight := 1
+		if i%2 == 1 {
+			weight = 3
+		}
+		sum += int(core[i]-'0') * weight
+	}
+	return core + strconv.Itoa((10-sum%10)%10)
+}
+
+func eapiCategoryText(value any) string {
+	switch value := value.(type) {
+	case string:
+		return value
+	case []any:
+		parts := make([]string, 0, len(value))
+		for _, entry := range value {
+			if name := eapiCategoryText(entry); name != "" {
+				parts = append(parts, name)
+			}
+		}
+		return strings.Join(parts, ", ")
+	case map[string]any:
+		for _, key := range []string{"name", "title", "path"} {
+			if name := eapiCategoryText(value[key]); name != "" {
+				return name
+			}
+		}
+	}
+	return ""
 }
 
 func decodeEAPIJSON(body []byte, target any) error {

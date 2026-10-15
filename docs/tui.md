@@ -1,22 +1,106 @@
 # Terminal interface
 
-Interactive commands use a full-screen list with a title, selection, details and
-keyboard hints. Output redirected to a file or pipe keeps the command's text or
-JSON format.
+Run `zlib tui` in a terminal for a persistent shell. Type a book title to search, or
+type `/` for commands. Tab completes the selected command; Enter runs it, even
+when you've typed only part of its name (for example, `/th` selects `/theme`).
+`/quit` exits. The shell keeps the current book list and selection when you return from
+a download, theme, settings or Kindle screen.
+
+The signed-in start screen shows a five-row ZLIB wordmark with theme colors
+for each letter. Its build version sits below the right edge of the logo; long
+development versions are shortened there and remain available through
+`zlib version`. The logo has no decorative side strokes.
+With at least 16 content rows, one blank row separates the wordmark and version,
+and two separate the version and command hints. Compact layouts reduce these
+gaps. Command columns have a four-cell gutter; single-column hints fit their content.
+It does not display the current directory or a persistent sign-in label. At 76
+columns or wider, command hints use two columns; smaller terminals use one.
+The hints show commands to type in the input; typing `/` opens the selectable
+command menu. When signed out, the start screen shows a single login action
+with its sign-in method. Press Enter to open the login form; `/` remains
+available for settings and domain checks.
+A successful login returns to the start
+screen; if you tried a protected command first, its draft stays in the input so
+you can press Enter to continue. Login errors stay on the form for another try.
+The TUI login form accepts email and password. To import a Cookie file, use
+`zlib login --cookies <file> --domain <domain>` outside the TUI.
+`/logout` asks for confirmation, clears the saved session and account pages, then
+returns to the signed-out start screen. Press Enter there to sign in again. If
+session removal fails, the current account screen stays open with an error.
+
+The command menu appears when you type `/`; it shows up to six matches with short
+descriptions and no count heading. ↑/↓ cycles through the matches, including from
+last to first.
+The menu scrolls only when the selection leaves its visible rows. Type more
+characters to narrow the list.
+Ctrl+K opens the menu without discarding an unfinished search; Esc restores the
+search text.
+
+Direct commands such as `zlib search` and `zlib history --json` still work.
+Bare `zlib` prints command help. `zlib tui` requires an interactive terminal.
+
+The shell accepts `/search`, `/favorites`, `/recommended`, `/most-popular`,
+`/history`, `/login`, `/logout`, `/profile`, `/doctor`,
+`/config`, `/config network`, `/config download`, `/config kindle`, `/theme`, `/kindle`,
+`/kindle config`, `/kindle send <file>` and `/quit`. Use `zlib version`
+outside the TUI to check the installed version.
+For automation, use direct commands and their flags, including `--json`.
+To download a selected book in the TUI, press Enter on its list row. To download
+by `id:hash` directly, use `zlib download "id:hash"` outside the TUI.
+The search list keeps its scroll position while you move within visible rows.
+If a search returns nothing or fails, edit the query with Ctrl+F, or retry a
+failed request with r.
+Search shows a spinner and the requested page while it fetches books, then reveals the results.
+The position bar follows the selected book.
+Search loads up to 50 books per server page, matching the direct `search` command.
+The number of visible rows follows the terminal height; scroll within a page with
+↑/↓ or PgUp/PgDn and change server pages with ←/→.
+
+## Book list spacing
+
+Search, Favorites, Recommended, Most popular, and History share one list layout:
+
+- Put the title and status above the selected-book card. At 78 columns or wider
+  with at least 20 page rows, the card uses 11 rows. From 30 to 77 columns it
+  uses 13 rows when the page has at least 24 rows. Otherwise it uses 8 rows.
+- The expanded card shows category, year, edition, publisher, language, pages,
+  and ISBN 10/13 when available. Missing EAPI fields are left blank. Valid
+  ISBN 10 and `978` ISBN 13 values can supply each other's equivalent.
+- Leave one empty row between the card and the column header.
+- At a page height of 15 rows or more, leave one empty row between the list area
+  and the bottom controls.
+- At a page height of 14 rows, omit the bottom gap to keep a book visible. Below
+  14 rows or narrower than 30 columns, show the enlarge-terminal prompt.
+
+Calculate visible book rows from the page height. The shell reserves space for
+its footer and, while typing a command, its input. Keep `feedRows()` and
+`feedViewWith()` in sync so scrolling, selection, and rendering agree. Use
+`fullScreenView()` to fill any remaining terminal space. The cross-page layout
+test is `TestBookListSpacingMatchesSearchAcrossPages`.
+
+The selected book's EAPI details load after the selection settles. Results are
+cached by `id:hash`; moving to another book keeps an older response from
+replacing its card. The list response remains visible while details load.
+History uses the same `#`, `Title`, and `Author` columns as the other book lists.
+The selected entry's download date appears beside the page status. Its card uses
+the book's author and metadata when EAPI provides them; moving within visible
+history rows keeps the list viewport still.
 
 ## Controls
 
 | Screen | Controls |
 | --- | --- |
+| Shell command input | `/` opens commands from a list; ↑/↓ cycles; Ctrl+K also opens it; Tab completes; Esc closes; pasted text needs Enter to run |
+| Profile, doctor | Full-screen result; ↑/↓ or PgUp/PgDn scrolls long output; Esc returns |
 | Book lists | ↑/↓ or j/k select; PgUp/PgDn scroll; Home/End jump; Enter opens download confirmation; q or Esc exits |
-| Search, saved books, history | ←/→ changes page; `/` edits the query in search |
+| Search, saved books, history | ←/→ changes page; Ctrl+F edits the query in shell search; `/` edits it in direct `zlib search` |
 | Failed list request | r retries the failed page; Esc closes |
 | Login, search options, Kindle settings | Enter edits a field; Enter applies an edit; Tab advances; choose the final action or press Ctrl+S to submit; Esc cancels |
-| Format selection | Space toggles; Enter returns; no selected formats means all formats |
-| Config | Enter opens or saves; Tab selects editor actions; Esc returns; q exits lists |
+| Format selection | Huh checkbox list: ↑/↓ moves; Space toggles; Ctrl+A selects all or clears all; Enter continues; no selected formats means all formats |
+| Config | Network, download and Kindle settings appear in one compact list; arrows or Tab select a field; Enter opens it; Esc returns; Tab selects editor actions |
 | File picker | Enter opens a folder or selects a file; ← goes to the parent; `/` accepts a directory path; Esc exits |
 | Download directory | Skip uses the displayed directory; Change directory applies only to this download; Ctrl+B browses folders |
-| Theme | ↑/↓ previews; Enter saves; Esc cancels |
+| Theme | Type to filter; ↑/↓ previews; Enter saves; Esc clears the filter, then closes |
 | Confirmation | Cancel is selected initially; ←/→ or Tab changes the action; Enter confirms |
 | Download progress | Esc or Ctrl+C cancels the transfer |
 
@@ -27,13 +111,14 @@ may still be delivered.
 ## Implementation references
 
 Crush revision: `b7b5522585e7302d2ee19b1a74a7003ac29ea562`.
-The implementation uses Bubbles v2 and Lip Gloss v2, with interaction patterns
+The implementation uses Bubbles v2, Huh v2 and Lip Gloss v2, with interaction patterns
 from Crush's `internal/ui/dialog/models.go`, `filepicker.go`, `inline_editor.go`,
 `dialog.go`, `internal/ui/list/list.go` and `internal/ui/model/status.go`.
 Crush internal packages are not imported or copied.
 
-- `tui_layout.go`: bounded screen layout, selected rows and Bubbles help.
-- `tui_form.go`: field lists, masked text input, validation and format selection.
+- `tui_layout.go`: terminal-sized screen layout, selected rows and Bubbles help.
+- `tui_form.go`, `tui_inline_form.go`: field lists, masked text input, validation
+  and Huh format checkboxes in the inline search form.
 - `tui_filepicker.go`: Bubbles file picker, path input and send confirmation.
 - `book_feed_view.go`: shared book list for search, recommendations, popular,
   favorites and history.

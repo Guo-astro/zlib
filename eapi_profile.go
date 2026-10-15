@@ -126,6 +126,7 @@ func (c *Client) downloadHistoryEAPI(page int) (DownloadHistoryResult, error) {
 			ID:          book.ID,
 			Hash:        book.Hash,
 			Name:        book.Name,
+			Authors:     book.Authors,
 			URL:         book.URL,
 			DownloadURL: book.DownloadURL,
 			Extension:   book.Extension,

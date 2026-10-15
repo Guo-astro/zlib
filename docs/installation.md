@@ -73,12 +73,20 @@ and `go vet ./...`.
 
 ```sh
 zlib version
-zlib --help
+zlib update
 ```
 
-Upgrade using the method you installed with: `brew upgrade heartleo/tap/zlib`,
-`winget upgrade --id heartleo.zlib --exact`, or rerun the install script / Go install
-command. For a manual install, replace the executable with a newer release.
+`zlib update` uses Homebrew, winget or Go when it can identify that installation.
+For a standalone binary, it downloads the latest GitHub release for the current
+OS and architecture, verifies the release checksum, then replaces the executable.
+The previous executable remains next to it as `zlib.previous` (or
+`zlib.exe.previous` on Windows). Restart zlib after updating. A source build with
+an unrecognized version must be rebuilt or replaced with a release.
+
+If the update cannot identify your package manager, use its normal upgrade
+command: `brew upgrade heartleo/tap/zlib`,
+`winget upgrade --id heartleo.zlib --exact`, or
+`go install github.com/heartleo/zlib/cmd/zlib@latest`.
 
 If a command in these docs is missing, check your installed version. Docs on a
 development branch may describe changes that have not reached a release yet;

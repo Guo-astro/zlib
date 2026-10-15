@@ -49,7 +49,7 @@ python3 -m http.server 8000 --directory site
 ## Notes
 
 - Colors are Catppuccin Latte (light) and Mocha (dark), the same two
-  palettes the CLI ships as `zlib theme latte|mocha`, so the site and the
+  palettes the CLI ships as `catppuccin-latte` and `catppuccin-mocha`, so the site and the
   tool match. Terminal blocks stay Mocha in both modes.
 - The hero is a replica of the `zlib search` picker. Key handling mirrors
   `internal/cli/search_interactive.go`: `↑/↓` `j/k` select, `←/→` `h/l`

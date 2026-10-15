@@ -14,7 +14,7 @@ func TestFetchBookEAPI(t *testing.T) {
 		if r.URL.Path != "/eapi/book/42/abc123" {
 			t.Fatalf("path = %q", r.URL.Path)
 		}
-		fmt.Fprint(w, `{"success":1,"book":{"id":42,"hash":"abc123","title":"Detail Book","author":"Author","extension":"epub"}}`)
+		fmt.Fprint(w, `{"success":1,"book":{"id":42,"hash":"abc123","title":"Detail Book","author":"Author","extension":"epub","categories":"Self-Help, Relationships & Lifestyle - Relationships","year":2015,"edition":6,"publisher":"人民邮电出版社","language":"Chinese","pages":540,"isbn10":"7115390576","isbn13":"9787115390578"}}`)
 	}))
 	defer server.Close()
 
@@ -24,6 +24,28 @@ func TestFetchBookEAPI(t *testing.T) {
 	}
 	if book.Name != "Detail Book" || book.DownloadURL != server.URL+"/eapi/book/42/abc123/file" {
 		t.Errorf("FetchBook() = %+v", book)
+	}
+	if book.Categories != "Self-Help, Relationships & Lifestyle - Relationships" || book.Year != "2015" || book.Edition != "6" || book.Publisher != "人民邮电出版社" || book.Language != "Chinese" || book.Pages != "540" || book.ISBN10 != "7115390576" || book.ISBN13 != "9787115390578" {
+		t.Errorf("FetchBook() lost publication details: %+v", book)
+	}
+}
+
+func TestEAPIBookDerivesISBNPair(t *testing.T) {
+	client := NewClient(WithDomain("https://example.com"))
+	for _, tc := range []struct {
+		identifier string
+		isbn10     string
+		isbn13     string
+	}{
+		{"9787115390578", "7115390576", "9787115390578"},
+		{"978-7-115-39057-8", "7115390576", "9787115390578"},
+		{"7115390576", "7115390576", "9787115390578"},
+		{"9791234567896", "", "9791234567896"},
+	} {
+		book := client.mapEAPIBook(eapiBook{Identifier: tc.identifier})
+		if book.ISBN10 != tc.isbn10 || book.ISBN13 != tc.isbn13 {
+			t.Errorf("identifier %q: ISBN10=%q ISBN13=%q", tc.identifier, book.ISBN10, book.ISBN13)
+		}
 	}
 }
 

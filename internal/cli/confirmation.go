@@ -14,7 +14,7 @@ func confirmationDialog(background string, width, height int, title, name, id, n
 		height = 24
 	}
 	if width < 32 || height < 14 {
-		return ansi.Truncate("Enlarge window; Esc cancels", max(1, width), "…")
+		return fullScreenView(width, height, ansi.Truncate("Enlarge window; Esc cancels", max(1, width), "…")).Content
 	}
 	inner := min(52, width-6)
 	base := lipgloss.NewStyle().Foreground(currentTheme.Title).Background(currentTheme.Surface)
@@ -41,5 +41,5 @@ func confirmationDialog(background string, width, height int, title, name, id, n
 	dialog := base.Width(inner).Padding(1, 1).Border(lipgloss.RoundedBorder()).BorderForeground(currentTheme.Accent).Render(content)
 	x, y := max(0, (width-lipgloss.Width(dialog))/2), max(0, (height-lipgloss.Height(dialog))/2)
 	dim := lipgloss.NewStyle().Foreground(currentTheme.Muted).Render(ansi.Strip(background))
-	return lipgloss.NewCompositor(lipgloss.NewLayer(dim), lipgloss.NewLayer(dialog).X(x).Y(y)).Render()
+	return fullScreenView(width, height, lipgloss.NewCompositor(lipgloss.NewLayer(dim), lipgloss.NewLayer(dialog).X(x).Y(y)).Render()).Content
 }

@@ -37,6 +37,7 @@ type settingValue struct {
 
 type settingsStore struct {
 	global, local string
+	kindle        string
 	env           map[string]string
 }
 
@@ -58,7 +59,7 @@ func newSettingsStore() (settingsStore, error) {
 			}
 		}
 	}
-	return settingsStore{global: global, local: filepath.Join(wd, ".env"), env: env}, nil
+	return settingsStore{global: global, local: filepath.Join(wd, ".env"), kindle: config.KindleConfigPath(), env: env}, nil
 }
 
 func readSettingsEnv(path string) (map[string]string, error) {

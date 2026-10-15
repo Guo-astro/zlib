@@ -22,10 +22,13 @@ func TestSettingsCommandRoutesAndJSON(t *testing.T) {
 		args  []string
 		count int
 	}{
-		{[]string{"config"}, 4}, {[]string{"config", "network"}, 2},
+		{[]string{"config"}, 8}, {[]string{"config", "network"}, 2},
 		{[]string{"config", "network", "domain"}, 1}, {[]string{"config", "network", "proxy"}, 1},
 		{[]string{"config", "download"}, 2}, {[]string{"config", "download", "directory"}, 1},
 		{[]string{"config", "download", "retries"}, 1},
+		{[]string{"config", "kindle"}, 4}, {[]string{"config", "kindle", "to"}, 1},
+		{[]string{"config", "kindle", "from"}, 1}, {[]string{"config", "kindle", "host"}, 1},
+		{[]string{"config", "kindle", "port"}, 1},
 	} {
 		out, err := executeRootForTest(t, append(tc.args, "--json")...)
 		if err != nil {
@@ -94,7 +97,7 @@ func TestSettingsSaveFailureKeepsDraft(t *testing.T) {
 func testSettingsStore(t *testing.T) settingsStore {
 	t.Helper()
 	dir := t.TempDir()
-	return settingsStore{global: filepath.Join(dir, "global.env"), local: filepath.Join(dir, "local.env"), env: map[string]string{}}
+	return settingsStore{global: filepath.Join(dir, "global.env"), local: filepath.Join(dir, "local.env"), kindle: filepath.Join(dir, "kindle.json"), env: map[string]string{}}
 }
 
 func TestSettingsSaveRoundTripAndReset(t *testing.T) {
@@ -163,7 +166,7 @@ func TestSettingsSourceAndRedaction(t *testing.T) {
 }
 
 func TestSettingsNavigationCancelAndViewport(t *testing.T) {
-	for _, page := range []string{"home", "network", "download", "domain"} {
+	for _, page := range []string{"home", "network", "download", "kindle", "domain"} {
 		for _, size := range [][2]int{{80, 24}, {40, 16}, {32, 12}, {20, 5}} {
 			m, err := newSettingsModel(t.Context(), testSettingsStore(t), page)
 			if err != nil {
@@ -196,6 +199,99 @@ func TestSettingsNavigationCancelAndViewport(t *testing.T) {
 	}
 	if m.page != "download" {
 		t.Fatal("cancel did not return to parent")
+	}
+}
+
+func TestSettingsHomeShowsEveryFieldAndReturnsToSelection(t *testing.T) {
+	s := testSettingsStore(t)
+	s.env[zlib.EnvProxy] = "http://reader:secret@localhost:7890"
+	m, err := newSettingsModel(t.Context(), s, "home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, size := range [][2]int{{80, 24}, {40, 16}, {32, 12}} {
+		m.width, m.height = size[0], size[1]
+		view := ansi.Strip(m.View().Content)
+		labels := []string{"NETWORK", "Domain", "Proxy URL", "DOWNLOADS", "Default directory", "Download retries", "KINDLE", "Kindle address", "From address", "SMTP host", "SMTP port"}
+		if size[1] < 20 {
+			labels = labels[:3]
+		}
+		for _, label := range labels {
+			if !strings.Contains(view, label) {
+				t.Fatalf("%v: missing %q", size, label)
+			}
+		}
+		if strings.Contains(view, "Saved to:") || strings.Contains(view, "Source:") {
+			t.Fatal("settings overview has redundant status")
+		}
+		if strings.Contains(view, "reader") || strings.Contains(view, "secret") {
+			t.Fatal("proxy credentials visible on settings home")
+		}
+	}
+	next, _ := m.Update(key("down"))
+	m = next.(settingsModel)
+	next, _ = m.Update(key("enter"))
+	m = next.(settingsModel)
+	if m.page != "edit" || m.key != zlib.EnvProxy {
+		t.Fatal("proxy row did not open its editor")
+	}
+	next, _ = m.Update(key("esc"))
+	m = next.(settingsModel)
+	if m.page != "home" || m.cursor != 1 {
+		t.Fatal("editor did not return to the selected home row")
+	}
+	next, _ = m.Update(key("home"))
+	m = next.(settingsModel)
+	next, _ = m.Update(key("enter"))
+	m = next.(settingsModel)
+	if m.page != "domain" {
+		t.Fatal("domain row did not open the domain picker")
+	}
+	next, _ = m.Update(key("esc"))
+	m = next.(settingsModel)
+	if m.page != "home" || m.cursor != 0 {
+		t.Fatal("domain picker did not return to settings home")
+	}
+}
+
+func TestSettingsKindleSaveAndNavigation(t *testing.T) {
+	s := testSettingsStore(t)
+	m, err := newSettingsModel(t.Context(), s, "home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.cursor = 4
+	next, _ := m.Update(key("enter"))
+	m = next.(settingsModel)
+	if m.page != "edit" || m.key != kindleToKey {
+		t.Fatal("Kindle row did not open")
+	}
+	m.input.SetValue("reader@kindle.com")
+	next, _ = m.Update(key("enter"))
+	m = next.(settingsModel)
+	if m.page != "home" || m.cursor != 4 || m.value(kindleToKey).Value != "reader@kindle.com" {
+		t.Fatal("Kindle save did not return to selection")
+	}
+	data, err := os.ReadFile(s.kindle)
+	if err != nil || !strings.Contains(string(data), "reader@kindle.com") || strings.Contains(string(data), "ZLIB_SMTP_PWD") {
+		t.Fatalf("Kindle config was not saved safely: %v", err)
+	}
+	m.edit(kindlePortKey)
+	m.input.SetValue("70000")
+	next, _ = m.Update(key("enter"))
+	m = next.(settingsModel)
+	if m.page != "edit" || !strings.Contains(m.message, "1 to 65535") {
+		t.Fatal("invalid SMTP port was accepted")
+	}
+	m.input.SetValue("465")
+	next, _ = m.Update(key("enter"))
+	m = next.(settingsModel)
+	if m.value(kindlePortKey).Value != "465" {
+		t.Fatal("SMTP port not saved")
+	}
+	loaded, err := newSettingsModel(t.Context(), s, "kindle")
+	if err != nil || loaded.value(kindleToKey).Value != "reader@kindle.com" || loaded.value(kindlePortKey).Value != "465" {
+		t.Fatal("Kindle values did not reload")
 	}
 }
 

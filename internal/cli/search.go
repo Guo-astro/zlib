@@ -12,9 +12,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const defaultSearchPageSize = 50
+
 var searchCmd = &cobra.Command{
 	Use:   "search [query]",
-	Short: "Search for books",
+	Short: "Search books by title, author, or ISBN",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jsonOut, _ := cmd.Flags().GetBool("json")
 
@@ -192,7 +194,7 @@ func searchOptsFromFlags(cmd *cobra.Command) *zlib.SearchOptions {
 
 func init() {
 	searchCmd.Flags().IntP("page", "p", 1, "Page number")
-	searchCmd.Flags().IntP("count", "n", 50, "Results per page")
+	searchCmd.Flags().IntP("count", "n", defaultSearchPageSize, "Results per page")
 	addDestDirFlag(searchCmd)
 	searchCmd.Flags().Bool("send-to-kindle", false, "Send the downloaded file to Kindle.")
 	searchCmd.Flags().StringArray("ext", nil, "Filter by file extension (repeatable): epub, pdf, mobi, …")

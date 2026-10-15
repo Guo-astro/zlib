@@ -12,7 +12,7 @@ var favoritesCmd = newSavedBooksCommand("favorites")
 func newSavedBooksCommand(name string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   name,
-		Short: "Browse favorites",
+		Short: "Show saved books",
 		Args:  cobra.NoArgs,
 		RunE:  runSavedBooks,
 	}
@@ -27,7 +27,7 @@ func runSavedBooks(cmd *cobra.Command, args []string) error {
 	c := newClient()
 	jsonOut, _ := cmd.Flags().GetBool("json")
 	if !jsonOut && !cmd.Flags().Changed("page") && isInteractive() {
-		p := tea.NewProgram(newSavedBooksSelectModel(c.SavedBooks))
+		p := tea.NewProgram(newSavedBooksSelectModel(c.SavedBooks).withBookDetails(c))
 		result, err := p.Run()
 		if err != nil {
 			return err
