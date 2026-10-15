@@ -29,8 +29,7 @@ the non-interactive forms below.
 | --- | --- | --- |
 | Find books | `zlib search "query" --json --count 10` | Object with `books`, `page`, `total_pages` |
 | Filter formats | `zlib search "query" --ext epub --ext pdf --json --count 10` | Same search object |
-| Browse saved books | `zlib saved --json --page 1` | Object with `books`, `page`, `total_pages` |
-| Browse favorites | `zlib favorites --json --page 1` | Same collection as saved books |
+| Browse saved books | `zlib favorites --json --page 1` | Object with `books`, `page`, `total_pages` |
 | Recommendations | `zlib recommended --json` | Array of books |
 | Popular books | `zlib most-popular --json` | Array of books |
 | Download history | `zlib history --json --page 1` | Object with `items`, `page`, `total_pages`; empty-page exception below |

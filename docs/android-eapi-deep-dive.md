@@ -35,7 +35,7 @@
 | `booksRecentlyAdded` · `GET /eapi/book/recently` | 凭据头；`ZLibMinBookListing` | **只返回 `success=1`，没有 `books`** | 暂不应把 `recently` 当成可用书单；先确认响应契约。 |
 | `booksRecommendations` · `GET /eapi/user/book/recommended` | 凭据头；`ZLibMinBookListing` | `success=1`，100 本 | `recommended` 已接入。 |
 | `getDownloadedBooks` · `GET /eapi/user/book/downloaded` | `order,page,limit`；`ZLibTypedBooksListing` | `page=1,limit=2` 返回 2 本及分页；另取前 10 本时七个 APK 排序值各有不同 ID 顺序 | `history` 已接入；可增加排序。 |
-| `getSavedBooks` · `GET /eapi/user/book/saved` | `order,page,limit`；`ZLibTypedBooksListing` | `page=1,limit=2` 返回 2 本及分页；现有 8 本在七个 APK 排序值下各有不同 ID 顺序 | `saved` 与 `favorites` 已接入；可增加排序。 |
+| `getSavedBooks` · `GET /eapi/user/book/saved` | `order,page,limit`；`ZLibTypedBooksListing` | `page=1,limit=2` 返回 2 本及分页；现有 8 本在七个 APK 排序值下各有不同 ID 顺序 | `favorites` 已接入；可增加排序。 |
 | `userProfile` · `GET /eapi/user/profile` | 凭据头；`ZLibUserListing` | `success=1`，含账号和配额字段；响应含敏感字段，未记录其值 | `profile` 已接入；JSON 应继续省略凭证。 |
 | `getHosts` · `GET /eapi/info/domains` | 凭据头；`ZLibHostsListing` | `success=1`，`domains` 有 5 项 | `doctor` 已使用；列表不等于全球全部可用域名，需逐个探测。 |
 | `getServiceInfo` · `GET /eapi/info/service` | `ZLibServiceInfo` | `success=1`，`service` 含 `desktopApps,supportEmail` | 可作为只读 `info service`，不应与域名健康混淆。 |
@@ -103,13 +103,13 @@ Android 搜索排序弹窗把选项索引交给 `com.positron_it.zlib.ui.library
 
 ## 对当前 zlib 的命令建议
 
-优先级按已观察的服务端行为、用户价值与实现风险排序；现有 `recommended`、`most-popular`、`saved`/`favorites`、`profile`、`history`、`doctor`、`search`、`download` 已在 R 中，不重复建议造同义命令。
+优先级按已观察的服务端行为、用户价值与实现风险排序；现有 `recommended`、`most-popular`、`favorites`、`profile`、`history`、`doctor`、`search`、`download` 已在 R 中，不重复建议造同义命令。
 
 | 优先级 | 命令或改进 | 依据与具体实现边界 |
 | --- | --- | --- |
 | 1 | `search --order`，交互搜索加入排序选择 | APK 八值有调用链证据，L 已观察八种不同排列。保持默认排序不变，显式值只接受经过验证的八种；不要继续把 `date_created/date_updated` 当作 Android 排序值。 |
 | 1 | `similar <id:hash>` | `/similar` 本次返回 24 本，适合复用当前书籍列表与选择下载界面；简版图书只保证 ID/hash/标题/作者/封面。 |
-| 1 | `saved --order` / `favorites --order` / `history --order` | APK 有各自七个值，现有 EAPI 方法只有分页；L 的书籍 ID 顺序比较支持这些值确实改变结果。收藏和历史不能误用搜索排序数组。 |
+| 1 | `favorites --order` / `history --order` | APK 有各自七个值，现有 EAPI 方法只有分页；L 的书籍 ID 顺序比较支持这些值确实改变结果。收藏和历史不能误用搜索排序数组。 |
 | 2 | `info languages`、`info extensions` | L 观察到语言映射和 12 个格式，可将搜索筛选值从本地固定枚举更新为服务端列表，仍需兼容离线与缓存失效。 |
 | 2 | `info service`、`info plans` 或合并的 `info` | 三个只读端点当前返回结构化 JSON。`plans` 展示计划规则，`profile` 展示本人配额；服务信息可只展示有意义的字段。 |
 | 3 | `formats <id:hash>` 或下载前的可选格式选择 | APK 有完整模型，但六次实测均为空数组；先作为如实报告的查询能力，避免承诺可转换或可选。 |

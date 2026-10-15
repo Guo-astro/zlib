@@ -114,3 +114,71 @@ func TestSearchCardTracksSelectionAndFits(t *testing.T) {
 		}
 	}
 }
+
+func TestSavedCardAndColumnSpacing(t *testing.T) {
+	for _, width := range []int{30, 40, 80, 120} {
+		m := newSavedBooksSelectModel(func(int) (zlib.SearchResult, error) { return zlib.SearchResult{}, nil })
+		m.state = searchStateResults
+		m.width, m.height = width, 24
+		m.books = []zlib.Book{
+			{ID: "1", Name: "Short title", Authors: []string{"First author"}},
+			{ID: "2", Name: "中文书名", Authors: []string{"Second author"}},
+		}
+		m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
+		view := ansi.Strip(m.View().Content)
+		end := strings.Index(view, "╰")
+		if end < 0 || !strings.Contains(view[:end], "Second author") || strings.Contains(view[:end], "First author") {
+			t.Fatal("saved selection did not update card")
+		}
+		if len(strings.Split(view, "\n")) > m.height {
+			t.Fatal("saved view exceeds terminal height")
+		}
+		for _, line := range strings.Split(view, "\n") {
+			if ansi.StringWidth(line) > width {
+				t.Fatal("saved view exceeds terminal width")
+			}
+			if width >= 70 && strings.Contains(line, "Title") && strings.Contains(line, "Author") {
+				if !strings.Contains(line, "#   Title") || strings.Index(line, "Author") != 20 {
+					t.Fatal("short titles leave excessive column spacing")
+				}
+			}
+		}
+	}
+}
+
+func TestPopularCardTracksSelection(t *testing.T) {
+	m := feedTestModel()
+	m.showBookCard = true
+	m.feedTitle = "Browse the most popular books"
+	m.width, m.height = 80, 24
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnd})
+	view := ansi.Strip(m.View().Content)
+	end := strings.Index(view, "╰")
+	if end < 0 || !strings.Contains(view[:end], "100:abcdef") {
+		t.Fatal("popular card does not show selected book")
+	}
+	if len(strings.Split(view, "\n")) > m.height || !strings.Contains(view, "> 100") {
+		t.Fatal("popular list overflowed or hid selection")
+	}
+}
+
+func TestBookColumnsUseAvailableWidth(t *testing.T) {
+	for _, needs := range [][2]int{{5, 40}, {80, 8}, {30, 35}, {120, 100}} {
+		for width := 30; width <= 240; width++ {
+			title, detail, gap := bookColumnWidths(width, 3, needs[0], needs[1])
+			used := 2 + 3 + gap + title
+			if detail > 0 {
+				used += gap + detail
+			}
+			if used > width || title <= 0 || title > needs[0] || detail > needs[1] {
+				t.Fatalf("invalid column widths at %d: %d/%d", width, title, detail)
+			}
+			if 2+3+4+needs[0]+needs[1] <= width && (title != needs[0] || detail != needs[1]) {
+				t.Fatalf("content truncated despite sufficient space at %d", width)
+			}
+			if detail > 0 && (title < needs[0] || detail < needs[1]) && used != width {
+				t.Fatalf("unused space while truncating at %d", width)
+			}
+		}
+	}
+}

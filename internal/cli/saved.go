@@ -7,18 +7,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var savedCmd = newSavedBooksCommand("saved")
 var favoritesCmd = newSavedBooksCommand("favorites")
 
 func newSavedBooksCommand(name string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   name,
-		Short: "Browse saved books",
+		Short: "Browse favorites",
 		Args:  cobra.NoArgs,
 		RunE:  runSavedBooks,
 	}
 	cmd.Flags().IntP("page", "p", 1, "Page number")
-	cmd.Flags().Bool("json", false, "Output saved books as JSON")
+	cmd.Flags().Bool("json", false, "Output favorites as JSON")
 	addDestDirFlag(cmd)
 	cmd.Flags().Bool("send-to-kindle", false, "Send the selected download to Kindle")
 	return cmd
@@ -57,15 +56,15 @@ func runSavedBooks(cmd *cobra.Command, args []string) error {
 		return printJSON(books)
 	}
 	if len(books.Books) == 0 {
-		lipgloss.Fprintf(cmd.OutOrStdout(), "No saved books found on page %d.\n", books.Page)
+		lipgloss.Fprintf(cmd.OutOrStdout(), "No favorites found on page %d.\n", books.Page)
 		return nil
 	}
-	lipgloss.Fprintf(cmd.OutOrStdout(), "Saved books, page %d of %d\n\n", books.Page, books.TotalPages)
+	lipgloss.Fprintf(cmd.OutOrStdout(), "Favorites, page %d of %d\n\n", books.Page, books.TotalPages)
 	printBookTable(cmd.OutOrStdout(), books.Books)
 	return nil
 }
 
 func init() {
-	rootCmd.AddCommand(savedCmd)
+
 	rootCmd.AddCommand(favoritesCmd)
 }

@@ -106,7 +106,7 @@ codex plugin add zlib@zlib
 | 交互式搜索 | `zlib search` |
 | 以表格显示搜索结果 | `zlib search "dune" --ext epub` |
 | 输出 JSON | `zlib search "dune" --json --count 10` |
-| 浏览已收藏图书 | `zlib saved` 或 `zlib favorites` |
+| 浏览已收藏图书 | `zlib favorites` |
 | 浏览推荐 / 热门图书 | `zlib recommended` / `zlib most-popular` |
 | 浏览下载历史 | `zlib history` |
 | 查看账号和每日配额 | `zlib profile` |

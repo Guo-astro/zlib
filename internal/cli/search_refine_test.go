@@ -109,7 +109,7 @@ func TestSavedBooksModelPagesWithoutSearch(t *testing.T) {
 	if m.state != searchStateLoading {
 		t.Fatalf("right did not load the next page: %v", m.state)
 	}
-	if !strings.Contains(m.View().Content, "Saved books") {
+	if !strings.Contains(m.View().Content, "Favorites") {
 		t.Fatal("saved title missing")
 	}
 }

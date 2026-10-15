@@ -43,7 +43,7 @@ zlib login --cookies ./cookies.txt --domain https://z-lib.gd
 | 域名诊断 | 支持 | `GET /eapi/info/domains` |
 | profile 账号资料及下载配额 | 支持 | `GET /eapi/user/profile` |
 | history | 支持 | `GET /eapi/user/book/downloaded` |
-| 已收藏（`saved`、`favorites`） | 支持 | `GET /eapi/user/book/saved` |
+| 已收藏（`favorites`） | 支持 | `GET /eapi/user/book/saved` |
 | 图书详情 | 支持 | `GET /eapi/book/{id}/{hash}` |
 | 下载链接 | 支持 | `GET /eapi/book/{id}/{hash}/file` |
 | 下载后 Kindle 投递 | 支持 | EAPI 下载后使用本地 SMTP |

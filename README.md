@@ -106,7 +106,7 @@ The shared skills live in [`.agents/skills/`](.agents/skills) for repo-level use
 | Search with a terminal picker | `zlib search` |
 | Print search results | `zlib search "dune" --ext epub` |
 | Get results as JSON | `zlib search "dune" --json --count 10` |
-| Browse saved books | `zlib saved` or `zlib favorites` |
+| Browse saved books | `zlib favorites` |
 | Browse recommendations / popular books | `zlib recommended` / `zlib most-popular` |
 | Browse download history | `zlib history` |
 | View account and daily quota | `zlib profile` |

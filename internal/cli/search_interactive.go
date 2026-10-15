@@ -26,6 +26,7 @@ type searchSelectModel struct {
 	client          *zlib.Client
 	query           string
 	feedTitle       string
+	showBookCard    bool
 	feed            func() ([]zlib.Book, error)
 	feedPage        func(int) (zlib.SearchResult, error)
 	opts            *zlib.SearchOptions
@@ -56,7 +57,7 @@ func newBookFeedSelectModel(title string, load func() ([]zlib.Book, error)) sear
 
 func newSavedBooksSelectModel(load func(int) (zlib.SearchResult, error)) searchSelectModel {
 	m := newSearchSelectModel("", nil, nil, false)
-	m.feedTitle = "Saved books"
+	m.feedTitle = "Favorites"
 	m.feedPage = load
 	return m
 }
@@ -334,7 +335,7 @@ func (m searchSelectModel) listView() tea.View {
 	if m.totalPages > 0 {
 		status += fmt.Sprintf(" / %d", m.totalPages)
 	}
-	v := tea.NewView(m.feedViewWith("Author", "No saved books on this page.", status, "←/→ page · "))
+	v := tea.NewView(m.feedViewWith("Author", "No favorites on this page.", status, "←/→ page · "))
 	v.AltScreen = true
 	return v
 }

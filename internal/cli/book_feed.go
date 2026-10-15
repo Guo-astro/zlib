@@ -31,7 +31,9 @@ func newBookFeedCommand(name, summary string, load func(*zlib.Client) ([]zlib.Bo
 			fetch := func() ([]zlib.Book, error) { return load(c) }
 			jsonOut, _ := cmd.Flags().GetBool("json")
 			if !jsonOut && isInteractive() {
-				p := tea.NewProgram(newBookFeedSelectModel(summary, fetch))
+				model := newBookFeedSelectModel(summary, fetch)
+				model.showBookCard = name == "most-popular"
+				p := tea.NewProgram(model)
 				result, err := p.Run()
 				if err != nil {
 					return err

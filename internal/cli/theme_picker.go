@@ -90,16 +90,11 @@ func (m themePickerModel) listView(width int) string {
 	end := min(len(m.names), start+rows)
 	lines := make([]string, 0, rows)
 	for i := start; i < end; i++ {
-		label := "  " + m.names[i]
+		label := m.names[i]
 		if m.names[i] == m.current {
 			label += " (current)"
 		}
-		style := lipgloss.NewStyle().Foreground(p.Title)
-		if i == m.cursor {
-			label = "> " + label[2:]
-			style = style.Background(p.Surface).Bold(true)
-		}
-		lines = append(lines, style.Width(width).Render(ansi.Truncate(label, width, "…")))
+		lines = append(lines, styledListRow(label, i == m.cursor, width, p))
 	}
 	for len(lines) < rows {
 		lines = append(lines, strings.Repeat(" ", width))

@@ -50,13 +50,18 @@ func uiKey(key, label string) keys.Binding {
 }
 
 func selectionRow(label string, selected bool, width int) string {
-	style := lipgloss.NewStyle().Foreground(currentTheme.Title)
+	return styledListRow(bookCell(label), selected, width, currentTheme)
+}
+
+// styledListRow preserves measured column spacing; callers sanitize cell text.
+func styledListRow(label string, selected bool, width int, palette Theme) string {
+	style := lipgloss.NewStyle().Foreground(palette.Title)
 	prefix := "  "
 	if selected {
 		prefix = "> "
-		style = style.Background(currentTheme.Surface).Bold(true)
+		style = style.Background(palette.Surface).Bold(true)
 	}
-	return style.Width(max(1, width)).Render(ansi.Truncate(prefix+bookCell(label), max(1, width), "…"))
+	return style.Width(max(1, width)).Render(ansi.Truncate(prefix+label, max(1, width), "…"))
 }
 
 func listCursor(k string, cursor, count, pageSize int) int {

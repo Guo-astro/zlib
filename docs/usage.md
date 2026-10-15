@@ -54,21 +54,20 @@ local book files remain. Scripts can delete directly with
 for a machine-readable success response.
 
 ```sh
-zlib saved
 zlib favorites
 zlib recommended
 zlib most-popular
 zlib history
 ```
 
-`saved` and `favorites` show the same account collection. In the terminal picker,
+`favorites` shows your account collection. In the terminal picker,
 select with `↑/↓` and press `Enter` to download. Saved books and history support
 `←/→` pagination; recommendations and popular books are single lists.
 
 For non-interactive output, use an explicit page or JSON:
 
 ```sh
-zlib saved --page 2
+zlib favorites --page 2
 zlib favorites --json
 zlib recommended --json
 zlib most-popular --json

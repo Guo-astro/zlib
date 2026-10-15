@@ -18,7 +18,7 @@ func (m searchSelectModel) feedRows() int {
 	if height == 0 {
 		height = 24
 	}
-	if m.feed == nil && m.feedPage == nil {
+	if m.feed == nil || m.showBookCard {
 		return max(1, height-13)
 	}
 	return max(1, height-12)
@@ -57,41 +57,40 @@ func (m searchSelectModel) feedViewWith(column, empty, status, navigation string
 		return strings.Join(append(lines, empty, "", ansi.Truncate(help, width, "…")), "\n")
 	}
 	cursor := min(max(0, m.cursor), len(m.books)-1)
-	searchCard := m.feed == nil && m.feedPage == nil
-	if searchCard {
-		lines = append(lines, searchBookCard(m.books[cursor], width), "")
+	showCard := m.feed == nil || m.showBookCard
+	if showCard {
+		lines = append(lines, selectedBookCard(m.books[cursor], width), "")
 	}
 	count := m.feedRows()
 	start := max(0, cursor-count+1)
 	end := min(len(m.books), start+count)
-	// Keep titles readable on narrow terminals; authors remain in the preview.
-	authorWidth := 0
-	if width >= 70 {
-		authorWidth = min(28, width/4)
-	}
 	numberWidth := len(fmt.Sprint(len(m.books)))
-	titleWidth := width - numberWidth - 3
-	if authorWidth > 0 {
-		titleWidth -= authorWidth + 2
+	titleNeed, detailNeed := len("Title"), ansi.StringWidth(column)
+	for _, book := range m.books {
+		titleNeed = max(titleNeed, ansi.StringWidth(bookCell(book.Name)))
+		detailNeed = max(detailNeed, ansi.StringWidth(bookCell(strings.Join(book.Authors, ", "))))
 	}
+	titleWidth, authorWidth, gapWidth := bookColumnWidths(width, numberWidth, titleNeed, detailNeed)
+	gap := strings.Repeat(" ", gapWidth)
 	cell := func(s string, w int) string {
 		s = ansi.Truncate(bookCell(s), w, "…")
 		return s + strings.Repeat(" ", max(0, w-ansi.StringWidth(s)))
 	}
 	row := func(number, title, author string) string {
-		s := "  " + cell(number, numberWidth) + " " + cell(title, titleWidth)
+		s := "  " + strings.Repeat(" ", max(0, numberWidth-ansi.StringWidth(number))) + number + gap + cell(title, titleWidth)
 		if authorWidth > 0 {
-			s += "  " + cell(author, authorWidth)
+			s += gap + cell(author, authorWidth)
 		}
-		return s
+		return s + strings.Repeat(" ", max(0, width-ansi.StringWidth(s)))
 	}
 	lines = append(lines, muted.Render(row("#", "Title", column)))
 	for i := start; i < end; i++ {
 		book := m.books[i]
 		s := row(fmt.Sprint(i+1), book.Name, strings.Join(book.Authors, ", "))
 		if i == cursor {
-			s = "> " + s[2:]
-			s = lipgloss.NewStyle().Foreground(currentTheme.Title).Background(currentTheme.Surface).Bold(true).Render(s)
+			s = styledListRow(s[2:], true, width, currentTheme)
+		} else {
+			s = styledListRow(s[2:], false, width, currentTheme)
 		}
 		lines = append(lines, s)
 	}
@@ -99,7 +98,7 @@ func (m searchSelectModel) feedViewWith(column, empty, status, navigation string
 		lines = append(lines, "")
 	}
 	book := m.books[cursor]
-	if !searchCard {
+	if !showCard {
 		lines = append(lines, "")
 		preview := strings.Split(ansi.Wrap(bookCell(book.Name), width, ""), "\n")
 		for i := range 3 {
@@ -139,8 +138,30 @@ func (m searchSelectModel) feedViewWith(column, empty, status, navigation string
 	return strings.Join(lines, "\n")
 }
 
+// Measure the whole page, not the selected row, to keep columns stationary.
+// Spend spare cells on content before truncating either column.
+func bookColumnWidths(width, numberWidth, titleNeed, detailNeed int) (int, int, int) {
+	gap := 3
+	if 2+numberWidth+2*gap+titleNeed+detailNeed > width {
+		gap = 2
+	}
+	available := max(1, width-2-numberWidth-2*gap)
+	if titleNeed+detailNeed <= available {
+		return titleNeed, detailNeed, gap
+	}
+	titleMin, detailMin := min(16, titleNeed), min(8, detailNeed)
+	if available < titleMin+detailMin {
+		return min(titleNeed, max(1, width-2-numberWidth-gap)), 0, gap
+	}
+	// Reserve a readable detail column, favor titles, then redistribute leftovers.
+	detail := min(detailNeed, max(detailMin, available/3))
+	title := min(titleNeed, available-detail)
+	detail = min(detailNeed, available-title)
+	return title, detail, gap
+}
+
 // Reserve the same space for every book so selection never moves the list.
-func searchBookCard(book zlib.Book, width int) string {
+func selectedBookCard(book zlib.Book, width int) string {
 	inner := max(1, width-4)
 	accent := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
 	muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)

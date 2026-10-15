@@ -43,7 +43,7 @@ Use these non-interactive forms:
 
 ```sh
 zlib search "the pragmatic programmer" --json --count 10
-zlib saved --json --page 1
+zlib favorites --json --page 1
 zlib history --json --page 1
 zlib recommended --json
 zlib most-popular --json

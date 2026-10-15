@@ -36,7 +36,7 @@ Crush internal packages are not imported or copied.
 - `tui_form.go`: field lists, masked text input, validation and format selection.
 - `tui_filepicker.go`: Bubbles file picker, path input and send confirmation.
 - `book_feed_view.go`: shared book list for search, recommendations, popular,
-  saved/favorites and history.
+  favorites and history.
 - `confirmation.go`: modal overlay with Cancel selected by default.
 
 ## Verification

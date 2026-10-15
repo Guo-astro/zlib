@@ -26,6 +26,7 @@ func newKindleFileModel(dir string) kindleFileModel {
 	fp.AutoHeight = false
 	fp.SetHeight(16)
 	fp.ShowPermissions = false
+	fp.ShowSize = false
 	fp.ShowHidden = true
 	fp.KeyMap.GoToTop.SetKeys("home", "g")
 	fp.KeyMap.GoToLast.SetKeys("end", "G")

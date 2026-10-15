@@ -13,6 +13,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	zlib "github.com/heartleo/zlib"
 )
 
@@ -491,23 +492,38 @@ func (m settingsModel) View() tea.View {
 		}
 	} else {
 		rows := m.rows()
+		values := make([]string, len(rows))
+		labelNeed, valueNeed := 0, 0
+		for i, label := range rows {
+			switch m.page {
+			case "network":
+				values[i] = displaySetting(m.values[i].Key, m.values[i].Value)
+			case "download":
+				values[i] = displaySetting(m.values[i+2].Key, m.values[i+2].Value)
+			case "domain":
+				values[i] = "Available"
+				if label == m.value(zlib.EnvDomain).Value {
+					values[i] += " (current)"
+				}
+			}
+			labelNeed = max(labelNeed, ansi.StringWidth(bookCell(label)))
+			valueNeed = max(valueNeed, ansi.StringWidth(bookCell(values[i])))
+		}
+		// The shared allocator reserves a leading column gap; compensate here
+		// because settings have no numeric column.
+		lw, vw, gap := bookColumnWidths(w+3, 0, labelNeed, valueNeed)
+		if gap == 2 {
+			lw, vw, gap = bookColumnWidths(w+2, 0, labelNeed, valueNeed)
+		}
 		visible := max(1, h-10)
 		start := max(0, m.cursor-visible+1)
 		for i := start; i < min(len(rows), start+visible); i++ {
 			label := rows[i]
-			if m.page == "network" {
-				label += "  " + displaySetting(m.values[i].Key, m.values[i].Value)
+			if values[i] != "" && vw > 0 {
+				label = ansi.Truncate(bookCell(label), lw, "…")
+				label += strings.Repeat(" ", max(0, lw-ansi.StringWidth(label))+gap) + ansi.Truncate(bookCell(values[i]), vw, "…")
 			}
-			if m.page == "download" {
-				label += "  " + displaySetting(m.values[i+2].Key, m.values[i+2].Value)
-			}
-			if m.page == "domain" {
-				label += "  Available"
-				if rows[i] == m.value(zlib.EnvDomain).Value {
-					label += " (current)"
-				}
-			}
-			lines = append(lines, selectionRow(label, i == m.cursor, w))
+			lines = append(lines, styledListRow(label, i == m.cursor, w, currentTheme))
 		}
 		if m.page == "browse" {
 			subtitle = bookCell(m.directory)
