@@ -63,6 +63,66 @@ func TestShellDownloadReturnsToSelectedBook(t *testing.T) {
 	}
 }
 
+func TestShellDownloadFailureKeepsContextAndRetries(t *testing.T) {
+	m := newShellModel()
+	m.width, m.height = 80, 24
+	list := newBookFeedSelectModel("Recommended", nil)
+	list.state = searchStateResults
+	list.books = []zlib.Book{{ID: "1", Hash: "abc", Name: "First"}}
+	m.open("list", list)
+	m.previous = m.page
+	m.download = newDownloadModel("1:abc", t.TempDir(), nil)
+	m.open("download", m.download)
+	failed := m.page.(downloadModel)
+	failed.bookName = "First"
+	failed.err = errors.New(`Get "https://signed.example/book?token=secret": timeout`)
+	m.page = failed
+	oldGeneration := m.generation
+	m, _ = shellStep(m, shellEvent{generation: oldGeneration, msg: tea.QuitMsg{}})
+	if m.kind != "download-error" || m.page == nil {
+		t.Fatalf("download failure left its context: kind=%q", m.kind)
+	}
+	view := ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "First") || !strings.Contains(view, "timeout") || !strings.Contains(view, "r retry") || strings.Contains(view, "token=secret") {
+		t.Fatalf("failure screen omitted context or exposed URL: %q", view)
+	}
+	m, cmd := shellStep(m, key("r"))
+	if cmd == nil {
+		t.Fatal("retry did not complete the error page")
+	}
+	m, _ = shellStep(m, shellEvent{generation: m.generation, msg: tea.QuitMsg{}})
+	if m.kind != "download" || m.generation <= oldGeneration || m.page.(downloadModel).dir != m.download.dir {
+		t.Fatalf("retry lost download settings: kind=%q generation=%d", m.kind, m.generation)
+	}
+	m, _ = shellStep(m, shellEvent{generation: oldGeneration, msg: errMsg{errors.New("stale")}})
+	if m.page.(downloadModel).err != nil {
+		t.Fatal("late result replaced the retried download")
+	}
+}
+
+func TestShellKindleFailureRequiresExplicitResend(t *testing.T) {
+	m := newShellModel()
+	m.width, m.height = 80, 24
+	page := kindleSendModel{filePath: "book.epub", err: errors.New("SMTP connection closed")}
+	m.open("kindle-send", page)
+	m, _ = shellStep(m, shellEvent{generation: m.generation, msg: tea.QuitMsg{}})
+	if m.kind != "kindle-error" || !strings.Contains(ansi.Strip(m.View().Content), "Check your Kindle inbox") {
+		t.Fatal("Kindle error did not stay visible with delivery warning")
+	}
+	m, cmd := shellStep(m, key("r"))
+	if cmd != nil || m.kind != "kindle-error" {
+		t.Fatal("Kindle failure restarted a possibly delivered send")
+	}
+	m, cmd = shellStep(m, key("esc"))
+	if cmd == nil {
+		t.Fatal("Kindle error did not allow exit")
+	}
+	m, _ = shellStep(m, shellEvent{generation: m.generation, msg: tea.QuitMsg{}})
+	if m.kind != "" {
+		t.Fatalf("Kindle error did not return home: %q", m.kind)
+	}
+}
+
 func TestShellUnknownCommandAndQuotedKindlePath(t *testing.T) {
 	m := newShellModel()
 	m.input.SetValue("/missing")
@@ -125,7 +185,35 @@ func isolateShellSession(t *testing.T) string {
 	return path
 }
 
-func TestShellLogoutReturnsToSignedOutHome(t *testing.T) {
+func TestShellStartsOnLoginWithoutSession(t *testing.T) {
+	isolateShellSession(t)
+	m := newShellStartupModel()
+	if m.signedIn || m.kind != "login" || m.typing {
+		t.Fatalf("signed-out startup did not open login: kind=%q signedIn=%v", m.kind, m.signedIn)
+	}
+	view := ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "Email") || !strings.Contains(view, "Password") || strings.Contains(view, "› Log in") {
+		t.Fatal("startup does not show the login form directly")
+	}
+	m, cmd := shellStep(m, key("esc"))
+	m, _ = shellStep(m, cmd())
+	if m.kind != "" || m.page != nil || !m.typing {
+		t.Fatal("cancel did not return to the signed-out home")
+	}
+}
+
+func TestShellStartsHomeWithSession(t *testing.T) {
+	path := isolateShellSession(t)
+	if err := os.WriteFile(path, []byte(`{"cookies":{"session":"test"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := newShellStartupModel()
+	if !m.signedIn || m.kind != "" || m.page != nil || !m.typing {
+		t.Fatal("signed-in startup did not open the home screen")
+	}
+}
+
+func TestShellLogoutOpensLogin(t *testing.T) {
 	path := isolateShellSession(t)
 	if err := os.WriteFile(path, []byte(`{"cookies":{"session":"test"}}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -147,19 +235,15 @@ func TestShellLogoutReturnsToSignedOutHome(t *testing.T) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("session remains after logout: %v", err)
 	}
-	if m.signedIn || m.kind != "" || m.page != nil || m.previous != nil || m.pending != "" || m.input.Value() != "" || !m.typing {
+	if m.signedIn || m.kind != "login" || m.page == nil || m.previous != nil || m.pending != "" || m.input.Value() != "" || m.typing {
 		t.Fatalf("logout kept account state: signedIn=%v kind=%q pending=%q", m.signedIn, m.kind, m.pending)
 	}
 	if m.status != "" {
 		t.Fatalf("logout left a redundant footer status: %q", m.status)
 	}
 	view := ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "Sign in to Z-Library") || !strings.Contains(view, "› Log in") || strings.Contains(view, "Private book") {
-		t.Fatal("logout did not show the signed-out home")
-	}
-	m, _ = shellStep(m, key("enter"))
-	if m.kind != "login" {
-		t.Fatalf("sign-in action opened %q", m.kind)
+	if !strings.Contains(view, "Email") || !strings.Contains(view, "Password") || strings.Contains(view, "Private book") {
+		t.Fatal("logout did not open the login form")
 	}
 }
 

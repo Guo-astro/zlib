@@ -5,10 +5,17 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	keys "charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
+
+func newLoadingSpinner() spinner.Model {
+	s := spinner.New(spinner.WithSpinner(spinner.Dot))
+	s.Style = lipgloss.NewStyle().Foreground(currentTheme.Accent)
+	return s
+}
 
 // screenView keeps the title and controls in place as the body changes.
 func screenView(width, height int, title, subtitle, body, status string, bindings ...keys.Binding) tea.View {

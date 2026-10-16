@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
 	zlib "github.com/heartleo/zlib"
+	"github.com/heartleo/zlib/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -22,8 +25,18 @@ var doctorCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		jsonOut, _ := cmd.Flags().GetBool("json")
+		if !jsonOut && isInteractive() {
+			model := newDoctorPageModel(zlib.KnownDomains(), proxyURL, doctorCurrentDomain(), nil)
+			defer model.stop()
+			result, err := tea.NewProgram(model, tea.WithContext(cmd.Context())).Run()
+			if final, ok := result.(doctorPageModel); ok {
+				final.stop()
+			}
+			return err
+		}
 		results := checkAvailableDomains(cmd.Context(), zlib.KnownDomains(), proxyURL)
-		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
+		if jsonOut {
 			return printJSON(results)
 		}
 		if len(results) == 0 {
@@ -31,33 +44,41 @@ var doctorCmd = &cobra.Command{
 			return nil
 		}
 
+		current := doctorCurrentDomain()
 		rows := make([][]string, 0, len(results))
 		for _, result := range results {
-			rows = append(rows, []string{result.Domain, "Available"})
+			item := doctorDomainItem{check: result, current: result.Domain == current}
+			rows = append(rows, []string{item.Title()})
 		}
 
 		t := table.New().
 			Border(lipgloss.RoundedBorder()).
 			BorderStyle(lipgloss.NewStyle().Foreground(currentTheme.Accent)).
-			Headers("Domain", "Status").
+			Headers("Available domains").
 			Rows(rows...).
 			StyleFunc(func(row, col int) lipgloss.Style {
 				pad := lipgloss.NewStyle().PaddingLeft(1).PaddingRight(1)
 				if row == table.HeaderRow {
 					return pad.Bold(true).Foreground(currentTheme.Accent)
 				}
-				switch col {
-				case 0:
-					return pad.Foreground(currentTheme.Muted)
-				case 1:
-					return pad.Foreground(currentTheme.Success)
+				if results[row].Domain == current {
+					return pad.Bold(true).Foreground(currentTheme.Accent)
 				}
-				return pad
+				return pad.Foreground(currentTheme.Title)
 			})
 
 		lipgloss.Fprintln(cmd.OutOrStdout(), t)
 		return nil
 	},
+}
+
+func doctorCurrentDomain() string {
+	session, _ := config.LoadSession()
+	current := resolveClientDomain(os.Getenv(zlib.EnvDomain), session.Domain)
+	if normalized, err := zlib.ParseAllowedDomain(current); err == nil {
+		return normalized
+	}
+	return current
 }
 
 func checkAvailableDomains(ctx context.Context, candidates []string, proxy string) []zlib.DomainCheck {

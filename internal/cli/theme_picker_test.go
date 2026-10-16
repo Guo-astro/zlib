@@ -1,15 +1,61 @@
 package cli
 
 import (
+	"image/color"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/heartleo/zlib/internal/config"
 )
+
+func TestThemePickerColorsFollowSelection(t *testing.T) {
+	sameColor := func(a, b color.Color) bool {
+		return a != nil && b != nil && color.RGBAModel.Convert(a) == color.RGBAModel.Convert(b)
+	}
+	for _, current := range []string{"catppuccin-mocha", "github"} {
+		for _, size := range [][2]int{{80, 24}, {100, 24}, {40, 17}} {
+			m := newThemePicker(current, "")
+			next, _ := m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+			m = next.(themePickerModel)
+			m = themePickerKey(m, tea.KeyHome)
+			for _, name := range themeOrder {
+				if m.selected() != name {
+					t.Fatalf("selected %q, want %q", m.selected(), name)
+				}
+				view := m.View().Content
+				lines := uv.NewStyledString(view).Lines(ansi.GraphemeWidth)
+				for y, line := range lines {
+					for x, cell := range line {
+						if cell.Style.Bg == nil {
+							t.Fatalf("%s -> %s %v: terminal background leaks at %d,%d", current, name, size, x, y)
+						}
+					}
+				}
+				if !sameColor(lines[0][0].Style.Fg, themes[current].Accent) ||
+					!sameColor(lines[0][0].Style.Bg, themes[current].Background) {
+					t.Fatalf("%s -> %s: picker chrome changed with preview", current, name)
+				}
+				px, py := 0, 3+m.visibleRows()+1
+				if m.width >= 90 {
+					px, py = max(40, min(44, (m.width-3)/2))+3, 3+(m.visibleRows()-8)/2
+				}
+				cell := lines[py][px]
+				if !sameColor(cell.Style.Bg, themes[name].Background) || !sameColor(cell.Style.Fg, themes[name].Accent) {
+					t.Fatalf("%s %v: preview does not match selected palette", name, size)
+				}
+				if strings.Contains(ansi.Strip(strings.Split(view, "\n")[2]), "…") {
+					t.Fatalf("%v: filter overflows the screen", size)
+				}
+				m = themePickerKey(m, tea.KeyDown)
+			}
+		}
+	}
+}
 
 func themePickerKey(m themePickerModel, code rune) themePickerModel {
 	next, _ := m.Update(tea.KeyPressMsg{Code: code})

@@ -11,6 +11,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -44,10 +45,20 @@ func newThemePicker(current, override string) themePickerModel {
 	search := textinput.New()
 	search.Prompt = "> "
 	search.Placeholder = "Type to filter themes..."
-	search.SetWidth(72)
+	search.SetWidth(77)
 	search.Focus()
 	m := themePickerModel{allNames: names, names: slices.Clone(names), search: search, current: current, override: override,
 		cursor: max(0, slices.Index(names, current)), width: 80, height: 24}
+	p := m.chromePalette()
+	styles := search.Styles()
+	styles.Focused.Text = lipgloss.NewStyle().Foreground(p.Title).Background(p.Background)
+	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(p.Accent).Background(p.Background)
+	styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(p.Muted).Background(p.Background)
+	styles.Focused.Suggestion = styles.Focused.Placeholder
+	styles.Blurred = styles.Focused
+	styles.Cursor.Color = p.Accent
+	styles.Cursor.Blink = false
+	m.search.SetStyles(styles)
 	m.ensureVisible()
 	return m
 }
@@ -67,6 +78,14 @@ func (m themePickerModel) palette() Theme {
 		return themes[defaultTheme]
 	}
 	return themes[m.selected()]
+}
+
+// Keep navigation readable while the preview crosses dark and light palettes.
+func (m themePickerModel) chromePalette() Theme {
+	if p, ok := themes[recognizedTheme(m.current)]; ok {
+		return p
+	}
+	return themes[defaultTheme]
 }
 func (m themePickerModel) visibleRows() int {
 	if m.width >= 90 {
@@ -103,7 +122,7 @@ func (m themePickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.search.SetWidth(max(1, msg.Width-2))
+		m.search.SetWidth(max(1, msg.Width-3))
 		m.ensureVisible()
 	case tea.KeyPressMsg:
 		switch {
@@ -152,23 +171,29 @@ func (m themePickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m themePickerModel) listView(width int) string {
-	p := m.palette()
+	p := m.chromePalette()
 	rows := m.visibleRows()
 	start := m.offset
 	end := min(len(m.names), start+rows)
 	lines := make([]string, 0, rows)
 	if len(m.names) == 0 {
-		lines = append(lines, lipgloss.NewStyle().Foreground(p.Muted).Render("No matching themes"))
+		lines = append(lines, lipgloss.NewStyle().Foreground(p.Muted).Background(p.Background).Width(width).Render("No matching themes"))
 	}
 	for i := start; i < end; i++ {
 		label := m.names[i]
 		if m.names[i] == m.current {
 			label += " (current)"
 		}
-		lines = append(lines, styledListRow(label, i == m.cursor, width, p))
+		style := lipgloss.NewStyle().Foreground(p.Title).Background(p.Background).Width(width)
+		prefix := "  "
+		if i == m.cursor {
+			prefix = "> "
+			style = style.Background(p.Surface).Bold(true)
+		}
+		lines = append(lines, style.Render(ansi.Truncate(prefix+label, width, "…")))
 	}
 	for len(lines) < rows {
-		lines = append(lines, strings.Repeat(" ", width))
+		lines = append(lines, lipgloss.NewStyle().Background(p.Background).Render(strings.Repeat(" ", width)))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -222,21 +247,24 @@ func (m themePickerModel) View() tea.View {
 	}
 	m.ensureVisible()
 	p := m.palette()
-	accent := lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
-	muted := lipgloss.NewStyle().Foreground(p.Muted)
+	chrome := m.chromePalette()
+	base := lipgloss.NewStyle().Foreground(chrome.Title).Background(chrome.Background)
+	accent := base.Foreground(chrome.Accent).Bold(true)
+	muted := base.Foreground(chrome.Muted)
 	detail := "Preview: " + m.selected()
 	if m.selected() == "" {
 		detail = "No matching themes"
 	}
-	m.search.SetWidth(max(1, w-2))
+	m.search.SetWidth(max(1, w-3))
 	body := ""
 	if w >= 90 {
 		listWidth := max(40, min(44, (w-3)/2))
-		body = lipgloss.JoinHorizontal(lipgloss.Top, m.listView(listWidth), "   ", themePreview(p, w-listWidth-3, m.visibleRows(), true))
+		gutter := base.Render(strings.TrimSuffix(strings.Repeat("   \n", m.visibleRows()), "\n"))
+		body = lipgloss.JoinHorizontal(lipgloss.Top, m.listView(listWidth), gutter, themePreview(p, w-listWidth-3, m.visibleRows(), true))
 	} else {
 		body = m.listView(w) + "\n\n" + themePreview(p, w, 4, false)
 	}
-	status := fmt.Sprintf("%d/%d themes · Enter saves", m.cursor+1, len(m.names))
+	status := fmt.Sprintf("%d/%d themes", m.cursor+1, len(m.names))
 	if len(m.names) == 0 {
 		status = "No matching themes"
 	}
@@ -245,8 +273,10 @@ func (m themePickerModel) View() tea.View {
 	}
 	helpModel := help.New()
 	helpModel.SetWidth(w)
-	helpModel.Styles.ShortKey = lipgloss.NewStyle().Foreground(p.Accent)
+	helpModel.Styles.ShortKey = base.Foreground(chrome.Accent)
 	helpModel.Styles.ShortDesc = muted
+	helpModel.Styles.ShortSeparator = muted
+	helpModel.Styles.Ellipsis = muted
 	bindings := []keys.Binding{themePickerKeys.up, themePickerKeys.save, themePickerKeys.cancel}
 	if w < 48 {
 		bindings = []keys.Binding{themePickerKeys.save, themePickerKeys.cancel}
@@ -262,7 +292,21 @@ func (m themePickerModel) View() tea.View {
 	lines = append(lines, muted.Render(ansi.Truncate(status, w, "…")), "", helpModel.ShortHelpView(bindings))
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], w, "…")
+		lines[i] += base.Render(strings.Repeat(" ", max(0, w-ansi.StringWidth(lines[i]))))
 	}
-	v.SetContent(fullScreenView(w, h, strings.Join(lines, "\n")).Content)
+	// Fill defaults left by component cursors and separators without replacing
+	// explicit preview or selection colors.
+	cells := uv.NewStyledString(fullScreenView(w, h, strings.Join(lines, "\n")).Content).Lines(ansi.GraphemeWidth)
+	for y := range cells {
+		for x := range cells[y] {
+			if cells[y][x].Style.Bg == nil {
+				cells[y][x].Style.Bg = chrome.Background
+			}
+			if cells[y][x].Style.Fg == nil {
+				cells[y][x].Style.Fg = chrome.Title
+			}
+		}
+	}
+	v.SetContent(uv.Lines(cells).Render())
 	return v
 }

@@ -47,19 +47,19 @@ var themes = func() map[string]Theme {
 	all := map[string]Theme{
 		"tokyo": {
 			Background: lipgloss.Color("#1a1b26"),
-			Accent:     lipgloss.Color("75"),  // Blue    #7aa2f7
-			Link:       lipgloss.Color("117"), // Cyan    #7dcfff
-			Title:      lipgloss.Color("189"), // Fg      #a9b1d6
-			Success:    lipgloss.Color("108"), // Green   #9ece6a
-			Error:      lipgloss.Color("203"), // Red     #f7768e
-			Warning:    lipgloss.Color("223"), // Yellow  #e0af68
-			Info:       lipgloss.Color("73"),  // Teal    #73daca
-			Muted:      lipgloss.Color("59"),  // Comment #565f89
-			Surface:    lipgloss.Color("236"), // Surface #24283b
-			ExtEPUB:    lipgloss.Color("108"),
-			ExtPDF:     lipgloss.Color("117"),
-			ExtMOBI:    lipgloss.Color("223"),
-			ExtFB2:     lipgloss.Color("75"),
+			Accent:     lipgloss.Color("#7aa2f7"), // Blue    #7aa2f7
+			Link:       lipgloss.Color("#7dcfff"), // Cyan    #7dcfff
+			Title:      lipgloss.Color("#a9b1d6"), // Fg      #a9b1d6
+			Success:    lipgloss.Color("#9ece6a"), // Green   #9ece6a
+			Error:      lipgloss.Color("#f7768e"), // Red     #f7768e
+			Warning:    lipgloss.Color("#e0af68"), // Yellow  #e0af68
+			Info:       lipgloss.Color("#73daca"), // Teal    #73daca
+			Muted:      lipgloss.Color("#565f89"), // Comment #565f89
+			Surface:    lipgloss.Color("#24283b"), // Surface #24283b
+			ExtEPUB:    lipgloss.Color("#9ece6a"),
+			ExtPDF:     lipgloss.Color("#7dcfff"),
+			ExtMOBI:    lipgloss.Color("#e0af68"),
+			ExtFB2:     lipgloss.Color("#7aa2f7"),
 		},
 	}
 	for name, palette := range codexThemes {

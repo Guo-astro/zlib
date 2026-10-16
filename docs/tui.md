@@ -16,17 +16,16 @@ gaps. Command columns have a four-cell gutter; single-column hints fit their con
 It does not display the current directory or a persistent sign-in label. At 76
 columns or wider, command hints use two columns; smaller terminals use one.
 The hints show commands to type in the input; typing `/` opens the selectable
-command menu. When signed out, the start screen shows a single login action
-with its sign-in method. Press Enter to open the login form; `/` remains
-available for settings and domain checks.
-A successful login returns to the start
-screen; if you tried a protected command first, its draft stays in the input so
+command menu. Without a saved session, `zlib tui` opens the email and password
+form immediately. Press Esc to reach the signed-out start screen, where Enter
+reopens login and `/` gives access to settings and domain checks. A successful
+login returns to the start screen. If you tried a protected command first, its
+draft stays in the input so
 you can press Enter to continue. Login errors stay on the form for another try.
 The TUI login form accepts email and password. To import a Cookie file, use
 `zlib login --cookies <file> --domain <domain>` outside the TUI.
 `/logout` asks for confirmation, clears the saved session and account pages, then
-returns to the signed-out start screen. Press Enter there to sign in again. If
-session removal fails, the current account screen stays open with an error.
+opens the login form. If session removal fails, the current screen shows an error.
 
 The command menu appears when you type `/`; it shows up to six matches with short
 descriptions and no count heading. ↑/↓ cycles through the matches, including from
@@ -37,6 +36,8 @@ Ctrl+K opens the menu without discarding an unfinished search; Esc restores the
 search text.
 
 Direct commands such as `zlib search` and `zlib history --json` still work.
+The search form uses a borderless Search button with an accent background when
+focused. Tab focuses it, Enter submits, and Ctrl+S submits from any field.
 Bare `zlib` prints command help. `zlib tui` requires an interactive terminal.
 
 The shell accepts `/search`, `/favorites`, `/recommended`, `/most-popular`,
@@ -50,7 +51,15 @@ by `id:hash` directly, use `zlib download "id:hash"` outside the TUI.
 The search list keeps its scroll position while you move within visible rows.
 If a search returns nothing or fails, edit the query with Ctrl+F, or retry a
 failed request with r.
-Search shows a spinner and the requested page while it fetches books, then reveals the results.
+Search and the other book lists show a Charm dot spinner while fetching results.
+Page numbers appear after loading. Profile, login, and settings domain checks
+also use the dot spinner while waiting for a response.
+Doctor shows only the Charm dot spinner while checking domains; Esc returns.
+`zlib doctor` opens the same page in an interactive terminal. Results contain
+only available domains, without a status label on each row. The accent border
+marks the focused row; `Current domain` marks the configured domain, which gets
+initial focus when available. Moving the focus does not change configuration.
+Redirected output uses a single-column table; `--json` keeps the probe fields.
 The position bar follows the selected book.
 Search loads up to 50 books per server page, matching the direct `search` command.
 The number of visible rows follows the terminal height; scroll within a page with
@@ -81,6 +90,9 @@ test is `TestBookListSpacingMatchesSearchAcrossPages`.
 The selected book's EAPI details load after the selection settles. Results are
 cached by `id:hash`; moving to another book keeps an older response from
 replacing its card. The list response remains visible while details load.
+The card border uses the theme accent, and its author uses the theme's primary
+text color. Moving the selection updates the card and position bar immediately,
+without a color flash or animated position change.
 History uses the same `#`, `Title`, and `Author` columns as the other book lists.
 The selected entry's download date appears beside the page status. Its card uses
 the book's author and metadata when EAPI provides them; moving within visible
@@ -91,7 +103,8 @@ history rows keeps the list viewport still.
 | Screen | Controls |
 | --- | --- |
 | Shell command input | `/` opens commands from a list; ↑/↓ cycles; Ctrl+K also opens it; Tab completes; Esc closes; pasted text needs Enter to run |
-| Profile, doctor | Full-screen result; ↑/↓ or PgUp/PgDn scrolls long output; Esc returns |
+| Profile | Full-screen account and quota page; ↑/↓ or PgUp/PgDn scrolls; r retries a failed request; Esc returns |
+| Doctor | Full-screen available-domain list; the focused row has an accent border and the current configured domain has a separate marker; ↑/↓ selects, PgUp/PgDn scrolls, r checks again, Esc returns |
 | Book lists | ↑/↓ or j/k select; PgUp/PgDn scroll; Home/End jump; Enter opens download confirmation; q or Esc exits |
 | Search, saved books, history | ←/→ changes page; Ctrl+F edits the query in shell search; `/` edits it in direct `zlib search` |
 | Failed list request | r retries the failed page; Esc closes |
@@ -102,19 +115,26 @@ history rows keeps the list viewport still.
 | Download directory | Skip uses the displayed directory; Change directory applies only to this download; Ctrl+B browses folders |
 | Theme | Type to filter; ↑/↓ previews; Enter saves; Esc clears the filter, then closes |
 | Confirmation | Cancel is selected initially; ←/→ or Tab changes the action; Enter confirms |
-| Download progress | Esc or Ctrl+C cancels the transfer |
+| Download progress | Esc or Ctrl+C cancels the transfer; a failure stays on its own page with r to retry using the same book and directory, or Esc to return |
 
 Passwords are masked. Invalid field values stay in the editor with an error.
 Kindle SMTP sending cannot be recalled: Ctrl+C stops waiting, and the message
 may still be delivered.
+After a Kindle send error, the file and error remain visible. Check the Kindle
+inbox before starting another send; the error page does not resend automatically.
+Download errors hide signed URLs in the terminal view.
 
 ## Implementation references
 
-Crush revision: `b7b5522585e7302d2ee19b1a74a7003ac29ea562`.
+Crush revision: `f49b28113b3bab3fcfe193676cc3f7fb858d6411`.
+The local source checkout is `D:\myspace\github\AI\crush` (Git Bash:
+`/d/myspace/github/AI/crush`; WSL: `/mnt/d/myspace/github/AI/crush`). Check its
+current HEAD before comparing code with the revision above.
 The implementation uses Bubbles v2, Huh v2 and Lip Gloss v2, with interaction patterns
 from Crush's `internal/ui/dialog/models.go`, `filepicker.go`, `inline_editor.go`,
 `dialog.go`, `internal/ui/list/list.go` and `internal/ui/model/status.go`.
 Crush internal packages are not imported or copied.
+See [Crush TUI patterns](crush-ui-patterns.md) for the component and layout analysis.
 
 - `tui_layout.go`: terminal-sized screen layout, selected rows and Bubbles help.
 - `tui_form.go`, `tui_inline_form.go`: field lists, masked text input, validation

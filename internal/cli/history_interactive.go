@@ -183,7 +183,7 @@ func (m historySelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.String() == "y" || (msg.String() == "enter" && m.deleteFocused) {
 				id := m.items[m.cursor].ID
 				m.state = historyStateDeleting
-				return m, func() tea.Msg { return historyDeletedMsg{m.client.DeleteDownloadHistory(id)} }
+				return m, tea.Batch(m.spinner.Tick, func() tea.Msg { return historyDeletedMsg{m.client.DeleteDownloadHistory(id)} })
 			}
 			if msg.String() == "n" || msg.String() == "esc" || msg.String() == "ctrl+c" || msg.String() == "enter" {
 				m.state = historyStateResults
@@ -260,7 +260,7 @@ func (m historySelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case spinner.TickMsg:
-		if m.state == historyStateLoading {
+		if m.state == historyStateLoading || m.state == historyStateDeleting {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
 			return m, cmd
@@ -312,7 +312,7 @@ func (m historySelectModel) View() tea.View {
 		lines := strings.Split(v.Content, "\n")
 		muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
 		if m.state == historyStateDeleting {
-			lines[len(lines)-1] = muted.Render("Deleting history…")
+			lines[len(lines)-1] = m.spinner.View()
 		} else {
 			lines[1] = bookCell(m.deleteError.Error())
 			lines[len(lines)-1] = muted.Render("Delete failed · d retry · " + list.exitHint())

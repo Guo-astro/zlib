@@ -1,0 +1,63 @@
+package cli
+
+import (
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+)
+
+// shellErrorModel keeps a failed operation and its next action on screen.
+// The shell owns the retry so it can start a fresh, generation-scoped request.
+type shellErrorModel struct {
+	width, height int
+	title         string
+	subtitle      string
+	detail        string
+	retry         bool
+	selectedRetry bool
+}
+
+func (m shellErrorModel) Init() tea.Cmd { return nil }
+
+func (m shellErrorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "r":
+			if m.retry {
+				m.selectedRetry = true
+				return m, tea.Quit
+			}
+		case "esc", "q", "enter":
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m shellErrorModel) View() tea.View {
+	message := lipgloss.NewStyle().Foreground(currentTheme.Error).Render(m.title)
+	body := "  " + message + "\n\n  " + bookCell(m.detail)
+	if m.retry {
+		return screenView(m.width, m.height, "Download", m.subtitle, body, "", uiKey("r", "retry"), uiKey("esc", "back"))
+	}
+	return screenView(m.width, m.height, "Send to Kindle", m.subtitle, body+"\n\n  Check your Kindle inbox before sending again.", "", uiKey("esc", "back"))
+}
+
+func downloadFailureDetail(err error) string {
+	if err == nil {
+		return "Download failed."
+	}
+	// Download errors may include signed URLs. Keep the operation useful without
+	// printing those links in the terminal or in a screenshot.
+	words := strings.Fields(err.Error())
+	for i, word := range words {
+		if strings.Contains(word, "://") {
+			words[i] = "[URL hidden]"
+		}
+	}
+	return strings.Join(words, " ")
+}

@@ -47,7 +47,6 @@ type searchSelectModel struct {
 	progress        progress.Model
 	revealRows      int
 	revealing       bool
-	cardFlash       int
 	motionSeq       uint64
 	reducedMotion   bool
 	selectedID      string // set when user presses Enter
@@ -101,14 +100,11 @@ func searchMotionTick(sequence uint64) tea.Cmd {
 	return tea.Tick(55*time.Millisecond, func(time.Time) tea.Msg { return searchMotionMsg{sequence} })
 }
 
-func (m *searchSelectModel) startSearchMotion() tea.Cmd {
-	if m.feed != nil || m.feedPage != nil || m.reducedMotion || len(m.books) == 0 {
-		m.revealing = false
-		m.cardFlash = 0
+func (m *searchSelectModel) startSearchReveal() tea.Cmd {
+	m.motionSeq++
+	if !m.revealing {
 		return nil
 	}
-	m.motionSeq++
-	m.cardFlash = 3
 	return searchMotionTick(m.motionSeq)
 }
 
@@ -197,7 +193,6 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case listLoadError:
 		m.motionSeq++
 		m.revealing = false
-		m.cardFlash = 0
 		m.err = msg.err
 		m.retryPage = msg.page
 		m.loadingPage = 0
@@ -216,11 +211,7 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.revealing = m.feed == nil && m.feedPage == nil && !m.reducedMotion && len(m.books) > 4
 		m.revealRows = min(4, len(m.books))
 		detail := m.queueSelectedDetail()
-		if m.reducedMotion {
-			return m, detail
-		}
-		bar := m.progress.SetPercent(1 / float64(max(1, len(m.books))))
-		return m, tea.Batch(bar, m.startSearchMotion(), detail)
+		return m, tea.Batch(m.startSearchReveal(), detail)
 
 	case bookDetailReadyMsg:
 		if msg.sequence == m.details.sequence && msg.ref == m.selectedBookRef() && m.state == searchStateResults {
@@ -240,16 +231,10 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.revealRows = min(len(m.books), m.revealRows+6)
 			m.revealing = m.revealRows < len(m.books)
 		}
-		m.cardFlash = max(0, m.cardFlash-1)
-		if m.revealing || m.cardFlash > 0 {
+		if m.revealing {
 			return m, searchMotionTick(m.motionSeq)
 		}
 		return m, nil
-
-	case progress.FrameMsg:
-		var cmd tea.Cmd
-		m.progress, cmd = m.progress.Update(msg)
-		return m, cmd
 
 	case tea.KeyPressMsg:
 		if m.err != nil && m.state != searchStateFilter && msg.String() != "r" && msg.String() != "/" && msg.String() != "esc" && msg.String() != "q" && msg.String() != "ctrl+c" {
@@ -341,12 +326,9 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 			m.ensureCursorVisible()
-			if m.cursor != previousCursor && m.feed == nil && m.feedPage == nil {
-				m.revealing = false
-				bar := m.progress.SetPercent(float64(m.cursor+1) / float64(len(m.books)))
-				return m, tea.Batch(bar, m.startSearchMotion(), m.queueSelectedDetail())
-			}
 			if m.cursor != previousCursor {
+				m.motionSeq++
+				m.revealing = false
 				return m, m.queueSelectedDetail()
 			}
 		case searchStateFilter:
@@ -445,11 +427,7 @@ func (m searchSelectModel) listView() tea.View {
 		}
 		if m.state == searchStateResults && len(m.books) > 0 {
 			if m.width >= 55 {
-				bar := m.progress.View()
-				if m.reducedMotion {
-					bar = m.progress.ViewAs(float64(m.cursor+1) / float64(len(m.books)))
-				}
-				status += "   " + bar
+				status += "   " + m.progress.ViewAs(float64(m.cursor+1)/float64(len(m.books)))
 			}
 		}
 		if m.state == searchStateFilter {

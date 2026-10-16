@@ -354,7 +354,8 @@ func TestSettingsEditorsFitAndButtonsSave(t *testing.T) {
 func TestSettingsProbeFailureAndCancel(t *testing.T) {
 	m, _ := newSettingsModel(t.Context(), testSettingsStore(t), "domain")
 	cmd := m.probe("http://127.0.0.1:1", "domain")
-	msg := cmd()
+	batch := cmd().(tea.BatchMsg)
+	msg := batch[1]()
 	next, _ := m.Update(msg)
 	m = next.(settingsModel)
 	if m.busy || len(m.domains) != 0 || !strings.Contains(m.View().Content, "No available domains") {

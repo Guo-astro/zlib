@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	zlib "github.com/heartleo/zlib"
 )
@@ -174,7 +175,7 @@ func TestExpandedBookCardShowsPublicationDetails(t *testing.T) {
 		Pages: "540", ISBN10: "7115390576", ISBN13: "9787115390578",
 	}
 	for _, size := range [][2]int{{80, 24}, {70, 24}, {40, 24}} {
-		card := ansi.Strip(selectedBookCardBorder(book, size[0], size[1], currentTheme.Accent))
+		card := ansi.Strip(selectedBookCardBorder(book, size[0], size[1]))
 		if got, want := len(strings.Split(card, "\n")), selectedBookCardRows(size[0], size[1]); got != want {
 			t.Fatalf("card at %v has %d lines, want %d: %q", size, got, want, card)
 		}
@@ -262,17 +263,17 @@ func TestSearchEmptyAndErrorOfferRecovery(t *testing.T) {
 	}
 }
 
-func TestSearchLoadingShowsRequestedPage(t *testing.T) {
+func TestSearchLoadingShowsOnlySpinner(t *testing.T) {
 	m := resultsModel("golang")
 	m.width, m.height = 80, 24
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyRight})
-	if m.loadingPage != 3 || !strings.Contains(ansi.Strip(m.View().Content), "Searching page 3") || !strings.Contains(ansi.Strip(m.View().Content), "Page 3 / 3") {
-		t.Fatal("loading view shows the previous page number")
+	if m.loadingPage != 3 || strings.Contains(ansi.Strip(m.View().Content), "Searching page") || strings.Contains(ansi.Strip(m.View().Content), "Page 3") {
+		t.Fatal("loading view repeats page information")
 	}
 	for _, size := range [][2]int{{80, 24}, {40, 16}, {30, 14}} {
 		m.width, m.height = size[0], size[1]
 		lines := strings.Split(m.View().Content, "\n")
-		if len(lines) > size[1] || strings.Contains(ansi.Strip(m.View().Content), "╭") || !strings.Contains(ansi.Strip(m.View().Content), "Searching page 3") {
+		if len(lines) > size[1] || strings.Contains(ansi.Strip(m.View().Content), "╭") || !strings.Contains(m.View().Content, m.spinner.View()) {
 			t.Fatalf("loading status missing, overflowing, or showing a skeleton at %v", size)
 		}
 		for _, line := range lines {
@@ -306,14 +307,8 @@ func TestSearchResultRevealStopsAndCanBeSkipped(t *testing.T) {
 	}
 	sequence := m.motionSeq
 	update(searchMotionMsg{sequence: firstSequence})
-	if m.motionSeq != sequence || m.cardFlash != 3 {
-		t.Fatal("stale animation frame changed the new selection")
-	}
-	for range 3 {
-		update(searchMotionMsg{sequence: sequence})
-	}
-	if m.cardFlash != 0 || m.revealing {
-		t.Fatal("selection animation did not finish")
+	if m.motionSeq != sequence || m.revealing {
+		t.Fatal("stale reveal frame changed the new selection")
 	}
 }
 
@@ -323,8 +318,36 @@ func TestSearchReducedMotionShowsResultsImmediately(t *testing.T) {
 	m.width, m.height = 80, 24
 	next, _ := m.Update(searchResultMsg{books: []zlib.Book{{Name: "First"}, {Name: "Second"}}, page: 1, totalPages: 1})
 	m = next.(searchSelectModel)
-	if m.revealing || m.cardFlash != 0 || !strings.Contains(ansi.Strip(m.View().Content), "Second") {
-		t.Fatal("reduced motion hid results or kept an animation running")
+	if m.revealing || !strings.Contains(ansi.Strip(m.View().Content), "Second") {
+		t.Fatal("reduced motion hid results or kept a reveal running")
+	}
+}
+
+func TestSearchCardKeepsThemeColorsAndDoesNotFlashOnSelection(t *testing.T) {
+	previous := currentTheme
+	currentTheme = themes["catppuccin-latte"]
+	t.Cleanup(func() { currentTheme = previous })
+	m := newSearchSelectModel("books", nil, nil, false)
+	m.width, m.height = 80, 24
+	m.state = searchStateResults
+	m.books = []zlib.Book{
+		{ID: "1", Name: "First", Authors: []string{"First Author"}},
+		{ID: "2", Name: "Second", Authors: []string{"Second Author"}},
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	selected := m.View().Content
+	author := lipgloss.NewStyle().Foreground(currentTheme.Title).Render("Second Author")
+	if !strings.Contains(selected, author) {
+		t.Fatal("selected book author does not use the theme's primary text color")
+	}
+	border := lipgloss.NewStyle().Foreground(currentTheme.Accent).Render("╭")
+	if !strings.Contains(selected, strings.TrimSuffix(border, "\x1b[m")) {
+		t.Fatal("selected book border does not use the theme accent")
+	}
+	next, _ := m.Update(searchMotionMsg{sequence: m.motionSeq})
+	m = next.(searchSelectModel)
+	if got := m.View().Content; got != selected {
+		t.Fatal("book card changed after selection without another key press")
 	}
 }
 

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"image/color"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -72,12 +71,8 @@ func (m searchSelectModel) feedViewWith(column, empty, status, navigation string
 	}
 	lines := []string{accent.Render(title), muted.Render(status)}
 	if m.state == searchStateLoading {
-		loading := "Loading books…"
-		if strings.Contains(navigation, "/ search") {
-			loading = fmt.Sprintf("Searching page %d…", max(1, m.loadingPage))
-		}
-		return strings.Join(append(lines,
-			ansi.Truncate(m.spinner.View()+" "+loading, width, "…"),
+		return strings.Join(append([]string{accent.Render(title), ""},
+			m.spinner.View(),
 			"",
 			muted.Render(m.exitHint())), "\n")
 	}
@@ -102,13 +97,7 @@ func (m searchSelectModel) feedViewWith(column, empty, status, navigation string
 	cursor := min(max(0, m.cursor), len(m.books)-1)
 	showCard := m.hasBookCard()
 	if showCard {
-		border := currentTheme.Accent
-		if m.feed == nil && m.feedPage == nil && m.cardFlash > 1 {
-			border = currentTheme.Info
-		} else if m.feed == nil && m.feedPage == nil && m.cardFlash == 1 {
-			border = currentTheme.Link
-		}
-		lines = append(lines, selectedBookCardBorder(m.selectedBook(), width, height, border), "")
+		lines = append(lines, selectedBookCardBorder(m.selectedBook(), width, height), "")
 	}
 	count := m.feedRows()
 	start := min(max(0, m.listOffset), max(0, len(m.books)-count))
@@ -243,7 +232,7 @@ func bookColumnWidths(width, numberWidth, titleNeed, detailNeed int) (int, int, 
 
 // Reserve the same space for every book so selection never moves the list.
 func selectedBookCard(book zlib.Book, width int) string {
-	return selectedBookCardBorder(book, width, 0, currentTheme.Accent)
+	return selectedBookCardBorder(book, width, 0)
 }
 
 func selectedBookCardRows(width, height int) int {
@@ -260,9 +249,10 @@ func selectedBookCardRows(width, height int) int {
 	return 8
 }
 
-func selectedBookCardBorder(book zlib.Book, width, height int, border color.Color) string {
+func selectedBookCardBorder(book zlib.Book, width, height int) string {
 	inner := max(1, width-6)
 	accent := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
+	primary := lipgloss.NewStyle().Foreground(currentTheme.Title)
 	muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
 	title := strings.Split(ansi.Wrap(bookCell(book.Name), inner, ""), "\n")
 	var lines []string
@@ -276,7 +266,7 @@ func selectedBookCardBorder(book zlib.Book, width, height int, border color.Colo
 		}
 		lines = append(lines, accent.Render(line))
 	}
-	lines = append(lines, ansi.Truncate(bookCell(strings.Join(book.Authors, ", ")), inner, "…"))
+	lines = append(lines, primary.Render(ansi.Truncate(bookCell(strings.Join(book.Authors, ", ")), inner, "…")))
 	var details []string
 	fileDetails := []string{strings.ToUpper(book.Extension), book.Size}
 	if selectedBookCardRows(width, height) == 8 {
@@ -336,7 +326,7 @@ func selectedBookCardBorder(book zlib.Book, width, height int, border color.Colo
 		}
 	}
 	lines = append(lines, muted.Render(ansi.Truncate("ID: "+bookCommandID(book), inner, "…")))
-	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(border).
+	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(currentTheme.Accent).
 		Padding(0, 1).Width(width - 2).Render(strings.Join(lines, "\n"))
 }
 

@@ -13,6 +13,7 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	keys "charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -46,6 +47,7 @@ type settingsModel struct {
 	message        string
 	domains        []string
 	busy           bool
+	spinner        spinner.Model
 	generation     int
 	cancel         context.CancelFunc
 	ctx            context.Context
@@ -203,13 +205,14 @@ func (m *settingsModel) probe(proxy string, page string) tea.Cmd {
 	m.generation++
 	generation := m.generation
 	m.busy = true
-	m.message = "Checking EAPI domains…"
+	m.message = ""
+	m.spinner = newLoadingSpinner()
 	m.probeReturn = page
 	candidates := zlib.KnownDomains()
 	if d, err := zlib.ParseAllowedDomain(m.value(zlib.EnvDomain).Value); err == nil {
 		candidates = append(candidates, d)
 	}
-	return func() tea.Msg {
+	return tea.Batch(m.spinner.Tick, func() tea.Msg {
 		results := checkAvailableDomains(ctx, candidates, proxy)
 		seen := map[string]bool{}
 		var domains []string
@@ -226,7 +229,7 @@ func (m *settingsModel) probe(proxy string, page string) tea.Cmd {
 		}
 		sort.Strings(domains)
 		return settingsProbeMsg{generation, domains}
-	}
+	})
 }
 
 func (m *settingsModel) effectiveProxy() string {
@@ -339,6 +342,13 @@ func (m *settingsModel) browse(path string) {
 
 func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		if m.busy {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
+		}
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.input.SetWidth(max(1, min(56, m.width-8)))
@@ -679,6 +689,9 @@ func settingsCompactView(width, height int, title, subtitle string, lines []stri
 func (m settingsModel) View() tea.View {
 	w, h := max(1, m.width), max(1, m.height)
 	titles := map[string]string{"home": "Settings", "network": "Settings / Network", "download": "Settings / Downloads", "kindle": "Settings / Kindle", "domain": "Settings / Domain", "browse": "Settings / Choose directory", "edit": "Settings / Edit"}
+	if m.busy {
+		return screenView(w, h, titles[m.page], "", m.spinner.View(), "", uiKey("esc", "back"))
+	}
 	subtitle := ""
 	status := m.message
 	controls := []keys.Binding{uiKey("esc", "back"), uiKey("enter", "open"), uiKey("↑/↓", "select"), uiKey("q", "quit")}

@@ -9,6 +9,7 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	keys "charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -49,6 +50,7 @@ type shellModel struct {
 	download                                                        downloadModel
 	kindlePath                                                      string
 	loginForm                                                       *inlineForm
+	spinner                                                         spinner.Model
 }
 
 type shellCommand struct{ name, description string }
@@ -77,8 +79,20 @@ func newShellModel() shellModel {
 	session, _ := config.LoadSession()
 	return shellModel{input: input, width: 80, height: 24, typing: true, signedIn: len(session.Cookies) > 0}
 }
-func runShell() error              { _, err := tea.NewProgram(newShellModel()).Run(); return err }
-func (m shellModel) Init() tea.Cmd { return textinput.Blink }
+func newShellStartupModel() shellModel {
+	m := newShellModel()
+	if !m.signedIn {
+		m.dispatch("/login")
+	}
+	return m
+}
+func runShell() error { _, err := tea.NewProgram(newShellStartupModel()).Run(); return err }
+func (m shellModel) Init() tea.Cmd {
+	if m.page != nil {
+		return shellCmd(m.generation, m.page.Init())
+	}
+	return textinput.Blink
+}
 
 // Adapt existing standalone pages without allowing their QuitMsg to end the shell.
 // Every async response is scoped to the page instance that started it.
@@ -99,6 +113,9 @@ func shellCmd(generation int, cmd tea.Cmd) tea.Cmd {
 	}
 }
 func (m *shellModel) open(kind string, page tea.Model) tea.Cmd {
+	if doctor, ok := m.page.(doctorPageModel); ok {
+		doctor.stop()
+	}
 	if m.kind == "list" && m.page != nil && m.previous == nil {
 		m.previous = m.page
 	}
@@ -122,6 +139,9 @@ func (m *shellModel) open(kind string, page tea.Model) tea.Cmd {
 	return shellCmd(m.generation, page.Init())
 }
 func (m *shellModel) home() {
+	if doctor, ok := m.page.(doctorPageModel); ok {
+		doctor.stop()
+	}
 	m.generation++
 	m.page = nil
 	m.kind = ""
@@ -144,6 +164,9 @@ func (m *shellModel) openInfo(title, content string) {
 	m.status = content
 }
 func (m *shellModel) restore() {
+	if doctor, ok := m.page.(doctorPageModel); ok {
+		doctor.stop()
+	}
 	old := m.previous
 	m.previous = nil
 	if old == nil {
@@ -211,6 +234,11 @@ func (m shellModel) childInputActive() bool {
 	}
 }
 func (m shellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if tick, ok := msg.(spinner.TickMsg); ok && m.kind == "login-wait" {
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(tick)
+		return m, cmd
+	}
 	if size, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width, m.height = size.Width, size.Height
 		m.input.SetWidth(max(1, m.width-4))
@@ -428,6 +456,9 @@ func (m *shellModel) dispatch(value string) tea.Cmd {
 		return nil
 	}
 	if name == "quit" {
+		if doctor, ok := m.page.(doctorPageModel); ok {
+			doctor.stop()
+		}
 		return tea.Quit
 	}
 	m.input.SetValue("")
@@ -481,18 +512,7 @@ func (m *shellModel) dispatch(value string) tea.Cmd {
 		}
 		return m.open("config", model)
 	case "doctor":
-		m.openInfo("Available domains", "Checking domains…")
-		return shellCmd(m.generation, func() tea.Msg {
-			checks := checkAvailableDomains(context.Background(), zlib.KnownDomains(), os.Getenv(zlib.EnvProxy))
-			var rows []string
-			for _, c := range checks {
-				rows = append(rows, c.Domain+"  Available")
-			}
-			if len(rows) == 0 {
-				rows = append(rows, "No available domains")
-			}
-			return shellText{text: strings.Join(rows, "\n")}
-		})
+		return m.open("doctor", newDoctorPageModel(zlib.KnownDomains(), os.Getenv(zlib.EnvProxy), doctorCurrentDomain(), nil))
 	case "kindle":
 		return m.openKindle(arg)
 	}
@@ -525,8 +545,7 @@ func (m *shellModel) dispatch(value string) tea.Cmd {
 	case "history":
 		return m.open("list", newHistorySelectModel(c))
 	case "profile":
-		m.openInfo("Profile", "Loading profile…")
-		return shellCmd(m.generation, func() tea.Msg { p, err := c.GetProfile(); return shellText{text: renderProfileCard(p), err: err} })
+		return m.open("profile", newProfilePageModel(c))
 	}
 	return nil
 }
@@ -576,14 +595,26 @@ func (m *shellModel) completed() tea.Cmd {
 		m.restore()
 		return nil
 	case downloadModel:
-		m.restore()
 		if page.err != nil {
-			m.status = page.err.Error()
+			book := page.bookName
+			if book == "" {
+				book = page.id
+			}
+			return m.open("download-error", shellErrorModel{title: "Download failed", subtitle: bookCell(book), detail: downloadFailureDetail(page.err), retry: true})
 		} else if page.state == stateCancelled {
+			m.restore()
 			m.status = "Download cancelled"
 		} else {
+			m.restore()
 			m.status = "Saved to: " + page.savedPath
 		}
+		return nil
+	case shellErrorModel:
+		if page.selectedRetry && page.retry {
+			m.download = newDownloadModel(m.download.id, m.download.dir, m.download.client)
+			return m.open("download", m.download)
+		}
+		m.restore()
 		return nil
 	case themePickerModel:
 		if page.accepted {
@@ -625,8 +656,9 @@ func (m *shellModel) completed() tea.Cmd {
 			m.home()
 			m.kind = "login-wait"
 			m.typing = false
-			m.status = "Logging in…"
-			return shellCmd(m.generation, func() tea.Msg { return shellLogin(fields) })
+			m.status = ""
+			m.spinner = newLoadingSpinner()
+			return tea.Batch(m.spinner.Tick, shellCmd(m.generation, func() tea.Msg { return shellLogin(fields) }))
 		case "kindle-config":
 			return m.saveKindle(page.fields)
 		}
@@ -635,10 +667,10 @@ func (m *shellModel) completed() tea.Cmd {
 			return m.sendKindle(page.path)
 		}
 	case kindleSendModel:
-		m.restore()
 		if page.err != nil {
-			m.status = page.err.Error()
+			return m.open("kindle-error", shellErrorModel{title: "Kindle send failed", subtitle: bookCell(page.filePath), detail: page.err.Error()})
 		} else {
+			m.restore()
 			m.status = "Kindle send finished"
 		}
 		return nil
@@ -657,7 +689,7 @@ func (m *shellModel) completed() tea.Cmd {
 				m.pending = ""
 				m.home()
 				m.status = ""
-				return nil
+				return m.dispatch("/login")
 			case "kindle-confirm":
 				return m.sendKindle(m.kindlePath)
 			}
@@ -689,6 +721,9 @@ func shellLogin(fields []formField) shellText {
 }
 
 func (m shellModel) View() tea.View {
+	if m.kind == "login-wait" {
+		return screenView(m.width, m.height, "Log in", "", m.spinner.View(), "")
+	}
 	if m.kind == "info" && !m.typing {
 		lines := strings.Split(m.status, "\n")
 		visible := max(1, m.height-6)
