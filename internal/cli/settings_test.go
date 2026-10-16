@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	zlib "github.com/heartleo/zlib"
@@ -138,6 +139,28 @@ func TestSettingsSaveRoundTripAndReset(t *testing.T) {
 	v, _ = readSettingsEnv(s.global)
 	if _, ok := v[zlib.EnvProxy]; ok {
 		t.Fatal("reset did not remove key")
+	}
+}
+
+func TestSettingsSaveSMTPPasswordWithoutChangingOtherKeys(t *testing.T) {
+	s := testSettingsStore(t)
+	if err := os.WriteFile(s.global, []byte("# keep this\nZLIB_PROXY=http://localhost:7890\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	password := ` pass$word\"value `
+	if err := s.save(kindleSMTPPasswordEnv, password); err != nil {
+		t.Fatal(err)
+	}
+	values, err := readSettingsEnv(s.global)
+	if err != nil || values[kindleSMTPPasswordEnv] != password || values[zlib.EnvProxy] != "http://localhost:7890" {
+		t.Fatal("SMTP password did not round trip with other settings intact")
+	}
+	data, err := os.ReadFile(s.global)
+	if err != nil || !strings.Contains(string(data), "# keep this") {
+		t.Fatal("saving SMTP password removed an unrelated comment")
+	}
+	if err := s.save(kindleSMTPPasswordEnv, " \t "); err == nil {
+		t.Fatal("blank SMTP password was accepted")
 	}
 }
 
@@ -348,6 +371,40 @@ func TestSettingsEditorsFitAndButtonsSave(t *testing.T) {
 	m = next.(settingsModel)
 	if m.value(zlib.EnvRetries).Saved != "2" {
 		t.Fatal("Save button failed")
+	}
+}
+
+func TestSettingsProxyEditorShowsURL(t *testing.T) {
+	const proxy = "http://reader:sample@localhost:7890"
+	s := testSettingsStore(t)
+	s.env[zlib.EnvProxy] = proxy
+	m, err := newSettingsModel(t.Context(), s, "home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(ansi.Strip(m.View().Content), "sample") {
+		t.Fatal("settings overview exposed proxy credentials")
+	}
+	m.edit(zlib.EnvProxy)
+	if m.input.EchoMode != textinput.EchoNormal {
+		t.Fatal("proxy URL input is masked")
+	}
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, proxy) {
+		t.Fatal("proxy URL is not visible in its editor")
+	}
+	for _, size := range [][2]int{{32, 12}, {40, 16}} {
+		m.width, m.height = size[0], size[1]
+		m.input.SetWidth(max(1, min(56, m.width-ansi.StringWidth(m.input.Prompt)-4)))
+		m.editAction = 4
+		view := m.View().Content
+		if !strings.Contains(ansi.Strip(view), "Save") {
+			t.Fatalf("save action hidden at %dx%d", size[0], size[1])
+		}
+		for _, line := range strings.Split(view, "\n") {
+			if ansi.StringWidth(line) > size[0] {
+				t.Fatalf("editor exceeds width at %dx%d", size[0], size[1])
+			}
+		}
 	}
 }
 

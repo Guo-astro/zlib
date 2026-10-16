@@ -2,12 +2,9 @@ package cli
 
 import (
 	"fmt"
-	"strings"
-	"time"
 
 	"charm.land/bubbles/v2/progress"
 	"charm.land/bubbles/v2/spinner"
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	zlib "github.com/heartleo/zlib"
@@ -21,7 +18,7 @@ const (
 	searchStateInput   searchState = iota // waiting for query input (handled outside model)
 	searchStateLoading                    // fetching a page
 	searchStateResults                    // showing results
-	searchStateFilter                     // editing the query inline (/)
+	searchStateFilter                     // editing search filters (/ or Ctrl+F)
 )
 
 const searchReducedMotion = false
@@ -45,9 +42,6 @@ type searchSelectModel struct {
 	state           searchState
 	spinner         spinner.Model
 	progress        progress.Model
-	revealRows      int
-	revealing       bool
-	motionSeq       uint64
 	reducedMotion   bool
 	selectedID      string // set when user presses Enter
 	confirmDownload bool
@@ -59,7 +53,7 @@ type searchSelectModel struct {
 	inShell         bool
 	width           int // terminal width, from tea.WindowSizeMsg
 	height          int
-	input           textinput.Model // inline query editor, shown in searchStateFilter
+	filter          searchFilterForm
 }
 
 func newBookFeedSelectModel(title string, load func() ([]zlib.Book, error)) searchSelectModel {
@@ -94,37 +88,12 @@ type listLoadError struct {
 	page int
 }
 
-type searchMotionMsg struct{ sequence uint64 }
-
-func searchMotionTick(sequence uint64) tea.Cmd {
-	return tea.Tick(55*time.Millisecond, func(time.Time) tea.Msg { return searchMotionMsg{sequence} })
-}
-
-func (m *searchSelectModel) startSearchReveal() tea.Cmd {
-	m.motionSeq++
-	if !m.revealing {
-		return nil
-	}
-	return searchMotionTick(m.motionSeq)
-}
-
 func newSearchSelectModel(query string, c *zlib.Client, opts *zlib.SearchOptions, fullTitle bool) searchSelectModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(currentTheme.Accent)
 	p := progress.New(progress.WithWidth(12), progress.WithColors(currentTheme.Accent, currentTheme.Info),
 		progress.WithoutPercentage(), progress.WithFillCharacters('━', '─'))
-
-	ti := textinput.New()
-	ti.Prompt = "/ "
-	ti.Placeholder = "refine search…"
-	styles := ti.Styles()
-	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(currentTheme.Accent)
-	styles.Focused.Text = lipgloss.NewStyle().Foreground(currentTheme.Title)
-	styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(currentTheme.Muted)
-	styles.Blurred = styles.Focused
-	styles.Cursor.Color = currentTheme.Accent
-	ti.SetStyles(styles)
 
 	return searchSelectModel{
 		client:        c,
@@ -137,7 +106,6 @@ func newSearchSelectModel(query string, c *zlib.Client, opts *zlib.SearchOptions
 		progress:      p,
 		reducedMotion: searchReducedMotion,
 		fullTitle:     fullTitle,
-		input:         ti,
 	}
 }
 
@@ -181,18 +149,40 @@ func (m searchSelectModel) fetchPage(page int) tea.Cmd {
 }
 
 func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.state == searchStateFilter {
+		if size, ok := msg.(tea.WindowSizeMsg); ok {
+			m.width, m.height = size.Width, size.Height
+		}
+		if k, ok := msg.(tea.KeyPressMsg); ok && k.String() == "esc" && m.filter.picker < 0 {
+			m.state = searchStateResults
+			return m, nil
+		}
+		if k, ok := msg.(tea.KeyPressMsg); ok && k.String() == "ctrl+c" {
+			m.quitting = true
+			return m, tea.Quit
+		}
+		next, _ := m.filter.Update(msg)
+		m.filter = next.(searchFilterForm)
+		if !m.filter.accepted {
+			return m, nil
+		}
+		m.query = m.filter.query
+		m.opts = m.filter.searchOptions()
+		m.page, m.loadingPage = 1, 1
+		m.totalPages, m.cursor, m.listOffset = 0, 0, 0
+		m.err = nil
+		m.state = searchStateLoading
+		return m, m.loadPage(1)
+	}
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.input.SetWidth(max(1, msg.Width-3))
 		m.ensureCursorVisible()
 		return m, nil
 
 	case listLoadError:
-		m.motionSeq++
-		m.revealing = false
 		m.err = msg.err
 		m.retryPage = msg.page
 		m.loadingPage = 0
@@ -208,10 +198,7 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.listOffset = 0
 		m.loadingPage = 0
 		m.state = searchStateResults
-		m.revealing = m.feed == nil && m.feedPage == nil && !m.reducedMotion && len(m.books) > 4
-		m.revealRows = min(4, len(m.books))
-		detail := m.queueSelectedDetail()
-		return m, tea.Batch(m.startSearchReveal(), detail)
+		return m, m.queueSelectedDetail()
 
 	case bookDetailReadyMsg:
 		if msg.sequence == m.details.sequence && msg.ref == m.selectedBookRef() && m.state == searchStateResults {
@@ -221,19 +208,6 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case bookDetailResultMsg:
 		m.details.store(msg)
-		return m, nil
-
-	case searchMotionMsg:
-		if msg.sequence != m.motionSeq || m.state != searchStateResults {
-			return m, nil
-		}
-		if m.revealing {
-			m.revealRows = min(len(m.books), m.revealRows+6)
-			m.revealing = m.revealRows < len(m.books)
-		}
-		if m.revealing {
-			return m, searchMotionTick(m.motionSeq)
-		}
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -314,12 +288,10 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.feed != nil || m.feedPage != nil {
 					return m, nil
 				}
-				// Enter inline query editing, pre-filled with the current
-				// query so it can be tweaked rather than retyped.
 				m.state = searchStateFilter
-				m.input.SetValue(m.query)
-				m.input.CursorEnd()
-				return m, m.input.Focus()
+				m.filter = newSearchFilterForm(m.query, m.opts)
+				m.filter.width, m.filter.height = m.width, m.height
+				return m, m.filter.Init()
 			case "q", "esc", "ctrl+c":
 				m.err = nil
 				m.quitting = true
@@ -327,41 +299,8 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.ensureCursorVisible()
 			if m.cursor != previousCursor {
-				m.motionSeq++
-				m.revealing = false
 				return m, m.queueSelectedDetail()
 			}
-		case searchStateFilter:
-			switch msg.String() {
-			case "enter":
-				q := m.input.Value()
-				m.input.Blur()
-				if strings.TrimSpace(q) == "" || q == m.query {
-					// Nothing to re-run; return to the current results.
-					m.state = searchStateResults
-					return m, nil
-				}
-				m.query = q
-				m.page = 1
-				m.totalPages = 0
-				m.cursor = 0
-				m.listOffset = 0
-				m.err = nil
-				m.state = searchStateLoading
-				m.loadingPage = 1
-				m.motionSeq++
-				m.revealing = false
-				return m, m.loadPage(1)
-			case "esc":
-				m.input.Blur()
-				m.state = searchStateResults
-				return m, nil
-			case "ctrl+c":
-				m.input.Blur()
-				m.quitting = true
-				return m, tea.Quit
-			}
-			// Any other key edits the query; fall through to input.Update below.
 		case searchStateLoading:
 			if msg.String() == "q" || msg.String() == "esc" || msg.String() == "ctrl+c" {
 				m.quitting = true
@@ -377,26 +316,20 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// While editing, route remaining messages (typed keys, cursor blink) to
-	// the text input so it updates and keeps blinking.
-	if m.state == searchStateFilter {
-		var cmd tea.Cmd
-		m.input, cmd = m.input.Update(msg)
-		return m, cmd
-	}
 	return m, nil
 }
 
 func (m searchSelectModel) View() tea.View {
+	if m.state == searchStateFilter {
+		return m.filter.View()
+	}
 	v := m.listView()
 	if m.err != nil {
 		title := m.feedTitle
 		if title == "" {
 			title = "Search: " + bookCell(m.query)
 		}
-		if m.state == searchStateFilter {
-			v = screenView(m.width, m.height, title, "Search failed", m.input.View(), bookCell(m.err.Error()), uiKey("enter", "search"), uiKey("esc", "cancel"))
-		} else if m.feed == nil && m.feedPage == nil {
+		if m.feed == nil && m.feedPage == nil {
 			searchKey := "/"
 			if m.inShell {
 				searchKey = "ctrl+f"
@@ -408,7 +341,7 @@ func (m searchSelectModel) View() tea.View {
 	}
 	if m.confirmDownload {
 		book := m.books[m.cursor]
-		v.Content = confirmationDialog(v.Content, m.width, m.height, "Download book?", book.Name, bookCommandID(book), "Download the selected book.", "Download", m.downloadFocused, false)
+		v.Content = confirmationDialog(v.Content, m.width, m.height, "Download book?", book.Name, bookCommandID(book), "", "Download", m.downloadFocused, false)
 		v.AltScreen = true
 	}
 	return fullScreenView(m.width, m.height, v.Content)
@@ -418,10 +351,10 @@ func (m searchSelectModel) listView() tea.View {
 	if m.feed == nil && m.feedPage == nil {
 		list := m
 		list.feedTitle = "Search: " + bookCell(m.query)
-		status := fmt.Sprintf("Page %d", m.page)
-		if m.state == searchStateLoading && m.loadingPage > 0 {
-			status = fmt.Sprintf("Page %d", m.loadingPage)
+		if m.state == searchStateLoading {
+			return screenView(m.width, m.height, list.feedTitle, "", "  "+m.spinner.View(), "", uiKey("esc", "back"))
 		}
+		status := fmt.Sprintf("Page %d", m.page)
 		if m.totalPages > 0 {
 			status += fmt.Sprintf(" / %d", m.totalPages)
 		}
@@ -430,8 +363,16 @@ func (m searchSelectModel) listView() tea.View {
 				status += "   " + m.progress.ViewAs(float64(m.cursor+1)/float64(len(m.books)))
 			}
 		}
-		if m.state == searchStateFilter {
-			status = m.input.View()
+		if m.state == searchStateResults && len(m.books) == 0 {
+			searchKey := "/"
+			exitLabel := "quit"
+			if m.inShell {
+				searchKey = "Ctrl+F"
+				exitLabel = "back"
+			}
+			return screenView(m.width, m.height, list.feedTitle, status,
+				"  No books found for this search.\n  Try another title, author, or ISBN.", "",
+				uiKey(searchKey, "search"), uiKey("q", exitLabel))
 		}
 		return fullScreenView(m.width, m.height, list.feedViewWith("Author", "No books found.", status, "/ search · ←/→ page · "))
 	}
@@ -446,41 +387,15 @@ func (m searchSelectModel) listView() tea.View {
 }
 
 func interactiveSearch(c *zlib.Client, opts *zlib.SearchOptions, fullTitle bool) (string, error) {
-	var query string
-	var selectedExts []string
-
-	// Pre-select extensions from CLI --ext flags
-	if opts != nil {
-		for _, e := range opts.Extensions {
-			selectedExts = append(selectedExts, string(e))
-		}
-	}
-
-	fields, accepted, err := runInlineForm(newInlineForm("Search books", "Search", []formField{
-		{label: "Query", hint: "Title, author, or ISBN", validate: requiredField("query")},
-		{label: "Formats", options: []string{"EPUB", "AZW", "AZW3", "MOBI", "PDF", "RTF", "TXT"}, selected: selectedExts, hint: "Choose formats or leave all unchecked"},
-	}))
+	form, err := runSearchFilterForm(newSearchFilterForm("", opts))
 	if err != nil {
 		return "", err
 	}
-	if !accepted {
+	if !form.accepted {
 		return "", nil
 	}
-	query, selectedExts = fields[0].value, fields[1].selected
-	if strings.TrimSpace(query) == "" {
-		return "", nil
-	}
-
-	// Merge selected extensions into opts
-	if len(selectedExts) > 0 || opts != nil {
-		if opts == nil {
-			opts = &zlib.SearchOptions{}
-		}
-		opts.Extensions = nil
-		for _, e := range selectedExts {
-			opts.Extensions = append(opts.Extensions, zlib.Extension(e))
-		}
-	}
+	query := form.query
+	opts = form.searchOptions()
 
 	if c == nil {
 		c = newClient()

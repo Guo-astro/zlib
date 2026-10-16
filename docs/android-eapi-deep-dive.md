@@ -97,7 +97,7 @@ Android 搜索排序弹窗把选项索引交给 `com.positron_it.zlib.ui.library
 | 文件从大到小 | `filesize` |
 | 文件从小到大 | `filesizeA` |
 
-同一会话、域名、查询词与 `limit=10` 下，八种值分别得到八个不同的 ID 顺序指纹；`date_created`、`date_updated` 和刻意无效的排序值则都与 `popular` 相同。此测试能证明服务器对八种值产生了可观察的不同排列，却不单凭十本样本证明年份和文件大小严格单调，也不证明其他查询恒定如此。当前 [OrderOption](../constants.go) 只有 `popular,date_created,date_updated`，后两者与 APK 的 UI 值不一致；[SearchOptions](../model.go) 甚至尚无 `order` 字段，CLI 也没有 `--order`。因此应先把 APK 值和对应标签贯通，并为同一测试数据上的排序结果加回归测试。成功码本身不足以验证排序。
+同一会话、域名、查询词与 `limit=10` 下，八种值分别得到八个不同的 ID 顺序指纹；`date_created`、`date_updated` 和刻意无效的排序值则都与 `popular` 相同。此测试能证明服务器对八种值产生了可观察的不同排列，却不单凭十本样本证明年份和文件大小严格单调，也不证明其他查询恒定如此。搜索现已支持这八种值；旧的 `date_created`、`date_updated` 常量保留给现有调用者，搜索表单和 `--order` 不提供它们。成功码本身不足以验证排序。
 
 收藏和下载历史使用另一组值。APK `com.positron_it.zlib.ui.mybooks.viewModel.g` 的收藏排序数组为 `saved_date,saved_dateA,titleA,title,year,filesize,filesizeA`；下载历史排序数组为 `downloaded_date,downloaded_dateA,titleA,title,year,filesize,filesizeA`。同一账户下，8 本收藏书籍在七个值下各有不同 ID 顺序；前 10 本下载历史也得到七种不同顺序。两类列表的 `date_created` 和刻意无效值各自同序，说明“服务器接受”仍不足以证明值有效。8 本和 10 本的比较只证明样本中的可观察差异，不证明字段排序的数学正确性，也不应与搜索共用同一排序枚举。
 
@@ -107,7 +107,7 @@ Android 搜索排序弹窗把选项索引交给 `com.positron_it.zlib.ui.library
 
 | 优先级 | 命令或改进 | 依据与具体实现边界 |
 | --- | --- | --- |
-| 1 | `search --order`，交互搜索加入排序选择 | APK 八值有调用链证据，L 已观察八种不同排列。保持默认排序不变，显式值只接受经过验证的八种；不要继续把 `date_created/date_updated` 当作 Android 排序值。 |
+| 已完成 | `search --order`，交互搜索加入排序选择 | 搜索表单和 CLI 使用 APK 的八种值；未选排序时不发送 `order`。`date_created/date_updated` 不在搜索选项中。 |
 | 1 | `similar <id:hash>` | `/similar` 本次返回 24 本，适合复用当前书籍列表与选择下载界面；简版图书只保证 ID/hash/标题/作者/封面。 |
 | 1 | `favorites --order` / `history --order` | APK 有各自七个值，现有 EAPI 方法只有分页；L 的书籍 ID 顺序比较支持这些值确实改变结果。收藏和历史不能误用搜索排序数组。 |
 | 2 | `info languages`、`info extensions` | L 观察到语言映射和 12 个格式，可将搜索筛选值从本地固定枚举更新为服务端列表，仍需兼容离线与缓存失效。 |

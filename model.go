@@ -93,6 +93,7 @@ type SearchOptions struct {
 	ToYear     int
 	Languages  []Language
 	Extensions []Extension
+	Order      OrderOption
 }
 
 type FullTextSearchOptions struct {

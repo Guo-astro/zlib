@@ -21,9 +21,16 @@ func (e Extension) String() string { return string(e) }
 type OrderOption string
 
 const (
-	OrderPopular OrderOption = "popular"
-	OrderNewest  OrderOption = "date_created"
-	OrderRecent  OrderOption = "date_updated"
+	OrderPopular      OrderOption = "popular"
+	OrderNewest       OrderOption = "date_created"
+	OrderRecent       OrderOption = "date_updated"
+	OrderBestMatch    OrderOption = "bestmatch"
+	OrderDate         OrderOption = "date"
+	OrderTitleAZ      OrderOption = "titleA"
+	OrderTitleZA      OrderOption = "title"
+	OrderYear         OrderOption = "year"
+	OrderFileSizeDesc OrderOption = "filesize"
+	OrderFileSizeAsc  OrderOption = "filesizeA"
 )
 
 func (o OrderOption) String() string { return string(o) }

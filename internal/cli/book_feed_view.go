@@ -128,10 +128,6 @@ func (m searchSelectModel) feedViewWith(column, empty, status, navigation string
 	}
 	lines = append(lines, muted.Render(row("#", "Title", column)))
 	for i := start; i < end; i++ {
-		if m.revealing && i >= m.revealRows {
-			lines = append(lines, "")
-			continue
-		}
 		book := m.books[i]
 		s := row(fmt.Sprint(i+1), book.Name, strings.Join(book.Authors, ", "))
 		if i == cursor {

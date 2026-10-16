@@ -102,18 +102,20 @@ func recognizedTheme(name string) string {
 	return ""
 }
 
-func resolveTheme() { currentTheme = themes[configuredThemeName()] }
+func resolveTheme() {
+	currentTheme, _ = namedTheme(configuredThemeName())
+}
 
 // themeNames returns the picker order.
 func themeNames() []string {
-	return slices.Clone(themeOrder)
+	return append(slices.Clone(themeOrder), customThemeNames()...)
 }
 
 func selectableThemes() []string { return themeNames() }
 
 // isSelectableTheme reports whether name is a settable theme value.
 func isSelectableTheme(name string) bool {
-	_, ok := themes[name]
+	_, ok := namedTheme(name)
 	return ok
 }
 
@@ -155,7 +157,7 @@ var themeCmd = &cobra.Command{
 			return fmt.Errorf("failed to save theme: %w", err)
 		}
 
-		currentTheme = themes[configuredThemeName()]
+		resolveTheme()
 		msg := colorBold(name)
 		lipgloss.Fprintf(cmd.OutOrStdout(), "%s Theme set to %s\n", colorGreen(symbolSuccess), msg)
 		lipgloss.Fprintf(cmd.OutOrStdout(), "%s Saved to: %s\n", colorFaint(symbolInfo), tildePath(config.ConfigPath()))

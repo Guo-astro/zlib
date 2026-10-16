@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -23,65 +22,19 @@ var kindleAllowedTypes = []string{".epub", ".pdf", ".txt", ".doc", ".docx", ".ht
 
 var kindleCmd = &cobra.Command{
 	Use:   "kindle",
-	Short: "Set up Kindle delivery",
+	Short: "Select a file to send to Kindle",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadKindleConfig()
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to load kindle config: %w", err)
-		}
+		return runStandaloneShellCommand("/kindle")
+	},
+}
 
-		if cfg.SMTPHost == "" {
-			cfg.SMTPHost = defaultKindleSMTPHost
-		}
-		if cfg.SMTPPort == 0 {
-			cfg.SMTPPort = defaultKindleSMTPPort
-		}
-		portStr := strconv.Itoa(cfg.SMTPPort)
-
-		form := newFormModel("Kindle settings", "Save", []formField{
-			{label: "Kindle address", value: cfg.To, hint: "Your Send to Kindle address", validate: requiredField("Kindle address")},
-			{label: "From address", value: cfg.From, hint: "An address approved in your Amazon settings", validate: requiredField("from address")},
-			{label: "SMTP host", value: cfg.SMTPHost, hint: "Outgoing mail server", validate: requiredField("SMTP host")},
-			{label: "SMTP port", value: portStr, hint: "Usually 587 (STARTTLS) or 465 (TLS)", validate: func(s string) error {
-				port, err := strconv.Atoi(strings.TrimSpace(s))
-				if err != nil || port < 1 || port > 65535 {
-					return fmt.Errorf("enter a port from 1 to 65535")
-				}
-				return nil
-			}},
-		})
-		form.validate = func(fields []formField) error {
-			draft := cfg
-			draft.To = fields[0].value
-			draft.From = fields[1].value
-			draft.SMTPHost = fields[2].value
-			draft.SMTPPort, _ = strconv.Atoi(strings.TrimSpace(fields[3].value))
-			return draft.Validate()
-		}
-		fields, accepted, err := runForm(form)
-		if err != nil {
-			return err
-		}
-		if !accepted {
-			return nil
-		}
-		cfg.To, cfg.From, cfg.SMTPHost, portStr = fields[0].value, fields[1].value, fields[2].value, fields[3].value
-		port, err := strconv.Atoi(strings.TrimSpace(portStr))
-		if err != nil || port <= 0 {
-			return fmt.Errorf("invalid SMTP port: %s", portStr)
-		}
-		cfg.SMTPPort = port
-
-		if err := cfg.Validate(); err != nil {
-			return err
-		}
-		if err := config.SaveKindleConfig(cfg); err != nil {
-			return fmt.Errorf("failed to save kindle config: %w", err)
-		}
-
-		lipgloss.Fprintf(os.Stdout, "%s Saved to: %s\n", colorGreen(symbolSuccess), tildePath(config.KindleConfigPath()))
-		lipgloss.Fprintf(os.Stdout, "%s SMTP password via: export %s=...\n", colorFaint(symbolInfo), kindleSMTPPasswordEnv)
-		return nil
+var kindleConfigCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Set up Kindle delivery",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runStandaloneShellCommand("/kindle config")
 	},
 }
 
@@ -90,6 +43,16 @@ var kindleSendCmd = &cobra.Command{
 	Short: "Send a local file to Kindle",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if isInteractive() {
+			if len(args) == 0 {
+				return runStandaloneShellCommand("/kindle send")
+			}
+			path, err := expandTilde(args[0])
+			if err != nil {
+				return err
+			}
+			return runStandaloneShellCommand("/kindle send " + path)
+		}
 		var filePath string
 		if len(args) > 0 {
 			expanded, err := expandTilde(args[0])
@@ -112,14 +75,14 @@ var kindleSendCmd = &cobra.Command{
 }
 
 func init() {
-	kindleCmd.AddCommand(kindleSendCmd)
+	kindleCmd.AddCommand(kindleConfigCmd, kindleSendCmd)
 }
 
 func sendDownloadedFileToKindle(filePath string) error {
 	cfg, err := config.LoadKindleConfig()
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("kindle config not found; run: zlib kindle")
+			return fmt.Errorf("kindle config not found; run: zlib kindle config")
 		}
 		return fmt.Errorf("failed to load kindle config: %w", err)
 	}

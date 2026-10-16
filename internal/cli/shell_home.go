@@ -36,6 +36,17 @@ func homeLogo(width, height int) []string {
 		name := accent.Render("ZLIB") + strings.Repeat(" ", blockWidth-4)
 		return []string{name, strings.Repeat(" ", blockWidth-ansi.StringWidth(label)) + version.Render(label)}
 	}
+	rows := homeWordmark()
+	wordmarkWidth := ansi.StringWidth(rows[0])
+	label := ansi.Truncate(zlib.Version, wordmarkWidth, "…")
+	meta := strings.Repeat(" ", wordmarkWidth-ansi.StringWidth(label)) + version.Render(label)
+	if height >= 16 {
+		rows = append(rows, strings.Repeat(" ", wordmarkWidth))
+	}
+	return append(rows, meta)
+}
+
+func homeWordmark() []string {
 	rows := make([]string, len(homeLetterforms[0]))
 	colors := []lipgloss.Style{
 		lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true),
@@ -50,13 +61,7 @@ func homeLogo(width, height int) []string {
 		}
 		rows[row] = strings.Join(letters, " ")
 	}
-	wordmarkWidth := ansi.StringWidth(rows[0])
-	label := ansi.Truncate(zlib.Version, wordmarkWidth, "…")
-	meta := strings.Repeat(" ", wordmarkWidth-ansi.StringWidth(label)) + version.Render(label)
-	if height >= 16 {
-		rows = append(rows, strings.Repeat(" ", wordmarkWidth))
-	}
-	return append(rows, meta)
+	return rows
 }
 
 func homeShortcutCell(shortcut homeShortcut, width int) string {

@@ -4,11 +4,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 
+	keys "charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/progress"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/heartleo/zlib"
 	"github.com/spf13/cobra"
 )
@@ -123,22 +128,27 @@ const (
 )
 
 type downloadModel struct {
-	width, height int
-	id            string
-	dir           string
-	client        *zlib.Client
-	state         downloadState
-	bookName      string
-	directURL     string // set to skip fetch and download immediately
-	spinner       spinner.Model
-	progress      progress.Model
-	written       int64
-	total         int64
-	savedPath     string
-	savedSize     int64
-	err           error
-	downloadCh    chan tea.Msg
-	cancel        context.CancelFunc
+	width, height  int
+	id             string
+	dir            string
+	client         *zlib.Client
+	state          downloadState
+	bookName       string
+	directURL      string // set to skip fetch and download immediately
+	spinner        spinner.Model
+	progress       progress.Model
+	written        int64
+	total          int64
+	savedPath      string
+	savedSize      int64
+	stayOnComplete bool
+	completeOffset int
+	completeAction int
+	sendToKindle   bool
+	kindleMessage  string
+	err            error
+	downloadCh     chan tea.Msg
+	cancel         context.CancelFunc
 }
 
 type fetchDoneMsg struct{ book zlib.Book }
@@ -177,6 +187,9 @@ func newDirectDownloadModel(bookName, downloadURL, dir string, c *zlib.Client) d
 }
 
 func (m downloadModel) Init() tea.Cmd {
+	if m.state == stateComplete {
+		return nil
+	}
 	if m.directURL != "" {
 		// Emit a synthetic fetchDoneMsg to skip the HTTP fetch.
 		book := zlib.Book{DownloadURL: m.directURL, Name: m.bookName}
@@ -243,6 +256,37 @@ func (m downloadModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, waitForMsg(ch)
 
 	case tea.KeyPressMsg:
+		if m.state == stateComplete && m.stayOnComplete {
+			if !m.canSendToKindle() {
+				m.completeAction = 0
+			}
+			switch msg.String() {
+			case "enter":
+				m.sendToKindle = m.completeAction == 1 && m.canSendToKindle()
+				return m, tea.Quit
+			case "esc", "q", "ctrl+c":
+				m.sendToKindle = false
+				return m, tea.Quit
+			case "left", "shift+tab":
+				if m.canSendToKindle() {
+					m.completeAction = (m.completeAction + 1) % 2
+				}
+			case "right", "tab":
+				if m.canSendToKindle() {
+					m.completeAction = (m.completeAction + 1) % 2
+				}
+			case "up", "k":
+				m.completeOffset--
+			case "down", "j":
+				m.completeOffset++
+			case "pgup":
+				m.completeOffset -= max(1, m.height-6)
+			case "pgdown":
+				m.completeOffset += max(1, m.height-6)
+			}
+			m.completeOffset = min(max(0, m.completeOffset), m.maxCompleteOffset())
+			return m, nil
+		}
 		if msg.String() == "ctrl+c" || msg.String() == "esc" {
 			if m.cancel != nil {
 				m.cancel()
@@ -263,8 +307,14 @@ func (m downloadModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case downloadDoneMsg:
 		m.savedPath = msg.path
+		if path, err := filepath.Abs(msg.path); err == nil {
+			m.savedPath = path
+		}
 		m.savedSize = msg.size
 		m.state = stateComplete
+		if m.stayOnComplete {
+			return m, nil
+		}
 		return m, tea.Quit
 
 	case progress.FrameMsg:
@@ -283,7 +333,57 @@ func (m downloadModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m downloadModel) View() tea.View {
+	if m.state == stateComplete && m.stayOnComplete {
+		return m.completeView()
+	}
 	return screenView(m.width, m.height, "Download", bookCell(m.bookName), m.viewContent(), "Directory: "+bookCell(m.dir), uiKey("esc", "cancel"))
+}
+
+func (m downloadModel) completeLines() []string {
+	path := strings.NewReplacer("\r", " ", "\n", " ").Replace(ansi.Strip(m.savedPath))
+	return append([]string{"Saved to:"}, strings.Split(ansi.Hardwrap(path, max(1, m.width-2), false), "\n")...)
+}
+
+func (m downloadModel) maxCompleteOffset() int {
+	return max(0, len(m.completeLines())-m.completePathRows())
+}
+
+func (m downloadModel) canSendToKindle() bool {
+	return slices.Contains(kindleAllowedTypes, strings.ToLower(filepath.Ext(m.savedPath)))
+}
+
+func (m downloadModel) completeActions() []string {
+	if m.canSendToKindle() {
+		return []string{"Back", "Send to Kindle"}
+	}
+	return []string{"Back"}
+}
+
+func (m downloadModel) completePathRows() int {
+	return max(1, m.height-6-len(actionButtonRows(m.completeActions(), m.completeAction+1, m.width))-1)
+}
+
+func (m downloadModel) completeView() tea.View {
+	lines := m.completeLines()
+	buttons := actionButtonRows(m.completeActions(), m.completeAction+1, m.width)
+	visible := m.completePathRows()
+	start := min(max(0, m.completeOffset), max(0, len(lines)-visible))
+	status := m.kindleMessage
+	if status == "" && len(lines) > visible {
+		status = fmt.Sprintf("Path lines %d–%d of %d", start+1, min(start+visible, len(lines)), len(lines))
+	}
+	bindings := []keys.Binding{uiKey("enter", "back")}
+	if m.canSendToKindle() {
+		bindings = []keys.Binding{uiKey("←/→", "select"), uiKey("enter", "open")}
+	}
+	if len(lines) > visible {
+		bindings = append(bindings, uiKey("↑/↓", "scroll"))
+	}
+	body := append([]string{}, lines[start:min(len(lines), start+visible)]...)
+	body = append(body, "")
+	body = append(body, buttons...)
+	return screenView(m.width, m.height, "Download complete", bookCell(m.bookName), strings.Join(body, "\n"), status,
+		bindings...)
 }
 
 func (m downloadModel) viewContent() string {

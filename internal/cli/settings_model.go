@@ -73,10 +73,15 @@ func newSettingsModel(ctx context.Context, store settingsStore, page string) (se
 	}
 	values = append(values, kindleSettingValues(kindle)...)
 	input := textinput.New()
-	input.Prompt = ""
+	input.SetVirtualCursor(false)
+	input.Prompt = "> "
 	input.SetWidth(48)
 	styles := input.Styles()
+	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(currentTheme.Accent)
 	styles.Focused.Text = lipgloss.NewStyle().Foreground(currentTheme.Title)
+	styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	styles.Blurred.Text = lipgloss.NewStyle().Foreground(currentTheme.Muted)
 	styles.Cursor.Color = currentTheme.Accent
 	input.SetStyles(styles)
 	return settingsModel{store: store, values: values, kindle: kindle, page: page, input: input, ctx: ctx, width: 80, height: 24}, nil
@@ -156,12 +161,12 @@ func (m *settingsModel) edit(key string) tea.Cmd {
 	m.original = value
 	m.input.SetValue(value)
 	m.input.CursorEnd()
-	m.input.SetWidth(max(1, min(56, m.width-8)))
+	m.input.Placeholder = ""
 	if key == zlib.EnvProxy {
-		m.input.EchoMode = textinput.EchoPassword
-	} else {
-		m.input.EchoMode = textinput.EchoNormal
+		m.input.Placeholder = "http://host:port"
 	}
+	m.input.SetWidth(max(1, min(56, m.width-ansi.StringWidth(m.input.Prompt)-4)))
+	m.input.EchoMode = textinput.EchoNormal
 	return m.input.Focus()
 }
 
@@ -351,7 +356,7 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.input.SetWidth(max(1, min(56, m.width-8)))
+		m.input.SetWidth(max(1, min(56, m.width-ansi.StringWidth(m.input.Prompt)-4)))
 		return m, nil
 	case settingsProbeMsg:
 		if msg.generation != m.generation {
@@ -714,18 +719,7 @@ func (m settingsModel) View() tea.View {
 		} else if m.key == zlib.EnvProxy {
 			actions[0] = "Test"
 		}
-		var buttons []string
-		for i, label := range actions {
-			if label == "" {
-				continue
-			}
-			style := lipgloss.NewStyle().Foreground(currentTheme.Title)
-			if m.editAction == i+1 {
-				style = style.Background(currentTheme.Accent).Foreground(currentTheme.Surface).Bold(true)
-			}
-			buttons = append(buttons, style.Render("["+label+"]"))
-		}
-		lines = append(lines, strings.Join(buttons, " "))
+		lines = append(lines, actionButtonRows(actions, m.editAction, w)...)
 		controls = []keys.Binding{uiKey("esc", "cancel"), uiKey("enter", "save"), uiKey("tab", "actions")}
 		if m.key == downloadDirEnvVar {
 			controls = append(controls, uiKey("ctrl+b", "browse"))

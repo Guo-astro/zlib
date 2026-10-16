@@ -44,8 +44,8 @@ func TestProfilePageUsesFullScreenAndScrolls(t *testing.T) {
 	before := m.viewport.YOffset()
 	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
 	m = next.(profilePageModel)
-	if m.viewport.YOffset() <= before || !strings.Contains(ansi.Strip(m.View().Content), "ACCOUNT") {
-		t.Fatal("profile does not scroll to account details")
+	if m.viewport.YOffset() <= before || !strings.Contains(ansi.Strip(m.View().Content), "kindle@example.com") {
+		t.Fatalf("profile does not scroll to account details: offset=%d, view=%q", m.viewport.YOffset(), ansi.Strip(m.View().Content))
 	}
 }
 
@@ -53,6 +53,46 @@ func TestProfilePageUnknownQuota(t *testing.T) {
 	page := renderProfilePage(zlib.UserProfile{Name: "Reader"}, 80)
 	if !strings.Contains(ansi.Strip(page), "Quota unavailable") || strings.Contains(page, "0 / 0") {
 		t.Fatalf("unknown quota rendered incorrectly: %q", page)
+	}
+}
+
+func TestProfileQuotaBarUsesWidthAndDoesNotRepeatRemaining(t *testing.T) {
+	profile := zlib.UserProfile{
+		Name: "Reader", Email: "reader@example.com", KindleEmail: "kindle@example.com", QuotaKnown: true,
+		DownloadLimit: zlib.DownloadLimit{DailyAmount: 1, DailyAllowed: 10, DailyRemaining: 9},
+	}
+	for _, width := range []int{20, 30, 40, 72, 80, 120} {
+		page := renderProfilePage(profile, width)
+		plain := ansi.Strip(page)
+		if strings.Count(plain, "1 / 10 used") != 1 || strings.Contains(plain, "Remaining") {
+			t.Fatalf("quota text is repeated at width %d: %q", width, plain)
+		}
+		barFound := false
+		for _, line := range strings.Split(page, "\n") {
+			if ansi.StringWidth(line) > width {
+				t.Fatalf("profile line exceeds width %d: %q", width, line)
+			}
+			if strings.Contains(ansi.Strip(line), "━") {
+				barFound = true
+				if ansi.StringWidth(line) != width || !strings.Contains(ansi.Strip(line), "─") {
+					t.Fatalf("quota bar does not fill width %d: %q", width, line)
+				}
+			}
+		}
+		if !barFound {
+			t.Fatalf("used quota is missing from the bar at width %d", width)
+		}
+		if width >= 72 {
+			paired := false
+			for _, line := range strings.Split(plain, "\n") {
+				if strings.Contains(line, "Email") && strings.Contains(line, "Kindle email") {
+					paired = true
+				}
+			}
+			if !paired {
+				t.Fatal("wide profile did not use account columns")
+			}
+		}
 	}
 }
 

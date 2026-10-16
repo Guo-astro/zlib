@@ -75,6 +75,44 @@ func uiKey(key, label string) keys.Binding {
 	return keys.NewBinding(keys.WithKeys(key), keys.WithHelp(key, label))
 }
 
+// actionButtonRows renders borderless actions and wraps them on narrow screens.
+// Focus is one-based so zero can represent a text field before the actions.
+func renderActionButton(label string, focused, danger bool) string {
+	style := lipgloss.NewStyle().Foreground(currentTheme.Title).Background(currentTheme.Surface).Padding(0, 2)
+	if focused {
+		background := currentTheme.Accent
+		if danger {
+			background = currentTheme.Error
+		}
+		style = style.Foreground(currentTheme.Surface).Background(background).Bold(true)
+	}
+	return style.Render(label)
+}
+
+func actionButtonRows(actions []string, focused, width int) []string {
+	var rows []string
+	row := ""
+	for i, label := range actions {
+		if label == "" {
+			continue
+		}
+		button := renderActionButton(label, focused == i+1, label == "Reset")
+		button = ansi.Truncate(button, max(1, width), "…")
+		if row != "" && ansi.StringWidth(row)+2+ansi.StringWidth(button) > width {
+			rows = append(rows, row)
+			row = ""
+		}
+		if row != "" {
+			row += "  "
+		}
+		row += button
+	}
+	if row != "" {
+		rows = append(rows, row)
+	}
+	return rows
+}
+
 func selectionRow(label string, selected bool, width int) string {
 	return styledListRow(bookCell(label), selected, width, currentTheme)
 }

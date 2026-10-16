@@ -54,7 +54,7 @@ func TestHistoryDeleteDialogButtons(t *testing.T) {
 	next, _ := m.Update(key("d"))
 	m = next.(historySelectModel)
 	view := ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "> Cancel") || !strings.Contains(view, "A book") {
+	if m.deleteFocused || !strings.Contains(view, "Cancel") || !strings.Contains(view, "Delete") || !strings.Contains(view, "A book") {
 		t.Fatal("dialog missing selection or book")
 	}
 	next, cmd := m.Update(key("enter"))
@@ -63,7 +63,7 @@ func TestHistoryDeleteDialogButtons(t *testing.T) {
 	}
 	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	m = next.(historySelectModel)
-	if !strings.Contains(ansi.Strip(m.View().Content), "> Delete") {
+	if !m.deleteFocused || !strings.Contains(ansi.Strip(m.View().Content), "Delete") {
 		t.Fatal("delete button not focused")
 	}
 	next, cmd = m.Update(key("enter"))

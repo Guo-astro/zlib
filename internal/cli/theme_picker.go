@@ -38,6 +38,13 @@ type themePickerModel struct {
 	cursor, offset    int
 	width, height     int
 	accepted          bool
+	mode              string
+	editor            textinput.Model
+	draftName         string
+	draftBase         string
+	draftPalette      Theme
+	slot              int
+	message           string
 }
 
 func newThemePicker(current, override string) themePickerModel {
@@ -72,17 +79,18 @@ func (m themePickerModel) selected() string {
 }
 func (m themePickerModel) palette() Theme {
 	if len(m.names) == 0 {
-		if p, ok := themes[m.current]; ok {
+		if p, ok := namedTheme(m.current); ok {
 			return p
 		}
 		return themes[defaultTheme]
 	}
-	return themes[m.selected()]
+	p, _ := namedTheme(m.selected())
+	return p
 }
 
 // Keep navigation readable while the preview crosses dark and light palettes.
 func (m themePickerModel) chromePalette() Theme {
-	if p, ok := themes[recognizedTheme(m.current)]; ok {
+	if p, ok := namedTheme(recognizedTheme(m.current)); ok {
 		return p
 	}
 	return themes[defaultTheme]
@@ -119,6 +127,9 @@ func (m *themePickerModel) filterNames() {
 }
 
 func (m themePickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.mode != "" {
+		return m.updateEditor(msg)
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -126,6 +137,12 @@ func (m themePickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ensureVisible()
 	case tea.KeyPressMsg:
 		switch {
+		case msg.String() == "ctrl+n":
+			m.beginCustomTheme()
+			return m, nil
+		case msg.String() == "ctrl+e":
+			m.editSelectedTheme()
+			return m, nil
 		case keys.Matches(msg, themePickerKeys.cancel):
 			if msg.String() == "esc" && m.search.Value() != "" {
 				m.search.SetValue("")
@@ -199,27 +216,28 @@ func (m themePickerModel) listView(width int) string {
 }
 
 type themePreviewRow struct {
-	text  string
-	color color.Color
+	text       string
+	color      color.Color
+	background color.Color
 }
 
 func themePreview(p Theme, width, height int, wide bool) string {
 	rows := []themePreviewRow{
-		{`zlib search "example"`, p.Accent},
-		{"> 1  Example Book", p.Title},
-		{"  EPUB · 4 MB", p.ExtEPUB},
-		{"✓ Download complete", p.Success},
+		{`zlib search "example"`, p.Accent, nil},
+		{"> 1  Example Book", p.Title, p.Surface},
+		{"  EPUB · 4 MB", p.ExtEPUB, nil},
+		{"✓ Download complete", p.Success, nil},
 	}
 	if wide {
 		rows = []themePreviewRow{
-			{`zlib search "example"`, p.Accent},
-			{"Search: example · Page 1 / 4", p.Muted},
-			{"> 1  Example Book", p.Title},
-			{"     Example Author · EPUB · 4 MB", p.ExtEPUB},
-			{"     Book details", p.Link},
-			{"Enter  Download", p.Warning},
-			{"Save to  ./books", p.Info},
-			{"✓ Download complete", p.Success},
+			{`zlib search "example"`, p.Accent, nil},
+			{"Search: example · Page 1 / 4", p.Muted, nil},
+			{"> 1  Example Book", p.Title, p.Surface},
+			{"     Example Author · EPUB · 4 MB", p.ExtEPUB, nil},
+			{"     Book details", p.Link, nil},
+			{"Enter  Download", p.Warning, nil},
+			{"Save to  ./books", p.Info, nil},
+			{"✓ Download complete", p.Success, nil},
 		}
 	}
 	lines := make([]string, 0, height)
@@ -229,7 +247,11 @@ func themePreview(p Theme, width, height int, wide bool) string {
 	}
 	for _, row := range rows {
 		line := ansi.Truncate(row.text, width, "…")
-		lines = append(lines, lipgloss.NewStyle().Foreground(row.color).Background(p.Background).Width(width).Render(line))
+		background := p.Background
+		if row.background != nil {
+			background = row.background
+		}
+		lines = append(lines, lipgloss.NewStyle().Foreground(row.color).Background(background).Width(width).Render(line))
 	}
 	for len(lines) < height {
 		lines = append(lines, blank)
@@ -238,6 +260,9 @@ func themePreview(p Theme, width, height int, wide bool) string {
 }
 
 func (m themePickerModel) View() tea.View {
+	if m.mode != "" {
+		return m.editorView()
+	}
 	w, h := max(1, m.width), max(1, m.height)
 	v := tea.NewView("")
 	v.AltScreen = true
@@ -271,13 +296,18 @@ func (m themePickerModel) View() tea.View {
 	if m.override != "" {
 		status = "ZLIB_THEME=" + bookCell(m.override) + " overrides the saved preference"
 	}
+	if m.message != "" {
+		status = m.message
+	} else if w < 48 && m.override == "" {
+		status = "Ctrl+N new · Ctrl+E edit"
+	}
 	helpModel := help.New()
 	helpModel.SetWidth(w)
 	helpModel.Styles.ShortKey = base.Foreground(chrome.Accent)
 	helpModel.Styles.ShortDesc = muted
 	helpModel.Styles.ShortSeparator = muted
 	helpModel.Styles.Ellipsis = muted
-	bindings := []keys.Binding{themePickerKeys.up, themePickerKeys.save, themePickerKeys.cancel}
+	bindings := []keys.Binding{themePickerKeys.up, themePickerKeys.save, themePickerKeys.cancel, uiKey("ctrl+n", "new"), uiKey("ctrl+e", "edit")}
 	if w < 48 {
 		bindings = []keys.Binding{themePickerKeys.save, themePickerKeys.cancel}
 	}
@@ -294,9 +324,14 @@ func (m themePickerModel) View() tea.View {
 		lines[i] = ansi.Truncate(lines[i], w, "…")
 		lines[i] += base.Render(strings.Repeat(" ", max(0, w-ansi.StringWidth(lines[i]))))
 	}
-	// Fill defaults left by component cursors and separators without replacing
-	// explicit preview or selection colors.
-	cells := uv.NewStyledString(fullScreenView(w, h, strings.Join(lines, "\n")).Content).Lines(ansi.GraphemeWidth)
+	v.SetContent(paintThemeCanvas(strings.Join(lines, "\n"), w, h, chrome))
+	return v
+}
+
+// Paint unstyled cells with the fixed picker chrome without covering the
+// candidate preview's own background or selected-row surface.
+func paintThemeCanvas(content string, width, height int, chrome Theme) string {
+	cells := uv.NewStyledString(fullScreenView(width, height, content).Content).Lines(ansi.GraphemeWidth)
 	for y := range cells {
 		for x := range cells[y] {
 			if cells[y][x].Style.Bg == nil {
@@ -307,6 +342,5 @@ func (m themePickerModel) View() tea.View {
 			}
 		}
 	}
-	v.SetContent(uv.Lines(cells).Render())
-	return v
+	return uv.Lines(cells).Render()
 }

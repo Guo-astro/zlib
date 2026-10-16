@@ -41,6 +41,12 @@ func TestLoginEAPISavesRemixCredentials(t *testing.T) {
 // mentions the vendor must not be mistaken for a DiamWall block page.
 func TestSearchEAPIAllowsDiamWallInJSONPayload(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Error(err)
+		}
+		if _, ok := r.Form["order"]; ok {
+			t.Error("default search sent an order value")
+		}
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"success":1,"books":[{"id":"1","hash":"h","title":"Defeating DiamWall"}],"pagination":{"current":1,"total_pages":1}}`)
 	}))
@@ -56,6 +62,35 @@ func TestSearchEAPIAllowsDiamWallInJSONPayload(t *testing.T) {
 	}
 	if len(got.Books) != 1 || got.Books[0].Name != "Defeating DiamWall" {
 		t.Errorf("searchEAPI() books = %+v, want the DiamWall title", got.Books)
+	}
+}
+
+func TestSearchEAPISendsAllFilters(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Error(err)
+			return
+		}
+		for key, want := range map[string]string{"message": "books", "page": "2", "limit": "50", "yearFrom": "2001", "yearTo": "2020", "e": "1", "order": "bestmatch"} {
+			if got := r.Form.Get(key); got != want {
+				t.Errorf("%s = %q, want %q", key, got, want)
+			}
+		}
+		if got := r.Form["languages[]"]; len(got) != 2 || got[0] != "chinese" || got[1] != "english" {
+			t.Errorf("languages = %v", got)
+		}
+		if got := r.Form["extensions[]"]; len(got) != 2 || got[0] != "epub" || got[1] != "pdf" {
+			t.Errorf("extensions = %v", got)
+		}
+		fmt.Fprint(w, `{"success":1,"books":[],"pagination":{"current":2,"total_pages":3}}`)
+	}))
+	defer server.Close()
+	c := NewClient(WithDomain(server.URL))
+	c.SetMode(ClientModeEAPI)
+	c.SetCookies(map[string]string{"remix_userid": "1", "remix_userkey": "k"})
+	_, err := c.Search("books", 2, 50, &SearchOptions{FromYear: 2001, ToYear: 2020, Exact: true, Order: OrderBestMatch, Languages: []Language{LangChinese, LangEnglish}, Extensions: []Extension{ExtEPUB, ExtPDF}})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

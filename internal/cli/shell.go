@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/help"
 	keys "charm.land/bubbles/v2/key"
@@ -39,6 +41,7 @@ type shellText struct {
 	text string
 	err  error
 }
+type shellNoticeExpired struct{ version uint64 }
 type shellModel struct {
 	input                                                           textinput.Model
 	page                                                            tea.Model
@@ -48,9 +51,20 @@ type shellModel struct {
 	typing                                                          bool
 	signedIn                                                        bool
 	download                                                        downloadModel
+	kindleReturn                                                    *downloadModel
 	kindlePath                                                      string
 	loginForm                                                       *inlineForm
 	spinner                                                         spinner.Model
+	noticeVersion                                                   uint64
+	standalone                                                      bool
+	commandErr                                                      error
+}
+
+const shellNoticeTTL = 5 * time.Second
+
+func (m *shellModel) setNotice(message string) {
+	m.status = message
+	m.noticeVersion++
 }
 
 type shellCommand struct{ name, description string }
@@ -74,7 +88,7 @@ var shellCommands = []shellCommand{
 func newShellModel() shellModel {
 	input := textinput.New()
 	input.Prompt = "> "
-	input.Placeholder = "Search books or type / for commands"
+	input.Placeholder = "Filter commands"
 	input.Focus()
 	session, _ := config.LoadSession()
 	return shellModel{input: input, width: 80, height: 24, typing: true, signedIn: len(session.Cookies) > 0}
@@ -126,6 +140,12 @@ func (m *shellModel) open(kind string, page tea.Model) tea.Cmd {
 		} else if list, ok := page.(historySelectModel); ok {
 			list.inShell = true
 			page = list
+		}
+	}
+	if kind == "download" {
+		if download, ok := page.(downloadModel); ok {
+			download.stayOnComplete = true
+			page = download
 		}
 	}
 	m.generation++
@@ -180,11 +200,30 @@ func (m *shellModel) restore() {
 	m.resizePage()
 }
 
+func (m *shellModel) returnToDownloadCompletion(message string) tea.Cmd {
+	page := *m.kindleReturn
+	m.kindleReturn = nil
+	page.completeAction = 0
+	page.sendToKindle = false
+	page.kindleMessage = message
+	return m.open("download", page)
+}
+
 func (m shellModel) contentHeight() int {
 	return max(1, m.height-m.footerHeight())
 }
 
+func (m shellModel) homeIdle() bool {
+	return m.page == nil && m.kind == "" && !strings.HasPrefix(m.input.Value(), "/")
+}
+
 func (m shellModel) footerHeight() int {
+	if m.homeIdle() {
+		return 1
+	}
+	if m.paletteOpen() {
+		return 1
+	}
 	if m.typing {
 		return 2
 	}
@@ -234,6 +273,33 @@ func (m shellModel) childInputActive() bool {
 	}
 }
 func (m shellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if expired, ok := msg.(shellNoticeExpired); ok {
+		if expired.version == m.noticeVersion && m.kind != "info" {
+			m.status = ""
+		}
+		return m, nil
+	}
+	before := m.noticeVersion
+	next, cmd := m.update(msg)
+	m = next.(shellModel)
+	if m.standalone && m.page == nil && m.kind == "" {
+		if m.status != "" {
+			m.openInfo("Kindle", m.status)
+			return m, nil
+		}
+		return m, tea.Quit
+	}
+	if m.noticeVersion != before && m.status != "" && m.kind != "info" {
+		version := m.noticeVersion
+		expire := tea.Tick(shellNoticeTTL, func(time.Time) tea.Msg {
+			return shellNoticeExpired{version: version}
+		})
+		return m, tea.Batch(cmd, expire)
+	}
+	return m, cmd
+}
+
+func (m shellModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if tick, ok := msg.(spinner.TickMsg); ok && m.kind == "login-wait" {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(tick)
@@ -243,7 +309,7 @@ func (m shellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = size.Width, size.Height
 		m.input.SetWidth(max(1, m.width-4))
 		m.resizePage()
-		m.paletteOffset = min(m.paletteOffset, max(0, len(m.matches())-m.paletteVisibleRows(m.contentHeight())))
+		m.paletteOffset = min(m.paletteOffset, max(0, len(m.matches())-m.paletteVisibleRows(m.height)))
 		return m, nil
 	}
 	if event, ok := msg.(shellEvent); ok {
@@ -269,7 +335,7 @@ func (m shellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, m.open("login", form)
 					}
 					m.home()
-					m.status = result.err.Error()
+					m.setNotice(result.err.Error())
 					return m, nil
 				}
 				m.loginForm = nil
@@ -282,7 +348,7 @@ func (m shellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if pending != "" {
 					m.input.SetValue(pending)
 					m.input.CursorEnd()
-					m.status = "Press Enter to continue."
+					m.setNotice("Press Enter to continue.")
 				}
 				return m, nil
 			}
@@ -302,6 +368,23 @@ func (m shellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if k, ok := msg.(tea.KeyPressMsg); ok {
+		if m.homeIdle() {
+			switch k.String() {
+			case "/":
+				m.typing = true
+				m.input.SetValue("/")
+				m.selection, m.paletteOffset = 0, 0
+				m.status = ""
+				return m, m.input.Focus()
+			case "esc", "ctrl+c":
+			case "enter":
+				if m.signedIn {
+					return m, nil
+				}
+			default:
+				return m, nil
+			}
+		}
 		if m.typing {
 			switch k.String() {
 			case "esc":
@@ -361,6 +444,7 @@ func (m shellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(items) > 0 {
 					m.input.SetValue("/" + items[min(m.selection, len(items)-1)].name + " ")
 					m.input.CursorEnd()
+					m.resizePage()
 				}
 				return m, nil
 			case "enter":
@@ -378,7 +462,7 @@ func (m shellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 		} else if m.kind == "info" {
-			if k.String() == "esc" || k.String() == "q" {
+			if k.String() == "esc" || k.String() == "q" || k.String() == "ctrl+c" {
 				m.restore()
 				m.status = ""
 				return m, nil
@@ -402,7 +486,7 @@ func (m shellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.infoOffset = min(max(0, m.infoOffset), max(0, len(lines)-visible))
 		}
 		if !m.typing && (m.kind == "list" || m.kind == "info" || m.page == nil) && !m.childInputActive() {
-			if k.String() == "/" || k.String() == "ctrl+k" {
+			if !m.standalone && (k.String() == "/" || k.String() == "ctrl+k") {
 				m.typing = true
 				m.input.SetValue("/")
 				m.selection = 0
@@ -418,13 +502,23 @@ func (m shellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	if m.typing {
+		if _, pasted := msg.(tea.PasteMsg); pasted && m.homeIdle() {
+			return m, nil
+		}
 		var cmd tea.Cmd
 		before := m.input.Value()
+		wasPalette := m.paletteOpen()
 		m.input, cmd = m.input.Update(msg)
+		if m.homeIdle() {
+			m.input.SetValue("")
+		}
 		if m.input.Value() != before {
 			m.selection = 0
 			m.paletteOffset = 0
 			m.status = ""
+			if wasPalette != m.paletteOpen() {
+				m.resizePage()
+			}
 		}
 		return m, cmd
 	}
@@ -452,7 +546,7 @@ func (m *shellModel) dispatch(value string) tea.Cmd {
 		}
 	}
 	if !known {
-		m.status = "Unknown command: /" + name
+		m.setNotice("Unknown command: /" + name)
 		return nil
 	}
 	if name == "quit" {
@@ -480,11 +574,11 @@ func (m *shellModel) dispatch(value string) tea.Cmd {
 		if !m.signedIn {
 			removed, err := clearSavedSession()
 			if err != nil {
-				m.status = "Could not log out: " + err.Error()
+				m.setNotice("Could not log out: " + err.Error())
 			} else if removed {
-				m.status = "Logged out"
+				m.setNotice("Logged out")
 			} else {
-				m.status = "Not logged in"
+				m.setNotice("Not logged in")
 			}
 			return nil
 		}
@@ -494,7 +588,7 @@ func (m *shellModel) dispatch(value string) tea.Cmd {
 	case "config":
 		store, err := newSettingsStore()
 		if err != nil {
-			m.status = err.Error()
+			m.setNotice(err.Error())
 			return nil
 		}
 		page := arg
@@ -502,12 +596,12 @@ func (m *shellModel) dispatch(value string) tea.Cmd {
 			page = "home"
 		}
 		if page != "home" && page != "network" && page != "download" && page != "kindle" {
-			m.status = "Use /config network, /config download, or /config kindle"
+			m.setNotice("Use /config network, /config download, or /config kindle")
 			return nil
 		}
 		model, err := newSettingsModel(context.Background(), store, page)
 		if err != nil {
-			m.status = err.Error()
+			m.setNotice(err.Error())
 			return nil
 		}
 		return m.open("config", model)
@@ -521,19 +615,16 @@ func (m *shellModel) dispatch(value string) tea.Cmd {
 		m.pending = value
 		m.home()
 		if m.signedIn {
-			m.status = err.Error()
+			m.setNotice(err.Error())
 		} else {
-			m.status = "Sign in to continue. Press Enter to sign in."
+			m.setNotice("Sign in to continue. Press Enter to sign in.")
 		}
 		return nil
 	}
 	switch name {
 	case "search":
 		if arg == "" {
-			return m.open("search-form", newInlineForm("Search books", "Search", []formField{
-				{label: "Query", hint: "Title, author, or ISBN", validate: requiredField("query")},
-				{label: "Formats", options: []string{"EPUB", "AZW", "AZW3", "MOBI", "PDF", "RTF", "TXT"}, hint: "No selection includes all formats"},
-			}))
+			return m.open("search-form", newSearchFilterForm("", nil))
 		}
 		return m.open("list", newSearchSelectModel(arg, c, nil, false))
 	case "favorites":
@@ -559,6 +650,19 @@ func (m *shellModel) chooseDirectory() tea.Cmd {
 }
 func (m *shellModel) completed() tea.Cmd {
 	switch page := m.page.(type) {
+	case searchFilterForm:
+		if !page.accepted {
+			m.restore()
+			return nil
+		}
+		c, err := loadClient()
+		if err != nil {
+			m.pending = "/search " + page.query
+			m.home()
+			m.setNotice(err.Error())
+			return nil
+		}
+		return m.open("list", newSearchSelectModel(page.query, c, page.searchOptions(), false))
 	case searchSelectModel:
 		if page.selectedID != "" {
 			id := page.selectedID
@@ -570,7 +674,7 @@ func (m *shellModel) completed() tea.Cmd {
 				var err error
 				client, err = loadClient()
 				if err != nil {
-					m.status = err.Error()
+					m.setNotice(err.Error())
 					m.restore()
 					return nil
 				}
@@ -602,17 +706,30 @@ func (m *shellModel) completed() tea.Cmd {
 			}
 			return m.open("download-error", shellErrorModel{title: "Download failed", subtitle: bookCell(book), detail: downloadFailureDetail(page.err), retry: true})
 		} else if page.state == stateCancelled {
+			m.kindleReturn = nil
 			m.restore()
-			m.status = "Download cancelled"
+			m.setNotice("Download cancelled")
+		} else if page.sendToKindle {
+			page.sendToKindle = false
+			page.completeAction = 0
+			m.kindleReturn = new(page)
+			m.kindlePath = page.savedPath
+			if !slices.Contains(kindleAllowedTypes, strings.ToLower(filepath.Ext(page.savedPath))) {
+				return m.returnToDownloadCompletion("Kindle does not support this file type")
+			}
+			return m.open("kindle-confirm", shellConfirm{title: "Send to Kindle?", detail: filepath.Base(page.savedPath), action: "Send"})
 		} else {
+			m.kindleReturn = nil
 			m.restore()
-			m.status = "Saved to: " + page.savedPath
 		}
 		return nil
 	case shellErrorModel:
 		if page.selectedRetry && page.retry {
 			m.download = newDownloadModel(m.download.id, m.download.dir, m.download.client)
 			return m.open("download", m.download)
+		}
+		if m.kindleReturn != nil {
+			return m.returnToDownloadCompletion("Kindle send failed")
 		}
 		m.restore()
 		return nil
@@ -621,35 +738,21 @@ func (m *shellModel) completed() tea.Cmd {
 			cfg, _ := config.LoadConfig()
 			cfg.Theme = page.selected()
 			if err := config.SaveConfig(cfg); err != nil {
-				m.status = err.Error()
+				m.setNotice(err.Error())
 			} else {
-				m.status = "Theme saved: " + cfg.Theme
+				m.setNotice("Theme saved: " + cfg.Theme)
 			}
 			resolveTheme()
 		}
 	case inlineForm:
 		if !page.accepted {
+			if m.kind == "kindle-password" && m.kindleReturn != nil {
+				return m.returnToDownloadCompletion("")
+			}
 			m.restore()
 			return nil
 		}
 		switch m.kind {
-		case "search-form":
-			c, err := loadClient()
-			if err != nil {
-				m.pending = "/search " + page.fields[0].value
-				m.home()
-				if m.signedIn {
-					m.status = err.Error()
-				} else {
-					m.status = "Sign in to continue. Press Enter to sign in."
-				}
-				return nil
-			}
-			opts := &zlib.SearchOptions{}
-			for _, ext := range page.fields[1].selected {
-				opts.Extensions = append(opts.Extensions, zlib.Extension(ext))
-			}
-			return m.open("list", newSearchSelectModel(page.fields[0].value, c, opts, false))
 		case "login":
 			fields := page.fields
 			m.loginForm = new(page)
@@ -661,6 +764,15 @@ func (m *shellModel) completed() tea.Cmd {
 			return tea.Batch(m.spinner.Tick, shellCmd(m.generation, func() tea.Msg { return shellLogin(fields) }))
 		case "kindle-config":
 			return m.saveKindle(page.fields)
+		case "kindle-password":
+			if err := saveKindleSMTPPassword(page.fields[0].value); err != nil {
+				page.accepted = false
+				page.message = "Could not save SMTP password: " + err.Error()
+				page.focus(0)
+				m.page = page
+				return nil
+			}
+			return m.sendKindle(m.kindlePath)
 		}
 	case kindleFileModel:
 		if page.accepted {
@@ -668,10 +780,13 @@ func (m *shellModel) completed() tea.Cmd {
 		}
 	case kindleSendModel:
 		if page.err != nil {
+			m.commandErr = page.err
 			return m.open("kindle-error", shellErrorModel{title: "Kindle send failed", subtitle: bookCell(page.filePath), detail: page.err.Error()})
+		} else if m.kindleReturn != nil {
+			return m.returnToDownloadCompletion("Email sent to Kindle")
 		} else {
-			m.restore()
-			m.status = "Kindle send finished"
+			path, _ := filepath.Abs(page.filePath)
+			m.openInfo("Email sent to Kindle", "File\n"+bookCell(path)+"\n\nTo\n"+bookCell(page.cfg.To))
 		}
 		return nil
 	case shellConfirm:
@@ -681,7 +796,7 @@ func (m *shellModel) completed() tea.Cmd {
 				_, err := clearSavedSession()
 				if err != nil {
 					m.restore()
-					m.status = "Could not log out: " + err.Error()
+					m.setNotice("Could not log out: " + err.Error())
 					return nil
 				}
 				m.signedIn = false
@@ -693,6 +808,9 @@ func (m *shellModel) completed() tea.Cmd {
 			case "kindle-confirm":
 				return m.sendKindle(m.kindlePath)
 			}
+		}
+		if m.kind == "kindle-confirm" && m.kindleReturn != nil {
+			return m.returnToDownloadCompletion("")
 		}
 	}
 	m.restore()
@@ -724,6 +842,22 @@ func (m shellModel) View() tea.View {
 	if m.kind == "login-wait" {
 		return screenView(m.width, m.height, "Log in", "", m.spinner.View(), "")
 	}
+	if m.paletteOpen() {
+		base := m.commandDialogView()
+		if m.status != "" {
+			return m.noticeView(base)
+		}
+		return base
+	}
+	if m.kind == "directory" {
+		if directory, ok := m.page.(downloadDirectoryModel); ok {
+			background := m.homeView(m.height)
+			if m.previous != nil {
+				background = m.previous.View().Content
+			}
+			return directory.dialogView(background)
+		}
+	}
 	if m.kind == "info" && !m.typing {
 		lines := strings.Split(m.status, "\n")
 		visible := max(1, m.height-6)
@@ -733,12 +867,15 @@ func (m shellModel) View() tea.View {
 		if len(lines) > visible {
 			status = fmt.Sprintf("%d–%d of %d", start+1, end, len(lines))
 		}
-		return screenView(m.width, m.height, m.infoTitle, "", strings.Join(lines[start:end], "\n"), status,
-			uiKey("↑/↓", "scroll"), uiKey("/", "commands"), uiKey("esc", "back"))
+		bindings := []keys.Binding{uiKey("↑/↓", "scroll")}
+		if !m.standalone {
+			bindings = append(bindings, uiKey("/", "commands"))
+		}
+		bindings = append(bindings, uiKey("esc", "back"))
+		return screenView(m.width, m.height, m.infoTitle, "", strings.Join(lines[start:end], "\n"), status, bindings...)
 	}
 	available := m.contentHeight()
-	palette := m.paletteLines(available)
-	contentRows := max(0, available-len(palette))
+	contentRows := available
 	var body string
 	if m.page != nil {
 		body = m.page.View().Content
@@ -755,8 +892,7 @@ func (m shellModel) View() tea.View {
 	for len(lines) < contentRows {
 		lines = append(lines, "")
 	}
-	lines = append(lines, palette...)
-	if m.typing {
+	if m.typing && !m.homeIdle() {
 		lines = append(lines, m.input.View())
 	}
 	if m.footerHeight() > 0 {
@@ -768,54 +904,39 @@ func (m shellModel) View() tea.View {
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], max(1, m.width), "…")
 	}
-	return fullScreenView(m.width, m.height, strings.Join(lines, "\n"))
+	base := fullScreenView(m.width, m.height, strings.Join(lines, "\n"))
+	if m.status == "" || m.kind == "info" {
+		return base
+	}
+	return m.noticeView(base)
 }
 
-func (m shellModel) paletteLines(available int) []string {
-	if !m.typing || !strings.HasPrefix(m.input.Value(), "/") || strings.Contains(m.input.Value(), " ") {
-		return nil
+func (m shellModel) noticeView(base tea.View) tea.View {
+	width := max(1, m.width)
+	message := strings.ReplaceAll(m.status, "\n", " ")
+	message = strings.ReplaceAll(message, "\r", " ")
+	message = ansi.Truncate(message, max(1, width-6), "…")
+	style := lipgloss.NewStyle().Foreground(currentTheme.Title).Background(currentTheme.Surface).Padding(0, 1)
+	notice := style.Render(message)
+	x := max(0, width-ansi.StringWidth(notice)-1)
+	y := 1
+	if m.height < 4 {
+		y = 0
 	}
-	items := m.matches()
-	muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
-	if len(items) == 0 {
-		return []string{muted.Render("  No matching commands")}
-	}
-	if available <= 1 {
-		return []string{styledListRow("/"+items[min(m.selection, len(items)-1)].name, true, m.width, currentTheme)}
-	}
-	count := min(len(items), m.paletteVisibleRows(available))
-	selected := min(max(0, m.selection), len(items)-1)
-	start := min(max(0, m.paletteOffset), len(items)-count)
-	if selected < start {
-		start = selected
-	} else if selected >= start+count {
-		start = selected - count + 1
-	}
-	end := min(len(items), start+count)
-	lines := make([]string, 0, count)
-	nameWidth := 0
-	for _, item := range items[start:end] {
-		nameWidth = max(nameWidth, len(item.name)+1)
-	}
-	nameWidth = min(nameWidth, max(1, m.width/2))
-	for i := start; i < end; i++ {
-		item := items[i]
-		name := "/" + item.name
-		row := name
-		if m.width >= 32 {
-			row += strings.Repeat(" ", max(1, nameWidth-len(name)+2)) + item.description
-		}
-		lines = append(lines, styledListRow(row, i == selected, m.width, currentTheme))
-	}
-	return lines
+	return fullScreenView(m.width, m.height, lipgloss.NewCompositor(
+		lipgloss.NewLayer(base.Content), lipgloss.NewLayer(notice).X(x).Y(y),
+	).Render())
 }
 
 func (m shellModel) paletteVisibleRows(available int) int {
-	return min(6, max(1, available))
+	if m.width >= 56 && available >= 18 {
+		return min(8, max(1, (min(20, available-2)-9)/2))
+	}
+	return min(10, max(1, available-11))
 }
 
 func (m *shellModel) ensurePaletteVisible(count int) {
-	rows := min(count, m.paletteVisibleRows(m.contentHeight()))
+	rows := min(count, m.paletteVisibleRows(m.height))
 	m.paletteOffset = min(max(0, m.paletteOffset), max(0, count-rows))
 	if m.selection < m.paletteOffset {
 		m.paletteOffset = m.selection
@@ -825,15 +946,17 @@ func (m *shellModel) ensurePaletteVisible(count int) {
 }
 
 func (m shellModel) footerView() string {
-	if m.status != "" && m.kind != "info" && m.kind != "login-wait" {
-		return lipgloss.NewStyle().Foreground(currentTheme.Accent).Render(m.status)
-	}
 	h := help.New()
 	h.SetWidth(max(1, m.width))
 	h.Styles.ShortKey = lipgloss.NewStyle().Foreground(currentTheme.Accent)
 	h.Styles.ShortDesc = lipgloss.NewStyle().Foreground(currentTheme.Muted)
 	bindings := []keys.Binding{uiKey("esc", "back")}
 	switch {
+	case m.homeIdle():
+		bindings = []keys.Binding{uiKey("/", "commands"), uiKey("ctrl+c", "quit")}
+		if !m.signedIn {
+			bindings = append([]keys.Binding{uiKey("enter", "sign in")}, bindings...)
+		}
 	case m.typing && strings.HasPrefix(m.input.Value(), "/"):
 		bindings = []keys.Binding{uiKey("↑/↓", "cycle"), uiKey("tab", "complete"), uiKey("enter", "run"), uiKey("esc", "close")}
 	case m.typing:

@@ -256,8 +256,8 @@ func TestSearchEmptyAndErrorOfferRecovery(t *testing.T) {
 	if m.state != searchStateFilter || m.err == nil || !strings.Contains(ansi.Strip(m.View().Content), "golang") {
 		t.Fatal("search error cannot open the query editor")
 	}
-	m.input.SetValue("rust")
-	m = step(m, key("enter"))
+	m.filter.input.SetValue("rust")
+	m = step(m, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	if m.state != searchStateLoading || m.err != nil || m.query != "rust" {
 		t.Fatal("editing after an error did not restart search")
 	}
@@ -284,31 +284,43 @@ func TestSearchLoadingShowsOnlySpinner(t *testing.T) {
 	}
 }
 
-func TestSearchResultRevealStopsAndCanBeSkipped(t *testing.T) {
+func TestSearchLoadingAndEmptyKeepControlsAtBottom(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {40, 16}, {30, 14}} {
+		for _, inShell := range []bool{false, true} {
+			m := newSearchSelectModel("golang", nil, nil, false)
+			m.width, m.height, m.inShell = size[0], size[1], inShell
+			loading := strings.Split(ansi.Strip(m.View().Content), "\n")
+			if len(loading) != size[1] || !strings.Contains(loading[len(loading)-1], "esc back") {
+				t.Fatalf("loading controls moved at %v, shell=%v", size, inShell)
+			}
+			m.state, m.loadingPage, m.totalPages = searchStateResults, 0, 3
+			empty := strings.Split(ansi.Strip(m.View().Content), "\n")
+			searchKey := "/ search"
+			if inShell {
+				searchKey = "Ctrl+F search"
+			}
+			if len(empty) != size[1] || !strings.Contains(empty[len(empty)-1], searchKey) || !strings.Contains(empty[1], "Page 1 / 3") {
+				t.Fatalf("empty search lost page or controls at %v, shell=%v", size, inShell)
+			}
+		}
+	}
+}
+
+func TestSearchResultsAppearTogetherAndSelectionStaysStable(t *testing.T) {
 	m := newSearchSelectModel("books", nil, nil, false)
-	update := func(msg tea.Msg) { next, _ := m.Update(msg); m = next.(searchSelectModel) }
 	m.width, m.height = 80, 24
 	books := make([]zlib.Book, 25)
 	for i := range books {
 		books[i] = zlib.Book{ID: fmt.Sprint(i + 1), Name: fmt.Sprintf("Book %d", i+1)}
 	}
-	update(searchResultMsg{books: books, page: 1, totalPages: 2})
-	if !m.revealing || m.revealRows != 4 || strings.Contains(ansi.Strip(m.View().Content), "Book 10") {
-		t.Fatal("search results were not revealed in stages")
-	}
-	firstSequence := m.motionSeq
-	update(searchMotionMsg{sequence: firstSequence})
-	if m.revealRows != 10 {
-		t.Fatalf("reveal after first frame = %d, want 10", m.revealRows)
+	next, cmd := m.Update(searchResultMsg{books: books, page: 1, totalPages: 2})
+	m = next.(searchSelectModel)
+	if cmd != nil || len(m.books) != 25 || !strings.Contains(ansi.Strip(m.View().Content), "Book 5") {
+		t.Fatal("search results were not ready in the first result frame")
 	}
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnd})
-	if m.revealing || m.cursor != 24 || !strings.Contains(ansi.Strip(m.View().Content), "Book 25") {
-		t.Fatal("keyboard navigation did not reveal the selected result immediately")
-	}
-	sequence := m.motionSeq
-	update(searchMotionMsg{sequence: firstSequence})
-	if m.motionSeq != sequence || m.revealing {
-		t.Fatal("stale reveal frame changed the new selection")
+	if m.cursor != 24 || !strings.Contains(ansi.Strip(m.View().Content), "Book 25") {
+		t.Fatal("keyboard navigation did not show the selected result")
 	}
 }
 
@@ -318,8 +330,8 @@ func TestSearchReducedMotionShowsResultsImmediately(t *testing.T) {
 	m.width, m.height = 80, 24
 	next, _ := m.Update(searchResultMsg{books: []zlib.Book{{Name: "First"}, {Name: "Second"}}, page: 1, totalPages: 1})
 	m = next.(searchSelectModel)
-	if m.revealing || !strings.Contains(ansi.Strip(m.View().Content), "Second") {
-		t.Fatal("reduced motion hid results or kept a reveal running")
+	if !strings.Contains(ansi.Strip(m.View().Content), "Second") {
+		t.Fatal("reduced motion hid results")
 	}
 }
 
@@ -344,10 +356,8 @@ func TestSearchCardKeepsThemeColorsAndDoesNotFlashOnSelection(t *testing.T) {
 	if !strings.Contains(selected, strings.TrimSuffix(border, "\x1b[m")) {
 		t.Fatal("selected book border does not use the theme accent")
 	}
-	next, _ := m.Update(searchMotionMsg{sequence: m.motionSeq})
-	m = next.(searchSelectModel)
 	if got := m.View().Content; got != selected {
-		t.Fatal("book card changed after selection without another key press")
+		t.Fatal("book card changed between renders without another key press")
 	}
 }
 

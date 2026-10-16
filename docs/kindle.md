@@ -11,17 +11,18 @@ Find your Kindle email address in Amazon's Personal Document Settings and add
 your sender email to the approved sender list. Then run:
 
 ```sh
-zlib kindle
+zlib kindle config
 ```
 
 Enter the Kindle address, sender address, SMTP host and port. You can also edit
 each value with `zlib config kindle` or `/config kindle` in the shell. The CLI
 saves these settings in `~/.config/zlib/kindle.json`.
 
-Open the [global `.env` file](configuration.md#create-or-edit-the-global-file) in
-your editor and add `ZLIB_SMTP_PWD` with the password required by your mail
-provider. If the provider requires an app password, use that instead of your
-account password. The CLI reads this value at send time.
+When you send interactively without `ZLIB_SMTP_PWD`, a masked prompt asks for the
+SMTP password. Saving writes it to the [global `.env`
+file](configuration.md#create-or-edit-the-global-file) and makes it available to
+the current send. Use an app password if your mail provider requires one. For
+non-interactive sends, set `ZLIB_SMTP_PWD` in that file beforehand.
 
 ## Send a file
 
@@ -29,7 +30,12 @@ account password. The CLI reads this value at send time.
 zlib kindle send ./book.epub
 ```
 
-Run `zlib kindle send` without a path to select a file interactively. For a book
+`zlib kindle` and `zlib kindle send` open the same file picker as `/kindle`.
+In a terminal, sending a path also asks for confirmation. The settings, password,
+progress, error, and result pages are shared with the TUI; closing a standalone
+page returns to the terminal. Non-interactive sends still run directly.
+
+For a book
 you are downloading, copy its full reference from the search results and use:
 
 ```sh
@@ -44,7 +50,7 @@ sender and document checks.
 
 | Symptom | Check |
 | --- | --- |
-| SMTP password not set | Set `ZLIB_SMTP_PWD` in the global `.env` used by this user |
+| SMTP password not set | Enter it in the TUI prompt, or set `ZLIB_SMTP_PWD` in the global `.env` for non-interactive use |
 | SMTP authentication failed | Check the sender account and provider's app-password requirements |
 | SMTP connection failed | Check the configured host, port and network access |
 | Send succeeded but no book arrived | Check the Kindle address, approved sender list and Amazon's response email |

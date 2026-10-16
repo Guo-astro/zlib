@@ -56,7 +56,7 @@ priority environment settings still apply. Unsaved changes can be discarded
 when returning to the parent page.
 For Kindle, Reset clears an address or restores the default SMTP host or port.
 
-- **Proxy:** enter a URL; Ctrl+T tests it without saving. Input is masked.
+- **Proxy:** enter a URL; Ctrl+T tests it without saving. The editor shows the full URL. Settings lists hide embedded credentials.
   Clearing the global proxy returns to existing environment proxy behavior.
 - **Directory:** enter a path or use Browse (Ctrl+B). In the directory browser,
   Enter opens a directory and Space selects the current directory. Selection
@@ -68,9 +68,10 @@ For Kindle, Reset clears an address or restores the default SMTP host or port.
 Network and download changes are saved to `~/.config/zlib/.env`, preserving unrelated settings.
 Kindle address and SMTP server settings are saved to `~/.config/zlib/kindle.json`.
 The UI reports when process or working-directory settings override a saved
-network or download value. It does not change login cookies. Set
-`ZLIB_SMTP_PWD` in the global `.env` with an editor; it is never stored in
-`kindle.json` or shown in the settings list.
+network or download value. It does not change login cookies. If the SMTP password
+is missing when you send to Kindle in the TUI, a masked form saves it to the
+global `.env` and sets `ZLIB_SMTP_PWD` for the running process. It is not stored
+in `kindle.json` or shown in the settings list.
 
 Without a terminal, these commands print a read-only summary. Add `--json` for
 values, sources and saved preferences; proxy credentials are redacted.
@@ -114,8 +115,9 @@ if (!(Test-Path -LiteralPath $zlibEnvFile)) {
 notepad $zlibEnvFile
 ```
 
-Enter one `KEY=value` per line. Put secret values such as `ZLIB_SMTP_PWD` in this
-file using your editor, rather than a command that enters shell history.
+Enter one `KEY=value` per line. You can also enter `ZLIB_SMTP_PWD` in the masked
+TUI prompt before sending to Kindle. The prompt writes it to this file for
+future runs. Use an editor to set it before a non-interactive send.
 
 ## Domains and proxies
 

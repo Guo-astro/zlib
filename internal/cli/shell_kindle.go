@@ -15,7 +15,7 @@ func (m *shellModel) openKindle(arg string) tea.Cmd {
 	if arg == "config" {
 		cfg, err := config.LoadKindleConfig()
 		if err != nil && !os.IsNotExist(err) {
-			m.status = err.Error()
+			m.setNotice(err.Error())
 			return nil
 		}
 		if cfg.SMTPHost == "" {
@@ -38,24 +38,24 @@ func (m *shellModel) openKindle(arg string) tea.Cmd {
 		path = strings.TrimSpace(path)
 		if strings.HasPrefix(path, "\"") {
 			if !strings.HasSuffix(path, "\"") || len(path) < 2 {
-				m.status = "Close the quoted file path"
+				m.setNotice("Close the quoted file path")
 				return nil
 			}
 			path = path[1 : len(path)-1]
 		}
 		if path == "" {
-			m.status = "Use /kindle send <file>"
+			m.setNotice("Use /kindle send <file>")
 			return nil
 		}
 		if info, err := os.Stat(path); err != nil || info.IsDir() {
-			m.status = "File not found: " + path
+			m.setNotice("File not found: " + path)
 			return nil
 		}
 		m.kindlePath = path
 		return m.open("kindle-confirm", shellConfirm{title: "Send to Kindle?", detail: filepath.Base(path), action: "Send"})
 	}
 	if arg != "" && arg != "send" {
-		m.status = "Use /kindle send <file> or /kindle config"
+		m.setNotice("Use /kindle send <file> or /kindle config")
 		return nil
 	}
 	dir, _ := os.Getwd()
@@ -76,11 +76,14 @@ func (m *shellModel) saveKindle(fields []formField) tea.Cmd {
 	if err == nil {
 		err = config.SaveKindleConfig(cfg)
 	}
-	m.restore()
 	if err != nil {
-		m.status = err.Error()
+		if form, ok := m.page.(inlineForm); ok {
+			form.accepted = false
+			form.message = "Could not save Kindle settings: " + err.Error()
+			m.page = form
+		}
 	} else {
-		m.status = "Kindle settings saved"
+		m.openInfo("Kindle settings saved", "Saved to\n"+bookCell(config.KindleConfigPath()))
 	}
 	return nil
 }
@@ -90,15 +93,35 @@ func (m *shellModel) sendKindle(path string) tea.Cmd {
 		err = cfg.Validate()
 	}
 	if err != nil {
-		m.status = err.Error()
-		m.restore()
+		if m.kindleReturn != nil {
+			return m.returnToDownloadCompletion("Set up Kindle in /config kindle")
+		}
+		m.commandErr = err
+		m.openInfo("Kindle setup required", "Set up delivery with zlib kindle config or /kindle config.")
 		return nil
 	}
 	password := os.Getenv(kindleSMTPPasswordEnv)
-	if password == "" {
-		m.status = "Set ZLIB_SMTP_PWD before sending"
-		m.restore()
-		return nil
+	if strings.TrimSpace(password) == "" {
+		m.kindlePath = path
+		form := newInlineForm("SMTP password", "Save and send", []formField{{
+			label: "SMTP password", hint: "Saved to ~/.config/zlib/.env", secret: true,
+		}})
+		form.validate = func(fields []formField) error {
+			_, err := validateSetting(kindleSMTPPasswordEnv, fields[0].value)
+			return err
+		}
+		return m.open("kindle-password", form)
 	}
 	return m.open("kindle-send", newKindleSendModel(path, cfg, password))
+}
+
+func saveKindleSMTPPassword(password string) error {
+	store, err := newSettingsStore()
+	if err != nil {
+		return err
+	}
+	if err := store.save(kindleSMTPPasswordEnv, password); err != nil {
+		return err
+	}
+	return os.Setenv(kindleSMTPPasswordEnv, password)
 }

@@ -18,24 +18,15 @@ func confirmationDialog(background string, width, height int, title, name, id, n
 	}
 	inner := min(52, width-6)
 	base := lipgloss.NewStyle().Foreground(currentTheme.Title).Background(currentTheme.Surface)
-	button := func(label string, focused bool, danger bool) string {
-		s := base.Padding(0, 1)
-		if focused {
-			c := currentTheme.Accent
-			if danger {
-				c = currentTheme.Error
-			}
-			s = s.Background(c).Foreground(currentTheme.Surface).Bold(true)
-			label = "> " + label
-		}
-		return s.Render(label)
-	}
 	lines := []string{base.Bold(true).Render(title), "", ansi.Truncate(bookCell(name), inner, "…")}
 	if id != "" {
 		lines = append(lines, ansi.Truncate("ID: "+id, inner, "…"))
 	}
-	lines = append(lines, ansi.Truncate(bookCell(note), inner, "…"), "",
-		lipgloss.JoinHorizontal(lipgloss.Top, button("Cancel", !focused, false), "  ", button(action, focused, danger)),
+	if note != "" {
+		lines = append(lines, "", ansi.Truncate(bookCell(note), inner, "…"))
+	}
+	lines = append(lines, "",
+		lipgloss.JoinHorizontal(lipgloss.Top, renderActionButton("Cancel", !focused, false), base.Render("  "), renderActionButton(action, focused, danger)),
 		"", "←/→ select · Enter · Esc")
 	content := strings.Join(lines, "\n")
 	dialog := base.Width(inner).Padding(1, 1).Border(lipgloss.RoundedBorder()).BorderForeground(currentTheme.Accent).Render(content)

@@ -25,7 +25,11 @@ var searchCmd = &cobra.Command{
 				return fmt.Errorf("--json requires a search query (interactive mode has no JSON output)")
 			}
 			fullTitle, _ := cmd.Flags().GetBool("full-title")
-			selectedID, err := interactiveSearch(nil, searchOptsFromFlags(cmd), fullTitle)
+			opts, err := searchOptsFromFlags(cmd)
+			if err != nil {
+				return err
+			}
+			selectedID, err := interactiveSearch(nil, opts, fullTitle)
 			if err != nil {
 				return err
 			}
@@ -45,7 +49,10 @@ var searchCmd = &cobra.Command{
 		page, _ := cmd.Flags().GetInt("page")
 		count, _ := cmd.Flags().GetInt("count")
 		fullTitle, _ := cmd.Flags().GetBool("full-title")
-		opts := searchOptsFromFlags(cmd)
+		opts, err := searchOptsFromFlags(cmd)
+		if err != nil {
+			return err
+		}
 
 		result, err := newClient().Search(query, page, count, opts)
 		if err != nil {
@@ -172,24 +179,48 @@ func historyCommandID(item zlib.DownloadHistoryItem) string {
 	return id
 }
 
-func searchOptsFromFlags(cmd *cobra.Command) *zlib.SearchOptions {
+func searchOptsFromFlags(cmd *cobra.Command) (*zlib.SearchOptions, error) {
 	exts, _ := cmd.Flags().GetStringArray("ext")
 	formats, _ := cmd.Flags().GetStringArray("format")
 	exts = append(exts, formats...)
-	if len(exts) == 0 {
-		return nil
+	from, _ := cmd.Flags().GetInt("from-year")
+	to, _ := cmd.Flags().GetInt("to-year")
+	langs, _ := cmd.Flags().GetStringArray("language")
+	exact, _ := cmd.Flags().GetBool("exact")
+	orderRaw, _ := cmd.Flags().GetString("order")
+	if from < 0 || to < 0 || from > 0 && from < 1000 || to > 0 && to < 1000 || from > 9999 || to > 9999 || from > 0 && to > 0 && from > to {
+		return nil, fmt.Errorf("invalid year range")
+	}
+	order := zlib.OrderOption(orderRaw)
+	if order != "" {
+		valid := false
+		for _, choice := range searchSorts {
+			if choice.value == order {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return nil, fmt.Errorf("invalid search order %q", orderRaw)
+		}
 	}
 	seen := make(map[zlib.Extension]bool)
-	var extensions []zlib.Extension
+	opts := &zlib.SearchOptions{FromYear: from, ToYear: to, Exact: exact, Order: order}
 	for _, e := range exts {
 		ext := zlib.Extension(strings.ToUpper(e))
 		if seen[ext] {
 			continue
 		}
 		seen[ext] = true
-		extensions = append(extensions, ext)
+		opts.Extensions = append(opts.Extensions, ext)
 	}
-	return &zlib.SearchOptions{Extensions: extensions}
+	for _, language := range langs {
+		opts.Languages = append(opts.Languages, zlib.Language(strings.ToLower(language)))
+	}
+	if len(opts.Extensions) == 0 && len(opts.Languages) == 0 && from == 0 && to == 0 && !exact && order == "" {
+		return nil, nil
+	}
+	return opts, nil
 }
 
 func init() {
@@ -199,6 +230,11 @@ func init() {
 	searchCmd.Flags().Bool("send-to-kindle", false, "Send the downloaded file to Kindle.")
 	searchCmd.Flags().StringArray("ext", nil, "Filter by file extension (repeatable): epub, pdf, mobi, …")
 	searchCmd.Flags().StringArray("format", nil, "Alias for --ext: filter by file format (repeatable)")
+	searchCmd.Flags().Int("from-year", 0, "Earliest publication year")
+	searchCmd.Flags().Int("to-year", 0, "Latest publication year")
+	searchCmd.Flags().StringArray("language", nil, "Filter by language (repeatable)")
+	searchCmd.Flags().Bool("exact", false, "Use exact match")
+	searchCmd.Flags().String("order", "", "Sort: popular, bestmatch, date, titleA, title, year, filesize, filesizeA")
 	searchCmd.Flags().Bool("full-title", false, "Do not truncate book titles in the results table")
 	searchCmd.Flags().Bool("json", false, "Output results as JSON (requires a query)")
 }

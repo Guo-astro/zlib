@@ -186,7 +186,11 @@ func (m formModel) View() tea.View {
 			}
 			label = f.label + "  " + value
 		}
-		lines = append(lines, selectionRow(label, i == m.cursor, m.width))
+		if i == len(m.fields) {
+			lines = append(lines, renderActionButton(label, i == m.cursor, false))
+		} else {
+			lines = append(lines, selectionRow(label, i == m.cursor, m.width))
+		}
 	}
 	if m.cursor < len(m.fields) {
 		lines = append(lines, "", m.fields[m.cursor].hint)

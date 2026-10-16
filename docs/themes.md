@@ -5,12 +5,22 @@ Up/Down, PgUp/PgDn, and Home/End move through it. Enter saves the selection.
 Esc clears the filter first, then closes the picker. The preview shows a sample
 zlib search result and download status.
 
-The list and filter keep the current theme while the preview uses the highlighted
-theme. Both areas paint their backgrounds, including blank cells, so light and
-dark previews stay readable regardless of the terminal background. Moving through
-the list does not save a preference; Enter saves and Esc cancels.
+Press Ctrl+N to create a theme from the highlighted palette. Enter a lowercase
+name, then edit colors as `#RRGGBB`. Up/Down or Tab moves between color fields;
+Ctrl+S saves and Esc cancels. Ctrl+E edits a saved custom theme. On a built-in
+theme, Ctrl+E starts a copy so the built-in palette stays available. Saved themes
+appear after the built-in themes in the picker. Enter selects one for zlib.
+Theme files are stored in `~/.config/zlib/themes/<name>.json` (or the equivalent
+user home on Windows). Each file records its built-in base and color values.
 
-Run `zlib theme <name>` to set a theme directly. `ZLIB_THEME=<name>` overrides
+The list and filter keep the current theme while the preview uses the highlighted
+theme. The selected-book row uses that theme's surface color. Both areas paint
+their backgrounds, including blank cells, so light and dark previews stay
+readable regardless of the terminal background. Moving through the list does not
+save a preference; Enter selects and Esc cancels.
+
+Run `zlib theme <name>` to set a built-in or saved custom theme directly.
+`ZLIB_THEME=<name>` overrides
 the saved choice for one process. With redirected output, `zlib theme` prints
 the current theme and the available names.
 

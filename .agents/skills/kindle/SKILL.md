@@ -24,9 +24,14 @@ Z-Library login. If a book must be found or downloaded first, use the bundled
 zlib kindle send "./books/book.epub"
 ```
 
-Pass the actual file path. Bare `zlib kindle` and `zlib kindle send` open terminal
-prompts. Sending mail requires the user's request; an existing instruction to send
+Pass the actual file path. Bare `zlib kindle` and `zlib kindle send` open the file
+picker; `zlib kindle config` opens delivery settings. Interactive sends share the
+TUI confirmation, password, and result pages. Sending mail requires the user's request; an existing instruction to send
 this file is sufficient, so do not ask for another confirmation.
+
+In the TUI, a missing SMTP password opens a masked prompt after send confirmation.
+It saves `ZLIB_SMTP_PWD` to the global `.env` and current process. Non-interactive
+commands still require the variable or an existing `.env` entry before sending.
 
 Report the CLI result and file name. SMTP success means the sending server
 accepted the message, not that the Kindle received it. After a timeout or uncertain

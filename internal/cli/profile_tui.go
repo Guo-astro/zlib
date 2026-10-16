@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	keys "charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/progress"
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
@@ -83,7 +84,7 @@ func (m profilePageModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *profilePageModel) updateContent() {
 	content := ""
 	if m.err != nil {
-		content = "Could not load profile: " + m.err.Error() + "\n\nPress r to retry."
+		content = "Could not load profile: " + m.err.Error()
 	} else if m.loaded {
 		content = renderProfilePage(m.profile, m.width)
 	}
@@ -95,93 +96,130 @@ func (m profilePageModel) View() tea.View {
 		return screenView(m.width, m.height, "Profile", "", m.spinner.View(), "", uiKey("esc", "back"))
 	}
 	status := ""
+	bindings := []keys.Binding{uiKey("esc", "back")}
+	if m.err != nil {
+		bindings = append([]keys.Binding{uiKey("r", "retry")}, bindings...)
+	}
 	if m.viewport.TotalLineCount() > m.viewport.Height() {
 		status = fmt.Sprintf("%d%%", int(m.viewport.ScrollPercent()*100))
+		bindings = append([]keys.Binding{uiKey("↑/↓", "scroll")}, bindings...)
 	}
-	return screenView(m.width, m.height, "Profile", "Account and download quota", m.viewport.View(), status,
-		uiKey("↑/↓", "scroll"), uiKey("r", "retry"), uiKey("esc", "back"))
+	return screenView(m.width, m.height, "Profile", "", m.viewport.View(), status, bindings...)
+}
+
+type profileField struct{ label, value string }
+
+func profileSection(title string, width int) string {
+	section := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
+	line := lipgloss.NewStyle().Foreground(currentTheme.Surface)
+	remaining := width - ansi.StringWidth(title) - 1
+	if remaining < 2 {
+		return section.Render(title)
+	}
+	return section.Render(title) + " " + line.Render(strings.Repeat("─", remaining))
+}
+
+func profileFieldBlock(field profileField, width int) string {
+	primary := lipgloss.NewStyle().Foreground(currentTheme.Title)
+	muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	lines := strings.Split(ansi.Hardwrap(bookCell(field.value), max(1, width), false), "\n")
+	for i := range lines {
+		lines[i] = primary.Render(lines[i])
+	}
+	return muted.Render(field.label) + "\n" + strings.Join(lines, "\n")
 }
 
 func renderProfilePage(profile zlib.UserProfile, width int) string {
 	width = max(1, width)
-	section := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
 	primary := lipgloss.NewStyle().Foreground(currentTheme.Title)
 	muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
-	remaining := lipgloss.NewStyle().Foreground(remainingColor(profile.DailyRemaining)).Bold(true)
 	rows := []string{}
 	if profile.Name != "" {
 		rows = append(rows, primary.Bold(true).Render(bookCell(profile.Name)), "")
 	}
-	rows = append(rows, section.Render("DAILY DOWNLOADS"), "")
+	quotaTitle := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true).Render("DAILY DOWNLOADS")
 	if !profile.QuotaKnown {
-		rows = append(rows, muted.Render("Quota unavailable"))
+		rows = append(rows, profileSection("DAILY DOWNLOADS", width), muted.Render("Quota unavailable"))
 	} else {
 		limits := profile.DownloadLimit
-		bar := progress.New(progress.WithWidth(min(40, max(1, width-2))),
+		usage := primary.Bold(true).Render(fmt.Sprintf("%d / %d used", limits.DailyAmount, limits.DailyAllowed))
+		gap := width - ansi.StringWidth(quotaTitle) - ansi.StringWidth(usage)
+		if gap >= 2 {
+			rows = append(rows, quotaTitle+strings.Repeat(" ", gap)+usage)
+		} else {
+			rows = append(rows, quotaTitle, usage)
+		}
+		bar := progress.New(progress.WithWidth(width),
 			progress.WithColors(remainingColor(limits.DailyRemaining), currentTheme.Surface),
 			progress.WithoutPercentage(), progress.WithFillCharacters('━', '─'))
 		fraction := 0.0
 		if limits.DailyAllowed > 0 {
-			fraction = float64(limits.DailyAmount) / float64(limits.DailyAllowed)
+			fraction = min(1, max(0, float64(limits.DailyAmount)/float64(limits.DailyAllowed)))
 		}
-		rows = append(rows, bar.ViewAs(fraction),
-			primary.Render(fmt.Sprintf("%d / %d used", limits.DailyAmount, limits.DailyAllowed)),
-			"",
-			"Remaining  "+remaining.Render(fmt.Sprint(limits.DailyRemaining)))
+		rows = append(rows, bar.ViewAs(fraction))
 		if limits.DailyReset != "" {
-			rows = append(rows, "Resets at  "+primary.Render(bookCell(limits.DailyReset)))
+			rows = append(rows, muted.Render("Resets at ")+primary.Render(bookCell(limits.DailyReset)))
 		}
 	}
-	rows = append(rows, "", section.Render("ACCOUNT"))
-	field := func(label, value string) {
-		if value == "" {
-			return
-		}
-		if width < 32 {
-			rows = append(rows, muted.Render(label))
-			for _, line := range strings.Split(ansi.Hardwrap(bookCell(value), width, false), "\n") {
-				rows = append(rows, primary.Render(line))
-			}
-			return
-		}
-		styledLabel := muted.Width(16).Render(label)
-		for i, line := range strings.Split(ansi.Hardwrap(bookCell(value), width-18, false), "\n") {
-			if i == 0 {
-				rows = append(rows, styledLabel+"  "+primary.Render(line))
-			} else {
-				rows = append(rows, strings.Repeat(" ", 18)+primary.Render(line))
-			}
+	fields := []profileField{}
+	addField := func(label, value string) {
+		if value != "" {
+			fields = append(fields, profileField{label, value})
 		}
 	}
-	field("Email", profile.Email)
-	field("Kindle email", profile.KindleEmail)
+	addField("Email", profile.Email)
+	addField("Kindle email", profile.KindleEmail)
 	if profile.Premium != nil {
 		if *profile.Premium {
-			field("Plan", "Premium")
+			addField("Plan", "Premium")
 		} else {
-			field("Plan", "Standard")
+			addField("Plan", "Standard")
 		}
 	}
 	if profile.Confirmed != nil {
 		if *profile.Confirmed {
-			field("Email confirmed", "Yes")
+			addField("Email confirmed", "Yes")
 		} else {
-			field("Email confirmed", "No")
+			addField("Email confirmed", "No")
 		}
 	}
 	if profile.DonationsActive != nil {
 		if *profile.DonationsActive {
-			field("Donation", "Active")
+			addField("Donation", "Active")
 		} else {
-			field("Donation", "Inactive")
+			addField("Donation", "Inactive")
 		}
 	}
-	field("Donation expires", profile.DonationsExpire)
+	addField("Donation expires", profile.DonationsExpire)
+	if len(fields) > 0 {
+		rows = append(rows, "", profileSection("ACCOUNT", width))
+		if width >= 72 {
+			columnWidth := (width - 3) / 2
+			for i := 0; i < len(fields); i += 2 {
+				left := lipgloss.NewStyle().Width(columnWidth).Render(profileFieldBlock(fields[i], columnWidth))
+				if i+1 < len(fields) {
+					right := profileFieldBlock(fields[i+1], width-columnWidth-3)
+					rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, left, "   ", right))
+				} else {
+					rows = append(rows, left)
+				}
+				if i+2 < len(fields) {
+					rows = append(rows, "")
+				}
+			}
+		} else {
+			for _, field := range fields {
+				rows = append(rows, profileFieldBlock(field, width), "")
+			}
+		}
+	}
 	if len(profile.PersonalDomains) > 0 {
-		rows = append(rows, "", section.Render("PERSONAL DOMAINS"))
+		rows = append(rows, "", profileSection("PERSONAL DOMAINS", width))
 		for _, domain := range profile.PersonalDomains {
-			rows = append(rows, primary.Render(bookCell(domain)))
+			for _, line := range strings.Split(ansi.Hardwrap(bookCell(domain), width, false), "\n") {
+				rows = append(rows, primary.Render(line))
+			}
 		}
 	}
-	return strings.Join(rows, "\n")
+	return strings.TrimRight(strings.Join(rows, "\n"), "\n")
 }

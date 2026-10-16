@@ -64,8 +64,8 @@ func TestSearchViewportAndInlineEditor(t *testing.T) {
 					t.Fatalf("line exceeds %d: %q", width, line)
 				}
 			}
-			if editing && !strings.Contains(view.Content, "esc cancel") {
-				t.Fatal("missing editor help")
+			if editing && !strings.Contains(ansi.Strip(view.Content), "search") {
+				t.Fatalf("missing editor help: %q", ansi.Strip(view.Content))
 			}
 		}
 	}
@@ -75,11 +75,11 @@ func TestEmptySearchCanEditQuery(t *testing.T) {
 	m := resultsModel("no results")
 	m.books = nil
 	m = step(m, key("/"))
-	if !strings.Contains(m.View().Content, "enter search") {
-		t.Fatal("empty editor has no submit hint")
+	if !strings.Contains(ansi.Strip(m.View().Content), "search") {
+		t.Fatalf("empty editor has no submit hint: %q", ansi.Strip(m.View().Content))
 	}
-	m.input.SetValue("new query")
-	m = step(m, key("enter"))
+	m.filter.input.SetValue("new query")
+	m = step(m, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	if m.query != "new query" || m.state != searchStateLoading {
 		t.Fatal("empty search cannot be retried")
 	}
@@ -171,15 +171,15 @@ func TestSlashEntersFilterPrefilled(t *testing.T) {
 	if m.state != searchStateFilter {
 		t.Fatalf("state = %v, want filter", m.state)
 	}
-	if m.input.Value() != "golang" {
-		t.Errorf("input = %q, want prefilled %q", m.input.Value(), "golang")
+	if m.filter.input.Value() != "golang" {
+		t.Errorf("input = %q, want prefilled %q", m.filter.input.Value(), "golang")
 	}
 }
 
 func TestFilterEnterRerunsWithNewQuery(t *testing.T) {
 	m := step(resultsModel("golang"), key("/"))
-	m.input.SetValue("rust")
-	m = step(m, key("enter"))
+	m.filter.input.SetValue("rust")
+	m = step(m, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	if m.state != searchStateLoading {
 		t.Fatalf("state = %v, want loading", m.state)
 	}
@@ -199,8 +199,8 @@ func TestFilterEnterRerunsWithNewQuery(t *testing.T) {
 
 func TestFilterEnterPreservesNonEmptyWhitespace(t *testing.T) {
 	m := step(resultsModel("golang"), key("/"))
-	m.input.SetValue(" golang ")
-	m = step(m, key("enter"))
+	m.filter.input.SetValue(" golang ")
+	m = step(m, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	if m.state != searchStateLoading {
 		t.Fatalf("state = %v, want loading", m.state)
 	}
@@ -211,9 +211,9 @@ func TestFilterEnterPreservesNonEmptyWhitespace(t *testing.T) {
 
 func TestFilterEnterUnchangedQueryReturnsToResults(t *testing.T) {
 	m := step(resultsModel("golang"), key("/"))
-	m = step(m, key("enter")) // value still "golang"
-	if m.state != searchStateResults {
-		t.Fatalf("state = %v, want results", m.state)
+	m = step(m, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
+	if m.state != searchStateLoading {
+		t.Fatalf("state = %v, want loading", m.state)
 	}
 	if m.query != "golang" {
 		t.Errorf("query = %q, want unchanged golang", m.query)
@@ -222,7 +222,7 @@ func TestFilterEnterUnchangedQueryReturnsToResults(t *testing.T) {
 
 func TestFilterEscCancels(t *testing.T) {
 	m := step(resultsModel("golang"), key("/"))
-	m.input.SetValue("rust")
+	m.filter.input.SetValue("rust")
 	m = step(m, key("esc"))
 	if m.state != searchStateResults {
 		t.Fatalf("state = %v, want results", m.state)
@@ -245,7 +245,7 @@ func TestFilterCtrlCQuits(t *testing.T) {
 
 func TestFilterTypingDoesNotQuitOnQ(t *testing.T) {
 	m := step(resultsModel("golang"), key("/"))
-	m.input.SetValue("")
+	m.filter.input.SetValue("")
 	m = step(m, key("q")) // must be treated as text, not quit
 	if m.quitting {
 		t.Errorf("typing 'q' while filtering should not quit")

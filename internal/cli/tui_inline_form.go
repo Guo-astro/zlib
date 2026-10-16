@@ -153,16 +153,7 @@ func (m inlineForm) View() tea.View {
 		lines = append(lines, "")
 	}
 	focused := m.cursor == len(m.fields)
-	if m.action == "Search" {
-		button := lipgloss.NewStyle().Foreground(currentTheme.Title).
-			Background(currentTheme.Surface).Padding(0, 2)
-		if focused {
-			button = button.Background(currentTheme.Accent).Foreground(currentTheme.Surface).Bold(true)
-		}
-		lines = append(lines, button.Render(m.action))
-	} else {
-		lines = append(lines, selectionRow(m.action, focused, m.width))
-	}
+	lines = append(lines, renderActionButton(m.action, focused, false))
 	bindings := []keys.Binding{uiKey("esc", "cancel"), uiKey("tab", "next"), uiKey("shift+tab", "previous"), uiKey("enter", "continue"), uiKey("ctrl+s", strings.ToLower(m.action))}
 	if m.cursor < len(m.fields) && len(m.fields[m.cursor].options) > 0 {
 		bindings = append(bindings, uiKey("↑/↓", "format"), uiKey("space", "toggle"), uiKey("ctrl+a", "all / none"))

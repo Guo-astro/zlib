@@ -10,7 +10,7 @@ Set Padding 20
 Set PlaybackSpeed 1
 
 Sleep 500ms
-Type "zlib kindle"
+Type "zlib kindle config"
 Enter
 Sleep 1s
 

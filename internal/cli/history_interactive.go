@@ -324,7 +324,7 @@ func (m historySelectModel) View() tea.View {
 	}
 	if m.confirmDownload {
 		book := m.items[m.cursor]
-		v.Content = confirmationDialog(v.Content, m.width, m.height, "Download book?", book.Name, historyCommandID(book), "Download the selected book.", "Download", m.downloadFocused, false)
+		v.Content = confirmationDialog(v.Content, m.width, m.height, "Download book?", book.Name, historyCommandID(book), "", "Download", m.downloadFocused, false)
 	}
 	return fullScreenView(m.width, m.height, v.Content)
 }

@@ -142,6 +142,12 @@ func validateSetting(key, value string) (string, error) {
 	if strings.ContainsAny(value, "\r\n\x00") {
 		return "", fmt.Errorf("enter a single-line value")
 	}
+	if key == kindleSMTPPasswordEnv {
+		if strings.TrimSpace(value) == "" {
+			return "", fmt.Errorf("enter an SMTP password")
+		}
+		return value, nil
+	}
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return "", nil

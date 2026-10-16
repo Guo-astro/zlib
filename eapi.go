@@ -118,6 +118,9 @@ func (c *Client) searchEAPI(query string, page, count int, opts *SearchOptions) 
 		for _, extension := range opts.Extensions {
 			values.Add("extensions[]", strings.ToLower(extension.String()))
 		}
+		if opts.Order != "" {
+			values.Set("order", opts.Order.String())
+		}
 	}
 
 	body, err := c.eapiPost(eapiSearchPath, values)

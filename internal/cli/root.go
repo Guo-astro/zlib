@@ -145,6 +145,13 @@ func classifyNetworkError(err error) (string, bool) {
 
 func init() {
 	runewidth.DefaultCondition.EastAsianWidth = false
+	defaultHelp := rootCmd.HelpFunc()
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if cmd == rootCmd {
+			lipgloss.Fprintln(cmd.OutOrStdout(), "\n"+strings.Join(homeWordmark(), "\n")+"\n")
+		}
+		defaultHelp(cmd, args)
+	})
 	rootCmd.SetVersionTemplate("{{printf \"%s version %s\\n\" .Name .Version}}")
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(logoutCmd)

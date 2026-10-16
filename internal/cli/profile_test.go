@@ -17,10 +17,13 @@ func TestRenderProfileCardShowsAccountAndKnownQuota(t *testing.T) {
 		},
 	}
 	card := renderProfileCard(profile)
-	for _, want := range []string{"Reader", "reader@example.com", "Premium", "3 / 10", "Remaining", "7"} {
+	for _, want := range []string{"Reader", "reader@example.com", "Premium", "3 / 10 used"} {
 		if !strings.Contains(card, want) {
 			t.Errorf("profile card is missing %q", want)
 		}
+	}
+	if strings.Contains(card, "Remaining") {
+		t.Fatal("profile repeats the quota as Remaining")
 	}
 }
 

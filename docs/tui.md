@@ -1,7 +1,9 @@
 # Terminal interface
 
-Run `zlib tui` in a terminal for a persistent shell. Type a book title to search, or
-type `/` for commands. Tab completes the selected command; Enter runs it, even
+Run `zlib tui` in a terminal for a persistent shell. Press `/` on the home screen
+to open commands, then choose Search to enter a book title. The home screen has
+no search input; typing, pasting, and Ctrl+K do not open commands there.
+Tab completes the selected command; Enter runs it, even
 when you've typed only part of its name (for example, `/th` selects `/theme`).
 `/quit` exits. The shell keeps the current book list and selection when you return from
 a download, theme, settings or Kindle screen.
@@ -27,18 +29,32 @@ The TUI login form accepts email and password. To import a Cookie file, use
 `/logout` asks for confirmation, clears the saved session and account pages, then
 opens the login form. If session removal fails, the current screen shows an error.
 
-The command menu appears when you type `/`; it shows up to six matches with short
-descriptions and no count heading. ↑/↓ cycles through the matches, including from
-last to first.
-The menu scrolls only when the selection leaves its visible rows. Type more
-characters to narrow the list.
-Ctrl+K opens the menu without discarding an unfinished search; Esc restores the
-search text.
+Typing `/` opens a centered command dialog over the current page. It keeps the
+page and its selection in place. At 80×24, the dialog shows five commands,
+each with its description below the name. Narrow terminals show one line per
+command. ↑/↓ cycles through matches,
+including from last to first; the list scrolls when selection leaves its visible
+rows. Type to filter, Tab to complete into the command input, or Enter to run.
+On book lists, Ctrl+K also opens the dialog. Esc closes it and restores the page.
+
+Shell command feedback appears near the top of the screen for five seconds.
+New feedback restarts the timer; an older timer cannot clear a newer message.
+The input and bottom key hints stay in place. Errors that need a response stay
+on their form or result page.
 
 Direct commands such as `zlib search` and `zlib history --json` still work.
-The search form uses a borderless Search button with an accent background when
-focused. Tab focuses it, Enter submits, and Ctrl+S submits from any field.
-Bare `zlib` prints command help. `zlib tui` requires an interactive terminal.
+The Search form shows query, year range, languages, formats, exact match, and sort
+order together. Enter opens a language, format, or sort picker; Space toggles a
+language or format. Esc closes the picker. The borderless Search button uses the
+accent background when focused. Tab moves between fields, Enter submits from
+the button, and Ctrl+S submits from any field. Invalid years stay on the form.
+Direct `zlib search <query>` accepts `--from-year`, `--to-year`, repeatable
+`--language` and `--ext`, `--exact`, and `--order`. An unset sort does not send
+an `order` value. The result page reopens the same filters with Ctrl+F in the
+shell or `/` in direct interactive search.
+Bare `zlib` prints the home screen's ZLIB wordmark above command help, without
+the version line. Use `zlib version` to see the full version.
+`zlib tui` requires an interactive terminal.
 
 The shell accepts `/search`, `/favorites`, `/recommended`, `/most-popular`,
 `/history`, `/login`, `/logout`, `/profile`, `/doctor`,
@@ -49,11 +65,14 @@ For automation, use direct commands and their flags, including `--json`.
 To download a selected book in the TUI, press Enter on its list row. To download
 by `id:hash` directly, use `zlib download "id:hash"` outside the TUI.
 The search list keeps its scroll position while you move within visible rows.
-If a search returns nothing or fails, edit the query with Ctrl+F, or retry a
+If a search returns nothing or fails, reopen its filters with Ctrl+F, or retry a
 failed request with r.
 Search and the other book lists show a Charm dot spinner while fetching results.
 Page numbers appear after loading. Profile, login, and settings domain checks
 also use the dot spinner while waiting for a response.
+Search results appear together when the request completes; rows do not fill in
+over several frames. Search loading and empty states keep their controls at the
+bottom of the page. An empty search shows its page and offers a query edit.
 Doctor shows only the Charm dot spinner while checking domains; Esc returns.
 `zlib doctor` opens the same page in an interactive terminal. Results contain
 only available domains, without a status label on each row. The accent border
@@ -100,24 +119,40 @@ history rows keeps the list viewport still.
 
 ## Controls
 
+### Action buttons
+
+Render every operation through `renderActionButton` in `tui_layout.go`. Forms,
+confirmations, settings editors, download completion, and download-directory
+choices use the same borderless button: two cells of horizontal padding, theme
+surface and title color at rest, theme accent fill when focused. A focused
+destructive action uses the theme error fill. The fill shows focus; do not add a
+leading `>` or a separate button border. Paint gaps between buttons with the
+panel background so ANSI resets do not expose the terminal background. Keep
+Cancel focused when a confirmation opens. Use `actionButtonRows` to wrap groups
+by terminal width. List entries and folder browser rows retain their list
+selection style.
+
 | Screen | Controls |
 | --- | --- |
 | Shell command input | `/` opens commands from a list; ↑/↓ cycles; Ctrl+K also opens it; Tab completes; Esc closes; pasted text needs Enter to run |
-| Profile | Full-screen account and quota page; ↑/↓ or PgUp/PgDn scrolls; r retries a failed request; Esc returns |
+| Profile | Full-screen account and daily download quota; the used count sits above a width-aware horizontal bar. Wide terminals show account fields in two columns. ↑/↓ or PgUp/PgDn scrolls when needed; r retries a failed request; Esc returns. |
 | Doctor | Full-screen available-domain list; the focused row has an accent border and the current configured domain has a separate marker; ↑/↓ selects, PgUp/PgDn scrolls, r checks again, Esc returns |
 | Book lists | ↑/↓ or j/k select; PgUp/PgDn scroll; Home/End jump; Enter opens download confirmation; q or Esc exits |
-| Search, saved books, history | ←/→ changes page; Ctrl+F edits the query in shell search; `/` edits it in direct `zlib search` |
+| Search, saved books, history | ←/→ changes page; Ctrl+F reopens Search filters in the shell; `/` reopens them in direct `zlib search` |
 | Failed list request | r retries the failed page; Esc closes |
 | Login, search options, Kindle settings | Enter edits a field; Enter applies an edit; Tab advances; choose the final action or press Ctrl+S to submit; Esc cancels |
 | Format selection | Huh checkbox list: ↑/↓ moves; Space toggles; Ctrl+A selects all or clears all; Enter continues; no selected formats means all formats |
 | Config | Network, download and Kindle settings appear in one compact list; arrows or Tab select a field; Enter opens it; Esc returns; Tab selects editor actions |
 | File picker | Enter opens a folder or selects a file; ← goes to the parent; `/` accepts a directory path; Esc exits |
-| Download directory | Skip uses the displayed directory; Change directory applies only to this download; Ctrl+B browses folders |
-| Theme | Type to filter; ↑/↓ previews; Enter saves; Esc clears the filter, then closes |
+| Download directory | A centered dialog overlays the selected book list. Download here uses the displayed folder; Choose another folder opens the browser. Space selects a folder; e or / edits the path; Esc uses the displayed folder; Ctrl+C cancels. |
+| Theme | Type to filter; ↑/↓ previews; Enter selects; Ctrl+N creates a custom theme; Ctrl+E edits a custom theme or copies a built-in; Ctrl+S saves color edits; Esc cancels or clears the filter |
 | Confirmation | Cancel is selected initially; ←/→ or Tab changes the action; Enter confirms |
-| Download progress | Esc or Ctrl+C cancels the transfer; a failure stays on its own page with r to retry using the same book and directory, or Esc to return |
+| Download | Esc or Ctrl+C cancels an active transfer. After completion, the page shows the full saved path and Back. Supported file types also show Send to Kindle; left/right selects an action and Enter opens it. Up/down scrolls a long path. Kindle sending asks for confirmation and returns to the saved-file page. A download failure stays on its own page with r to retry using the same book and directory, or Esc to return. |
 
 Passwords are masked. Invalid field values stay in the editor with an error.
+If the SMTP password is missing after Kindle confirmation, a masked form saves
+it to the global `.env` and sets it for the current process before sending.
+Cancel returns to the saved file; a save error keeps the form open.
 Kindle SMTP sending cannot be recalled: Ctrl+C stops waiting, and the message
 may still be delivered.
 After a Kindle send error, the file and error remain visible. Check the Kindle
@@ -125,6 +160,13 @@ inbox before starting another send; the error page does not resend automatically
 Download errors hide signed URLs in the terminal view.
 
 ## Implementation references
+
+Interactive `zlib profile` uses the same profile page as `/profile`, including
+loading, retry, scrolling, and the quota bar. `--json` keeps its JSON output;
+redirected text output uses the same profile fields without opening a TUI.
+`zlib kindle`, `kindle config`, and `kindle send` reuse the corresponding shell
+pages and transitions. Closing them returns to the terminal. Kindle send results
+stay visible until dismissed; non-interactive sends do not open a confirmation.
 
 Crush revision: `f49b28113b3bab3fcfe193676cc3f7fb858d6411`.
 The local source checkout is `D:\myspace\github\AI\crush` (Git Bash:
