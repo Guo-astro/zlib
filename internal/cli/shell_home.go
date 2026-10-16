@@ -1,11 +1,12 @@
 package cli
 
 import (
+	"image/color"
+	"math"
 	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	zlib "github.com/heartleo/zlib"
 )
 
 // Fixed letterforms keep the wordmark steady while the terminal resizes.
@@ -25,43 +26,83 @@ var signedInShortcuts = []homeShortcut{
 }
 
 func homeLogo(width, height int) []string {
-	accent := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
-	version := lipgloss.NewStyle().Foreground(currentTheme.Muted)
 	if width < 32 || height < 12 {
-		if width < 4 || height < 2 {
-			return []string{ansi.Truncate(accent.Render("ZLIB"), width, "")}
-		}
-		label := ansi.Truncate(zlib.Version, max(1, width-2), "…")
-		blockWidth := max(4, ansi.StringWidth(label))
-		name := accent.Render("ZLIB") + strings.Repeat(" ", blockWidth-4)
-		return []string{name, strings.Repeat(" ", blockWidth-ansi.StringWidth(label)) + version.Render(label)}
+		return []string{ansi.Truncate(gradientText("ZLIB", true), width, "")}
 	}
-	rows := homeWordmark()
-	wordmarkWidth := ansi.StringWidth(rows[0])
-	label := ansi.Truncate(zlib.Version, wordmarkWidth, "…")
-	meta := strings.Repeat(" ", wordmarkWidth-ansi.StringWidth(label)) + version.Render(label)
-	if height >= 16 {
-		rows = append(rows, strings.Repeat(" ", wordmarkWidth))
-	}
-	return append(rows, meta)
+	return homeWordmark()
 }
 
-func homeWordmark() []string {
+func homeWordmarkRows() []string {
 	rows := make([]string, len(homeLetterforms[0]))
-	colors := []lipgloss.Style{
-		lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true),
-		lipgloss.NewStyle().Foreground(currentTheme.Link).Bold(true),
-		lipgloss.NewStyle().Foreground(currentTheme.Title).Bold(true),
-		lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true),
-	}
 	for row := range rows {
 		letters := make([]string, len(homeLetterforms))
 		for letter := range homeLetterforms {
-			letters[letter] = colors[letter].Render(homeLetterforms[letter][row])
+			letters[letter] = homeLetterforms[letter][row]
 		}
 		rows[row] = strings.Join(letters, " ")
 	}
 	return rows
+}
+
+// homeWordmark paints one ramp across the wordmark's columns, as Crush's
+// ApplyForegroundGrad does, so every row shares a color at a given column.
+func homeWordmark() []string {
+	rows := homeWordmarkRows()
+	ramp := lipgloss.Blend1D(ansi.StringWidth(rows[0]), currentTheme.Accent, wordmarkRampEnd(currentTheme))
+	for i, row := range rows {
+		rows[i] = paintRamp(row, ramp, true)
+	}
+	return rows
+}
+
+func gradientText(text string, bold bool) string {
+	return paintRamp(text, lipgloss.Blend1D(ansi.StringWidth(text), currentTheme.Accent, wordmarkRampEnd(currentTheme)), bold)
+}
+
+// paintRamp colors each single-cell rune with the ramp entry for its column and
+// leaves spaces unstyled.
+func paintRamp(text string, ramp []color.Color, bold bool) string {
+	var b strings.Builder
+	for i, r := range []rune(text) {
+		if r == ' ' || i >= len(ramp) {
+			b.WriteRune(r)
+			continue
+		}
+		b.WriteString(lipgloss.NewStyle().Foreground(ramp[i]).Bold(bold).Render(string(r)))
+	}
+	return b.String()
+}
+
+// Below this RGB distance a two-stop ramp reads as a flat color.
+const wordmarkMinRampSpan = 48
+
+// wordmarkRampEnd prefers Link, then Info and Success, so themes whose Link
+// equals or nearly equals Accent still show a visible gradient.
+func wordmarkRampEnd(t Theme) color.Color {
+	best, bestSpan := t.Link, -1.0
+	for _, candidate := range []color.Color{t.Link, t.Info, t.Success} {
+		if candidate == nil {
+			continue
+		}
+		span := colorDistance(t.Accent, candidate)
+		if span >= wordmarkMinRampSpan {
+			return candidate
+		}
+		if span > bestSpan {
+			best, bestSpan = candidate, span
+		}
+	}
+	return best
+}
+
+func colorDistance(a, b color.Color) float64 {
+	if a == nil || b == nil {
+		return 0
+	}
+	ar, ag, ab, _ := a.RGBA()
+	br, bg, bb, _ := b.RGBA()
+	dr, dg, db := float64(ar>>8)-float64(br>>8), float64(ag>>8)-float64(bg>>8), float64(ab>>8)-float64(bb>>8)
+	return math.Sqrt(dr*dr + dg*dg + db*db)
 }
 
 func homeShortcutCell(shortcut homeShortcut, width int) string {
@@ -71,7 +112,7 @@ func homeShortcutCell(shortcut homeShortcut, width int) string {
 		return ansi.Truncate(styled, width, "…")
 	}
 	gap := strings.Repeat(" ", max(2, 16-ansi.StringWidth(name)))
-	label := lipgloss.NewStyle().Foreground(currentTheme.Title).Render(shortcut.label)
+	label := lipgloss.NewStyle().Foreground(currentTheme.Muted).Render(shortcut.label)
 	return ansi.Truncate(styled+gap+label, width, "…")
 }
 
@@ -114,14 +155,14 @@ func (m shellModel) homeView(available int) string {
 		if available-len(rows) >= 3 {
 			rows = append(rows, "", lipgloss.NewStyle().Foreground(currentTheme.Title).Bold(true).Render("Sign in to Z-Library"))
 		}
+		if available-len(rows) >= 3 {
+			rows = append(rows, "")
+		}
 		if len(rows) < available {
-			rows = append(rows, lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true).Render("› Log in"))
+			rows = append(rows, renderActionButton("Log in", true, false))
 		}
 		if len(rows) < available {
 			rows = append(rows, lipgloss.NewStyle().Foreground(currentTheme.Muted).Render("Email and password"))
-		}
-		if available-len(rows) >= 2 {
-			rows = append(rows, "", lipgloss.NewStyle().Foreground(currentTheme.Muted).Render("Search and saved books require sign-in"))
 		}
 	} else if !strings.HasPrefix(m.input.Value(), "/") && available-len(rows) >= 4 {
 		shortcuts := m.homeShortcutRows()

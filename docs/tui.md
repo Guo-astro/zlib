@@ -8,19 +8,24 @@ when you've typed only part of its name (for example, `/th` selects `/theme`).
 `/quit` exits. The shell keeps the current book list and selection when you return from
 a download, theme, settings or Kindle screen.
 
-The signed-in start screen shows a five-row ZLIB wordmark with theme colors
-for each letter. Its build version sits below the right edge of the logo; long
-development versions are shortened there and remain available through
-`zlib version`. The logo has no decorative side strokes.
-With at least 16 content rows, one blank row separates the wordmark and version,
-and two separate the version and command hints. Compact layouts reduce these
-gaps. Command columns have a four-cell gutter; single-column hints fit their content.
+The signed-in start screen shows a five-row ZLIB wordmark painted with one
+Accent-to-Link gradient across its columns, as Crush paints its logo. When a
+theme's Link is too close to Accent for the ramp to show, Info or Success ends
+the gradient (`wordmarkRampEnd`). The home screen shows no brand text, build
+version, decorative side strokes or trademark sign; use `zlib version` for the
+version. Below 32 columns or 12 rows, the word ZLIB in the same gradient
+replaces it.
+With at least 16 content rows, two blank rows separate the wordmark and command
+hints; compact layouts use one. Command columns have a four-cell gutter; single-column hints fit their content.
 It does not display the current directory or a persistent sign-in label. At 76
 columns or wider, command hints use two columns; smaller terminals use one.
 The hints show commands to type in the input; typing `/` opens the selectable
 command menu. Without a saved session, `zlib tui` opens the email and password
 form immediately. Press Esc to reach the signed-out start screen, where Enter
-reopens login and `/` gives access to settings and domain checks. A successful
+reopens login and `/` gives access to settings and domain checks. That screen
+shows a heading, a focused Log in button rendered by `renderActionButton`, and
+the sign-in method; it adds no other explanatory text. Command hints on the
+signed-in screen use muted descriptions, matching the command dialog. A successful
 login returns to the start screen. If you tried a protected command first, its
 draft stays in the input so
 you can press Enter to continue. Login errors stay on the form for another try.

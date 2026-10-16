@@ -433,7 +433,7 @@ func TestShellStartsOnLoginWithoutSession(t *testing.T) {
 		t.Fatalf("signed-out startup did not open login: kind=%q signedIn=%v", m.kind, m.signedIn)
 	}
 	view := ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "Email") || !strings.Contains(view, "Password") || strings.Contains(view, "› Log in") {
+	if !strings.Contains(view, "Email") || !strings.Contains(view, "Password") || strings.Contains(view, "Sign in to Z-Library") {
 		t.Fatal("startup does not show the login form directly")
 	}
 	m, cmd := shellStep(m, key("esc"))
@@ -568,7 +568,7 @@ func TestShellSignedOutHomeOpensLogin(t *testing.T) {
 	m.signedIn = false
 	m.input.SetValue("")
 	view := ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "Sign in to Z-Library") || !strings.Contains(view, "› Log in") || !strings.Contains(view, "Email and password") || !strings.Contains(view, "enter sign in") {
+	if !strings.Contains(view, "Sign in to Z-Library") || !strings.Contains(view, "  Log in  ") || !strings.Contains(view, "Email and password") || !strings.Contains(view, "enter sign in") {
 		t.Fatal("signed-out home has no clear sign-in action")
 	}
 	if strings.Contains(view, "/search") || strings.Contains(view, "/favorites") {
@@ -769,17 +769,14 @@ func TestShellHomeLogoAndShortcutsResponsive(t *testing.T) {
 		if !tc.large && !strings.Contains(view, "ZLIB") {
 			t.Fatalf("%dx%d: compact wordmark is missing", tc.width, tc.height)
 		}
-		if !strings.Contains(view, zlib.Version) || strings.Contains(view, "╱") {
-			t.Fatalf("%dx%d: version is missing or thin strokes remain", tc.width, tc.height)
+		if strings.Contains(view, "╱") || strings.Contains(view, "Z-Library") || strings.Contains(view, "™") {
+			t.Fatalf("%dx%d: home shows strokes or brand text around the wordmark", tc.width, tc.height)
 		}
 		for _, row := range homeLogo(tc.width, tc.height) {
 			plain := strings.TrimSpace(ansi.Strip(row))
 			if strings.HasPrefix(plain, "╱") || strings.HasSuffix(plain, "╱") {
 				t.Fatalf("%dx%d: decorative slashes surround the logo: %q", tc.width, tc.height, plain)
 			}
-		}
-		if tc.large && strings.Index(view, zlib.Version) < strings.Index(view, "█████") {
-			t.Fatalf("%dx%d: version is above the wordmark", tc.width, tc.height)
 		}
 		for _, line := range strings.Split(view, "\n") {
 			if strings.Contains(line, "/search") {
@@ -804,35 +801,47 @@ func TestShellHomeLogoAndShortcutsResponsive(t *testing.T) {
 		}
 	}
 	logo := homeLogo(80, 24)
-	if len(logo) != 7 {
-		t.Fatalf("large wordmark has %d rows, want five letterform rows, a gap, and version", len(logo))
+	if len(logo) != len(homeLetterforms[0]) {
+		t.Fatalf("large wordmark has %d rows, want only the letterform rows", len(logo))
 	}
 	width := ansi.StringWidth(logo[0])
 	for _, row := range logo {
 		if ansi.StringWidth(row) != width {
-			t.Fatal("wordmark and version rows have inconsistent width")
+			t.Fatal("wordmark rows have inconsistent width")
 		}
 	}
-	if !strings.HasSuffix(ansi.Strip(logo[len(logo)-1]), zlib.Version) {
-		t.Fatal("version is not aligned to the wordmark's right edge")
+	if ramp := homeWordmark()[0]; strings.Count(ramp, "\x1b[") < 4 || ansi.Strip(ramp) != homeWordmarkRows()[0] {
+		t.Fatal("wordmark is not painted column by column")
 	}
 	originalVersion := zlib.Version
 	zlib.Version = "v0.0.9-0.20261015033749-d94e112583df+dirty"
 	t.Cleanup(func() { zlib.Version = originalVersion })
-	wideLogo := homeLogo(80, 24)
-	if !strings.HasSuffix(ansi.Strip(wideLogo[len(wideLogo)-1]), ansi.Truncate(zlib.Version, width, "…")) {
-		t.Fatal("long build version is not right-aligned below the wordmark")
+	for _, size := range [][2]int{{80, 24}, {40, 16}, {24, 12}} {
+		m := newShellModel()
+		m.signedIn = true
+		m.width, m.height = size[0], size[1]
+		if view := ansi.Strip(m.View().Content); strings.Contains(view, "v0.0.9") {
+			t.Fatalf("%dx%d: home shows the build version", size[0], size[1])
+		}
 	}
-	if ansi.StringWidth(wideLogo[0]) > 80 || ansi.StringWidth(homeLogo(40, 16)[0]) > 40 {
-		t.Fatal("version metadata exceeds the terminal width")
-	}
-	compactLogo := homeLogo(24, 12)
-	if len(compactLogo) != 2 || ansi.StringWidth(compactLogo[0]) != ansi.StringWidth(compactLogo[1]) {
-		t.Fatal("compact logo does not place version below its right edge")
+	if compactLogo := homeLogo(24, 12); len(compactLogo) != 1 || ansi.Strip(compactLogo[0]) != "ZLIB" {
+		t.Fatalf("compact logo = %q, want only ZLIB", compactLogo)
 	}
 	for _, shortcut := range signedInShortcuts {
 		if !slices.ContainsFunc(shellCommands, func(command shellCommand) bool { return command.name == shortcut.name }) {
 			t.Fatalf("home shortcut /%s is not a shell command", shortcut.name)
+		}
+	}
+}
+
+func TestHomeWordmarkGradientVisibleInEveryTheme(t *testing.T) {
+	for _, name := range themeOrder {
+		theme, ok := namedTheme(name)
+		if !ok {
+			t.Fatalf("built-in theme %q is missing", name)
+		}
+		if span := colorDistance(theme.Accent, wordmarkRampEnd(theme)); span < wordmarkMinRampSpan {
+			t.Fatalf("%s: wordmark gradient span %.1f reads as a flat color", name, span)
 		}
 	}
 }
