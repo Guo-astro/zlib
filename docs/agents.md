@@ -109,3 +109,11 @@ without changing files; CI runs that check on every pull request.
 The generated copies are committed so plugin installations work without Node.js
 or a build step. Avoid editing them directly. If a source file is removed, delete
 the corresponding obsolete bundle file before synchronizing.
+
+## Writing
+
+Use the `no-ai-slop` skill for every repository document and user-facing
+description, including READMEs, skill instructions, CLI help, and TUI copy.
+Name commands, data, and behavior directly. Check claims against the current
+code and say when something is unknown. Cut filler, hype, repeated explanations,
+and decorative headings. Apply the same standard to English and Chinese text.

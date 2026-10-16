@@ -45,6 +45,7 @@ directory under `go env GOPATH`.
 ## Build from source
 
 Requires the Go version declared in [go.mod](../go.mod).
+To build a development branch, check out that branch before running the build command.
 
 ```sh
 git clone https://github.com/heartleo/zlib

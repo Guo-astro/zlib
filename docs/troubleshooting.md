@@ -8,8 +8,9 @@
 zlib doctor
 ```
 
-`doctor` probes known domains using EAPI and shows only usable results, labelled
-`Available`. It does not log in or change your configured domain. Availability
+`doctor` probes known domains using EAPI and lists usable results. The focused
+row shows your position; `Current domain` marks the configured domain. It does
+not log in or change your configured domain. Availability
 depends on your network and can change; use the current result rather than a
 saved domain list. The website and EAPI may have different availability.
 
