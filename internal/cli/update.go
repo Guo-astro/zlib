@@ -100,7 +100,7 @@ func updateCommand(method updateMethod) (string, []string) {
 }
 
 func detectUpdateMethod(ctx context.Context, executable string) updateMethod {
-	path := strings.ToLower(filepath.ToSlash(executable))
+	path := strings.ToLower(strings.ReplaceAll(executable, `\`, "/"))
 	if strings.Contains(path, "/cellar/zlib/") {
 		return updateBrew
 	}

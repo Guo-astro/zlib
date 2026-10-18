@@ -88,11 +88,13 @@ func TestShellNoticeAppearsOverCommandDialog(t *testing.T) {
 }
 
 func TestShellDownloadReturnsToSelectedBook(t *testing.T) {
+	isolateConfigHome(t)
 	m := newShellModel()
 	list := newBookFeedSelectModel("Recommended", nil)
 	list.state = searchStateResults
 	list.books = []zlib.Book{{ID: "1", Hash: "abc", Name: "First"}, {ID: "2", Hash: "def", Name: "Second"}}
 	list.cursor = 1
+	list.client = zlib.NewClient()
 	m.open("list", list)
 
 	m, cmd := shellStep(m, key("enter"))
