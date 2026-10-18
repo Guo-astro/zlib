@@ -1,6 +1,6 @@
 # Troubleshooting
 
-[README](../README.md) · [Configuration](configuration.md) · [EAPI notes](eapi.md)
+[README](../README.md) · [Configuration](configuration.md)
 
 ## No available domains
 

@@ -166,7 +166,6 @@ codex plugin add zlib@zlib
 | [主题指南](docs/themes.md) | 配色列表和预览操作 |
 | [Kindle](docs/kindle.md) | SMTP 配置与发送 |
 | [排障指南](docs/troubleshooting.md) | 登录和网络问题 |
-| [EAPI 笔记](docs/eapi.md) | 接口行为和已知限制（中文） |
 
 遇到问题请在 [Issues](https://github.com/heartleo/zlib/issues) 附上
 `zlib version`、操作系统、所用命令和报错。请勿附带密码、Cookie 或会话文件。

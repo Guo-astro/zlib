@@ -170,7 +170,6 @@ Then ask your agent:
 | [Themes](docs/themes.md) | Available palettes and preview controls |
 | [Kindle](docs/kindle.md) | SMTP setup and delivery |
 | [Troubleshooting](docs/troubleshooting.md) | Login and network problems |
-| [EAPI notes](docs/eapi.md) | API behavior and known limits (Chinese) |
 
 Report bugs in [Issues](https://github.com/heartleo/zlib/issues) with your
 `zlib version`, OS, command, and error. Omit passwords, cookies, and session files.
