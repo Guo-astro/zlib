@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -86,7 +87,8 @@ func runDownloadModel(m downloadModel) (downloadModel, error) {
 
 // runPlain performs the download without the bubbletea UI, for non-terminal
 // output. It mirrors the fetch-then-download flow of the UI model and records
-// the result on the returned model.
+// the result on the returned model. Ctrl+C cancels the transfer, so the
+// library can clean up its partial file before the command exits.
 func (m downloadModel) runPlain() (downloadModel, error) {
 	downloadURL, name := m.directURL, m.bookName
 	if downloadURL == "" {
@@ -100,8 +102,13 @@ func (m downloadModel) runPlain() (downloadModel, error) {
 		downloadURL, name = book.DownloadURL, book.Name
 	}
 
+	// Trap Ctrl+C only for the transfer; during the fetch it still exits
+	// immediately, since nothing has been written yet.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	lipgloss.Fprintf(os.Stdout, "  Downloading: %s\n", name)
-	result, err := m.client.Download(downloadURL, m.dir, nil)
+	result, err := m.client.DownloadWithContext(ctx, downloadURL, m.dir, nil)
 	if err != nil {
 		return m, err
 	}

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -114,6 +115,139 @@ func TestDownloadDoesNotRetryPermanentStatus(t *testing.T) {
 	}
 	if got := requests.Load(); got != 1 {
 		t.Errorf("requests = %d, want 1", got)
+	}
+}
+
+// setStallTimeout overrides the stall timeout for the duration of a test.
+func setStallTimeout(t *testing.T, d time.Duration) {
+	t.Helper()
+	original := downloadStallTimeout
+	downloadStallTimeout = d
+	t.Cleanup(func() { downloadStallTimeout = original })
+}
+
+// assertOnlyFiles fails unless dir holds exactly the named files, which is how
+// the tests check that no temporary download file was left behind.
+func assertOnlyFiles(t *testing.T, dir string, want ...string) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir() error = %v", err)
+	}
+	var got []string
+	for _, e := range entries {
+		got = append(got, e.Name())
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("files in dir = %q, want %q", got, want)
+	}
+}
+
+func TestDownloadFailureKeepsExistingFile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Promise more bytes than are sent, so the client sees a truncated body.
+		w.Header().Set("Content-Disposition", `attachment; filename="book.epub"`)
+		w.Header().Set("Content-Length", "1000")
+		_, _ = w.Write([]byte("partial"))
+	}))
+	t.Cleanup(server.Close)
+
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "book.epub")
+	if err := os.WriteFile(existing, []byte("good copy"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := loggedInClient().Download(server.URL+"/dl", dir, nil); err == nil {
+		t.Fatal("Download() error = nil, want truncated body error")
+	}
+	body, err := os.ReadFile(existing)
+	if err != nil {
+		t.Fatalf("existing file: %v", err)
+	}
+	if string(body) != "good copy" {
+		t.Errorf("existing file = %q, want it untouched", body)
+	}
+	assertOnlyFiles(t, dir, "book.epub")
+}
+
+func TestDownloadReplacesExistingFileOnSuccess(t *testing.T) {
+	server, _ := downloadServer(t, 0, 0)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "book.epub"), []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := loggedInClient().Download(server.URL+"/dl", dir, nil)
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	body, err := os.ReadFile(result.FilePath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if string(body) != "book body" {
+		t.Errorf("body = %q, want %q", body, "book body")
+	}
+	assertOnlyFiles(t, dir, "book.epub")
+}
+
+func TestDownloadStallTimesOut(t *testing.T) {
+	tests := []struct {
+		name        string
+		sendHeaders bool
+	}{
+		{"before response headers", false},
+		{"mid body", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setStallTimeout(t, 50*time.Millisecond)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.sendHeaders {
+					w.Header().Set("Content-Disposition", `attachment; filename="book.epub"`)
+					w.Header().Set("Content-Length", "1000")
+					_, _ = w.Write([]byte("partial"))
+					w.(http.Flusher).Flush()
+				}
+				<-r.Context().Done()
+			}))
+			t.Cleanup(server.Close)
+			dir := t.TempDir()
+
+			start := time.Now()
+			_, err := loggedInClient().Download(server.URL+"/dl", dir, nil)
+			if !errors.Is(err, ErrDownloadFailed) {
+				t.Fatalf("Download() error = %v, want ErrDownloadFailed", err)
+			}
+			if elapsed := time.Since(start); elapsed > 5*time.Second {
+				t.Errorf("Download() took %s, want it to stop near the stall timeout", elapsed)
+			}
+			assertOnlyFiles(t, dir)
+		})
+	}
+}
+
+func TestDownloadSlowButSteadyIsNotStalled(t *testing.T) {
+	setStallTimeout(t, 200*time.Millisecond)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Disposition", `attachment; filename="book.epub"`)
+		// Five chunks 60ms apart: the whole transfer outlasts the stall
+		// timeout, but no single gap does.
+		for range 5 {
+			_, _ = w.Write([]byte("chunk"))
+			w.(http.Flusher).Flush()
+			time.Sleep(60 * time.Millisecond)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	result, err := loggedInClient().Download(server.URL+"/dl", t.TempDir(), nil)
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	if result.Size != 25 {
+		t.Errorf("Size = %d, want 25", result.Size)
 	}
 }
 

@@ -2,6 +2,7 @@ package zlib
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,17 @@ const DefaultDownloadRetries = 3
 // attempt. It is a var so tests can shorten it.
 var downloadRetryBase = time.Second
 
+// downloadStallTimeout bounds how long a download may go without receiving
+// data, from the first request to the last byte. A slow transfer that keeps
+// making progress is never cut off; a connection that stops delivering is,
+// instead of hanging an unattended command forever. It is a var so tests can
+// shorten it.
+var downloadStallTimeout = 2 * time.Minute
+
+// errDownloadStalled is the cancellation cause recorded when
+// downloadStallTimeout fires.
+var errDownloadStalled = errors.New("download stalled")
+
 // resolveDownloadRetries reads a retry count from raw, falling back to
 // DefaultDownloadRetries when it is unset, unparseable or negative.
 func resolveDownloadRetries(raw string) int {
@@ -42,21 +54,45 @@ func (c *Client) Download(downloadURL, destDir string, progressFn func(written, 
 	return c.DownloadWithContext(context.Background(), downloadURL, destDir, progressFn)
 }
 
+// DownloadWithContext saves the file at downloadURL into destDir. The file is
+// written to a temporary name and only renamed into place once complete, so a
+// failed or cancelled download never truncates or removes an existing file of
+// the same name.
 func (c *Client) DownloadWithContext(ctx context.Context, downloadURL, destDir string, progressFn func(written, total int64)) (DownloadResult, error) {
 	if !c.loggedIn {
 		return DownloadResult{}, ErrNotLoggedIn
 	}
+
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	stall := time.AfterFunc(downloadStallTimeout, func() { cancel(errDownloadStalled) })
+	defer stall.Stop()
+	progress := func(written, total int64) {
+		stall.Reset(downloadStallTimeout)
+		if progressFn != nil {
+			progressFn(written, total)
+		}
+	}
+
+	result, err := c.download(ctx, downloadURL, destDir, progress)
+	if err != nil && errors.Is(context.Cause(ctx), errDownloadStalled) {
+		return DownloadResult{}, fmt.Errorf("%w: no data received for %s", ErrDownloadFailed, downloadStallTimeout)
+	}
+	return result, err
+}
+
+func (c *Client) download(ctx context.Context, downloadURL, destDir string, progressFn func(written, total int64)) (DownloadResult, error) {
 	resolvedURL, err := c.resolveEAPIFileURL(ctx, downloadURL)
 	if err != nil {
 		return DownloadResult{}, err
 	}
 	downloadURL = resolvedURL
 
-	// Use a separate client with no timeout for downloads (CDN can be slow)
+	// Use a separate client with no timeout for downloads (CDN can be slow);
+	// DownloadWithContext bounds stalls instead of total duration.
 	dlClient := &http.Client{
 		Jar:       c.httpClient.Jar,
 		Transport: c.httpClient.Transport,
-		// No Timeout — let the download run as long as needed
 	}
 
 	resp, err := c.openDownload(ctx, dlClient, downloadURL)
@@ -69,7 +105,7 @@ func (c *Client) DownloadWithContext(ctx context.Context, downloadURL, destDir s
 		loc := resp.Header.Get("Location")
 		resp.Body.Close()
 		if loc != "" {
-			return c.DownloadWithContext(ctx, loc, destDir, progressFn)
+			return c.download(ctx, loc, destDir, progressFn)
 		}
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -78,41 +114,63 @@ func (c *Client) DownloadWithContext(ctx context.Context, downloadURL, destDir s
 
 	filename := sanitizeFilename(filenameFromResponse(resp, downloadURL))
 	destPath := filepath.Join(destDir, filename)
-
-	f, err := os.Create(destPath)
+	written, err := saveDownload(resp, destPath, progressFn)
 	if err != nil {
 		return DownloadResult{}, err
 	}
-	defer f.Close()
+	return DownloadResult{FilePath: destPath, Size: written}, nil
+}
+
+// saveDownload streams resp.Body into a temporary file beside destPath and
+// renames it over destPath only after the body has been read in full. On any
+// error the temporary file is removed and destPath is left untouched.
+func saveDownload(resp *http.Response, destPath string, progressFn func(written, total int64)) (int64, error) {
+	tmp, err := os.CreateTemp(filepath.Dir(destPath), ".zlib-*.part")
+	if err != nil {
+		return 0, err
+	}
+	tmpPath := tmp.Name()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tmp.Close()
+			_ = os.Remove(tmpPath)
+		}
+	}()
 
 	total := resp.ContentLength
 	var written int64
-
 	buf := make([]byte, 32*1024)
 	for {
 		n, readErr := resp.Body.Read(buf)
 		if n > 0 {
-			nw, writeErr := f.Write(buf[:n])
+			nw, writeErr := tmp.Write(buf[:n])
 			if writeErr != nil {
-				return DownloadResult{}, writeErr
+				return 0, writeErr
 			}
 			written += int64(nw)
-			if progressFn != nil {
-				progressFn(written, total)
-			}
+			progressFn(written, total)
 		}
 		if readErr == io.EOF {
 			break
 		}
 		if readErr != nil {
-			// Remove incomplete file on error (e.g. context cancellation)
-			f.Close()
-			os.Remove(destPath)
-			return DownloadResult{}, readErr
+			return 0, readErr
 		}
 	}
 
-	return DownloadResult{FilePath: destPath, Size: written}, nil
+	// CreateTemp uses 0600; give the finished file ordinary permissions.
+	if err := tmp.Chmod(0o644); err != nil {
+		return 0, err
+	}
+	if err := tmp.Close(); err != nil {
+		return 0, err
+	}
+	if err := os.Rename(tmpPath, destPath); err != nil {
+		return 0, err
+	}
+	committed = true
+	return written, nil
 }
 
 // openDownload issues the download request, retrying with exponential backoff
