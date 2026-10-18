@@ -12,7 +12,8 @@ Z-Library login. If a book must be found or downloaded first, use the bundled
 
 ## Send
 
-1. Confirm `zlib version` succeeds and the requested file exists. Resolve an
+1. Confirm `zlib version` succeeds and the requested file exists. If `zlib` is
+   missing, install it as described in the [zlib skill](../zlib/SKILL.md). Resolve an
    ambiguous file choice before sending. Reuse the user's existing choice.
 2. If the user requested delivery and settings are already configured, run the
    command below without a TTY. Let the CLI resolve `ZLIB_SMTP_PWD` from its

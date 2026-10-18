@@ -13,9 +13,16 @@ the non-interactive forms below.
 ## Start
 
 1. Run `zlib version` once to confirm the executable is available. If missing,
-   give the installation command for the user's platform: Windows
-   `winget install --id heartleo.zlib --exact`; macOS/Linux
-   `brew install heartleo/tap/zlib`. Resume when the binary is available.
+   install it yourself, then rerun `zlib version`:
+   - Windows: `winget install --id heartleo.zlib --exact`
+   - macOS/Linux with Homebrew: `brew install heartleo/tap/zlib`
+   - macOS/Linux without Homebrew:
+     `curl -fsSL https://raw.githubusercontent.com/heartleo/zlib/main/install.sh | sh`
+     (writes to `/usr/local/bin` and may need `sudo`)
+
+   If installation fails or needs a password, report the error and the command
+   for the user to run. A new install may need a new shell before `zlib` is on
+   `PATH`.
 2. For account operations, run `zlib profile --json` once per session. Parse it
    privately; report personal fields only when the user requests them.
    `doctor --json` works without login and does not need this check.

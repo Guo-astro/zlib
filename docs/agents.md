@@ -16,8 +16,9 @@ installation in the README remains available for use outside this checkout.
 
 ## Prepare the agent's environment
 
-Install `zlib` on the `PATH` used by your agent and complete
-[login](../README.md#quick-start) in your own terminal. Check:
+If `zlib` is not on the agent's `PATH`, the skills install it with winget,
+Homebrew or the install script. Complete [login](../README.md#quick-start) in
+your own terminal. Check:
 
 ```sh
 zlib version
