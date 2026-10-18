@@ -8,13 +8,6 @@ import (
 	"strings"
 )
 
-func makeEAPIBookRef(id, hash string) string {
-	if id == "" || hash == "" {
-		return ""
-	}
-	return id + ":" + hash
-}
-
 func parseEAPIBookRef(ref string) (string, string, error) {
 	id, hash, ok := strings.Cut(strings.TrimSpace(ref), ":")
 	if !ok || id == "" || hash == "" || strings.Contains(hash, ":") {

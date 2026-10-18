@@ -47,7 +47,7 @@ func customThemeNames() []string {
 
 func validateCustomThemeName(name string) error {
 	if !themeNamePattern.MatchString(name) {
-		return errors.New("Use 1–40 lowercase letters, digits, or hyphens; start with a letter")
+		return errors.New("use 1–40 lowercase letters, digits, or hyphens; start with a letter")
 	}
 	if slices.Contains(themeOrder, name) {
 		return fmt.Errorf("%s is a built-in theme", name)

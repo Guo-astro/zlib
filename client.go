@@ -247,22 +247,14 @@ func isBotProtectionResponse(statusCode int, header http.Header, body []byte) bo
 	return diamWallTitleRe.Match(body)
 }
 
-// validateStatus rejects a non-2xx response. It is separate from
-// validateResponse because callers that handle specific non-2xx bodies (the JS
-// challenge, an EAPI error envelope) must inspect the body before the status
-// is allowed to fail the request.
+// validateStatus rejects a non-2xx response. Callers that handle a specific
+// non-2xx body, such as an EAPI error envelope, inspect it before letting the
+// status fail the request.
 func validateStatus(resp *http.Response) error {
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return &HTTPStatusError{StatusCode: resp.StatusCode, URL: resp.Request.URL.String()}
 	}
 	return nil
-}
-
-func validateResponse(resp *http.Response, body []byte) error {
-	if isBotProtectionResponse(resp.StatusCode, resp.Header, body) {
-		return &BotProtectionError{StatusCode: resp.StatusCode, URL: resp.Request.URL.String()}
-	}
-	return validateStatus(resp)
 }
 
 func checkRedirect(req *http.Request, via []*http.Request) error {

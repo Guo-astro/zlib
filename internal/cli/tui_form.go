@@ -198,18 +198,6 @@ func (m formModel) View() tea.View {
 	return screenView(m.width, m.height, m.title, "", strings.Join(lines, "\n"), m.message, uiKey("esc", "cancel"), uiKey("enter", "open"), uiKey("ctrl+s", strings.ToLower(m.action)), uiKey("↑/↓", "select"))
 }
 
-func runForm(m formModel) ([]formField, bool, error) {
-	if !isInteractive() {
-		return nil, false, fmt.Errorf("%s requires a terminal", strings.ToLower(m.title))
-	}
-	result, err := tea.NewProgram(m).Run()
-	if err != nil {
-		return nil, false, err
-	}
-	final := result.(formModel)
-	return final.fields, final.accepted, nil
-}
-
 func requiredField(label string) func(string) error {
 	return func(value string) error {
 		if strings.TrimSpace(value) == "" {
