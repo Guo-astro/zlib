@@ -6,13 +6,9 @@
 
 Z-Library 命令行工具，搜索、下载图书并发送到 Kindle，你和 Claude Code、Codex 等 AI Agent 都能用。
 
-[![Go version](https://img.shields.io/github/go-mod/go-version/heartleo/zlib)](go.mod)
-[![CI](https://img.shields.io/github/actions/workflow/status/heartleo/zlib/ci.yml)](https://github.com/heartleo/zlib/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/heartleo/zlib)](https://github.com/heartleo/zlib/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/heartleo/zlib/total)](https://github.com/heartleo/zlib/releases)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+<a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/heartleo/zlib" alt="Go version" height="20"/></a> <a href="https://github.com/heartleo/zlib/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/heartleo/zlib/ci.yml" alt="CI" height="20"/></a> <a href="https://github.com/heartleo/zlib/releases/latest"><img src="https://img.shields.io/github/v/release/heartleo/zlib" alt="Release" height="20"/></a> <a href="https://github.com/heartleo/zlib/releases"><img src="https://img.shields.io/github/downloads/heartleo/zlib/total" alt="Downloads" height="20"/></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" height="20"/></a>
 
-<a href="https://trendshift.io/repositories/135168?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-135168" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/135168/daily?language=Go" alt="heartleo%2Fzlib | Trendshift" width="250" height="55"/></a>
+<a href="https://trendshift.io/repositories/135168?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-135168" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/135168/daily?language=Go" alt="heartleo%2Fzlib | Trendshift" width="250" height="55"/></a> <a href="https://gittrend.io/repo/heartleo/zlib"><picture><source media="(prefers-color-scheme: dark)" srcset="https://gittrend.io/api/badge/trending/heartleo/zlib.svg?theme=dark" /><source media="(prefers-color-scheme: light)" srcset="https://gittrend.io/api/badge/trending/heartleo/zlib.svg" /><img alt="GitHub Trending Repository of the Day" src="https://gittrend.io/api/badge/trending/heartleo/zlib.svg" width="250" height="55" /></picture></a>
 
 [English](README.md) | 简体中文
 
