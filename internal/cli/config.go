@@ -72,12 +72,12 @@ type settingsStart struct {
 func (m settingsStart) Init() tea.Cmd { return m.initial }
 
 func init() {
-	root := settingsCommand("config", "home", "", "Edit network, download, and Kindle settings")
-	root.PersistentFlags().Bool("json", false, "Print settings and sources as JSON")
+	root := settingsCommand("config", "home", "", "View or edit network, download, and Kindle settings")
+	root.PersistentFlags().Bool("json", false, "Print settings and their sources as JSON")
 	network := settingsCommand("network", "network", "", "Set domain and proxy")
-	network.AddCommand(settingsCommand("domain", "domain", "", "Set EAPI domain"), settingsCommand("proxy", "network", zlib.EnvProxy, "Set proxy URL"))
+	network.AddCommand(settingsCommand("domain", "domain", "", "Set Z-Library domain"), settingsCommand("proxy", "network", zlib.EnvProxy, "Set proxy URL"))
 	download := settingsCommand("download", "download", "", "Set download directory and retries")
-	download.AddCommand(settingsCommand("directory", "download", downloadDirEnvVar, "Set default download directory"), settingsCommand("retries", "download", zlib.EnvRetries, "Set download retries"))
+	download.AddCommand(settingsCommand("directory", "download", downloadDirEnvVar, "Set default download directory"), settingsCommand("retries", "download", zlib.EnvRetries, "Set download retry count"))
 	kindle := settingsCommand("kindle", "kindle", "", "Set Kindle address and SMTP")
 	kindle.AddCommand(settingsCommand("to", "kindle", kindleToKey, "Set Kindle address"), settingsCommand("from", "kindle", kindleFromKey, "Set sender address"), settingsCommand("host", "kindle", kindleHostKey, "Set SMTP host"), settingsCommand("port", "kindle", kindlePortKey, "Set SMTP port"))
 	root.AddCommand(network, download, kindle)

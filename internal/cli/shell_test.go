@@ -713,7 +713,7 @@ func TestShellCommandsStayInPalette(t *testing.T) {
 	}
 	m.input.SetValue("/")
 	palette := ansi.Strip(m.View().Content)
-	if !strings.Contains(palette, "/search") || !strings.Contains(palette, "Search books by title") || !strings.Contains(palette, "Commands") || strings.Contains(palette, " of 13") {
+	if !strings.Contains(palette, "/search") || !strings.Contains(palette, "Search books with filters") || !strings.Contains(palette, "Commands") || strings.Contains(palette, " of 13") {
 		t.Fatal("command dialog should show commands and descriptions without a count heading")
 	}
 	if strings.Count(palette, "/search") != 1 {
@@ -722,7 +722,7 @@ func TestShellCommandsStayInPalette(t *testing.T) {
 	if rows := m.paletteVisibleRows(m.height); rows != 5 {
 		t.Fatalf("palette has %d visible rows, want 5", rows)
 	}
-	if !strings.Contains(palette, "> /search") || !strings.Contains(palette, "\n       │   Search books by title, author, or ISBN") {
+	if !strings.Contains(palette, "> /search") || !strings.Contains(palette, "\n       │   Search books with filters") {
 		t.Fatal("wide command dialog should show descriptions below command names")
 	}
 	if strings.Contains(palette, "/quit") {

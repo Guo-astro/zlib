@@ -22,7 +22,7 @@ var kindleAllowedTypes = []string{".epub", ".pdf", ".txt", ".doc", ".docx", ".ht
 
 var kindleCmd = &cobra.Command{
 	Use:   "kindle",
-	Short: "Select a file to send to Kindle",
+	Short: "Pick a file and send it to Kindle",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runStandaloneShellCommand("/kindle")
@@ -40,7 +40,8 @@ var kindleConfigCmd = &cobra.Command{
 
 var kindleSendCmd = &cobra.Command{
 	Use:   "send [file]",
-	Short: "Send a local file to Kindle",
+	Short: "Send a file to Kindle",
+	Long:  "Send a local file to Kindle. Without a file, open the file picker.",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if isInteractive() {

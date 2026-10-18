@@ -12,14 +12,14 @@ var favoritesCmd = newSavedBooksCommand("favorites")
 func newSavedBooksCommand(name string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   name,
-		Short: "Show saved books",
+		Short: "Show favorite books",
 		Args:  cobra.NoArgs,
 		RunE:  runSavedBooks,
 	}
 	cmd.Flags().IntP("page", "p", 1, "Page number")
-	cmd.Flags().Bool("json", false, "Output favorites as JSON")
+	cmd.Flags().Bool("json", false, "Print favorites as JSON")
 	addDestDirFlag(cmd)
-	cmd.Flags().Bool("send-to-kindle", false, "Send the selected download to Kindle")
+	cmd.Flags().Bool("send-to-kindle", false, "Send the downloaded book to Kindle")
 	return cmd
 }
 

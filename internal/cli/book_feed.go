@@ -17,7 +17,7 @@ var recommendedCmd = newBookFeedCommand("recommended", "Show recommended books",
 	return c.RecommendedBooks()
 })
 
-var mostPopularCmd = newBookFeedCommand("most-popular", "Show popular books", "Browse the most popular books", func(c *zlib.Client) ([]zlib.Book, error) {
+var mostPopularCmd = newBookFeedCommand("most-popular", "Show most popular books", "Browse the most popular books", func(c *zlib.Client) ([]zlib.Book, error) {
 	return c.MostPopularBooks()
 })
 
@@ -69,9 +69,9 @@ func newBookFeedCommand(name, description, summary string, load func(*zlib.Clien
 			return nil
 		},
 	}
-	cmd.Flags().Bool("json", false, "Output books as JSON")
+	cmd.Flags().Bool("json", false, "Print books as JSON")
 	addDestDirFlag(cmd)
-	cmd.Flags().Bool("send-to-kindle", false, "Send the selected download to Kindle")
+	cmd.Flags().Bool("send-to-kindle", false, "Send the downloaded book to Kindle")
 	return cmd
 }
 

@@ -9,7 +9,7 @@ import (
 
 var profileCmd = &cobra.Command{
 	Use:   "profile",
-	Short: "Show profile and download quota",
+	Short: "Show account profile and download quota",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := loadClient()
 		if err != nil {
@@ -42,5 +42,5 @@ func renderProfileCard(profile zlib.UserProfile) string {
 }
 
 func init() {
-	profileCmd.Flags().Bool("json", false, "Output account profile and download quota as JSON")
+	profileCmd.Flags().Bool("json", false, "Print profile and quota as JSON")
 }

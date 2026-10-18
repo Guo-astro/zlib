@@ -56,7 +56,7 @@ const downloadDirEnvVar = "ZLIB_DOWNLOAD_DIR"
 // cannot drift apart from what destDirFlag actually resolves.
 func addDestDirFlag(cmd *cobra.Command) {
 	cmd.Flags().StringP("dir", "d", ".",
-		"Destination directory. Falls back to $"+downloadDirEnvVar+" when omitted.")
+		"Download directory (falls back to $"+downloadDirEnvVar+")")
 }
 
 // destDirFlag reads the --dir flag shared by the download, search and history

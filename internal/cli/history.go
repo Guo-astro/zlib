@@ -16,7 +16,7 @@ import (
 var historyCmd = &cobra.Command{
 	Use:   "history",
 	Short: "Show download history",
-	Long:  "Browse download history in a terminal. Use flags to print or edit entries.",
+	Long:  "Without flags, browse download history interactively. Use --json to print it, --download to download a book, or --delete to remove an entry.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		page, _ := cmd.Flags().GetInt("page")
 		downloadID, _ := cmd.Flags().GetString("download")
@@ -191,12 +191,12 @@ var historyCmd = &cobra.Command{
 
 func init() {
 	historyCmd.Flags().IntP("page", "p", 1, "Page number")
-	historyCmd.Flags().StringP("download", "D", "", "Download a history book by book ID")
+	historyCmd.Flags().StringP("download", "D", "", "Download a book from history by ID")
 	addDestDirFlag(historyCmd)
-	historyCmd.Flags().Bool("send-to-kindle", false, "Send the downloaded file to Kindle.")
-	historyCmd.Flags().StringP("format", "f", "", "Filter by file format (e.g. epub, pdf)")
-	historyCmd.Flags().Bool("json", false, "Output history as JSON (implies non-interactive)")
-	historyCmd.Flags().String("delete", "", "Delete a remote history entry by numeric ID or id:hash (keeps local files)")
+	historyCmd.Flags().Bool("send-to-kindle", false, "Send the downloaded book to Kindle")
+	historyCmd.Flags().StringP("format", "f", "", "Filter by file format, e.g. epub")
+	historyCmd.Flags().Bool("json", false, "Print history as JSON")
+	historyCmd.Flags().String("delete", "", "Delete a history entry on Z-Library by ID or id:hash; local files stay")
 	historyCmd.MarkFlagsMutuallyExclusive("delete", "download")
 	historyCmd.MarkFlagsMutuallyExclusive("delete", "page")
 	historyCmd.MarkFlagsMutuallyExclusive("delete", "format")

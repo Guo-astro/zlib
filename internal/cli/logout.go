@@ -11,7 +11,7 @@ import (
 
 var logoutCmd = &cobra.Command{
 	Use:   "logout",
-	Short: "Remove saved session",
+	Short: "Delete the saved session",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		removed, err := clearSavedSession()
 		if err != nil {

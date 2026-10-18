@@ -121,8 +121,8 @@ func isSelectableTheme(name string) bool {
 
 var themeCmd = &cobra.Command{
 	Use:   "theme [name]",
-	Short: "Choose or set a theme",
-	Long:  fmt.Sprintf("Choose a theme from the list or set one by name. Without a terminal, show the current theme.\n\nAvailable: %s\n", strings.Join(selectableThemes(), ", ")),
+	Short: "Choose or set a color theme",
+	Long:  fmt.Sprintf("Set a theme by name, or pick one from the list. Without a terminal, print the current theme.\n\nAvailable: %s\n", strings.Join(selectableThemes(), ", ")),
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name string

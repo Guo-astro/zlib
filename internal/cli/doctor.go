@@ -17,8 +17,8 @@ import (
 
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
-	Short: "Find available EAPI domains",
-	Long:  "Probe EAPI domains without logging in or changing your selected domain.",
+	Short: "Find working Z-Library domains",
+	Long:  "Check known domains without logging in or changing the selected domain.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		proxyValue, _ := cmd.Flags().GetString("proxy")
 		proxyURL, err := validateDoctorProxy(proxyValue)
@@ -124,8 +124,8 @@ func validateDoctorProxy(rawURL string) (string, error) {
 }
 
 func init() {
-	doctorCmd.Flags().Bool("json", false, "Output available domains as JSON")
-	doctorCmd.Flags().String("proxy", "", "Proxy URL for checks (http, https, socks5, or socks5h)")
+	doctorCmd.Flags().Bool("json", false, "Print available domains as JSON")
+	doctorCmd.Flags().String("proxy", "", "Proxy URL for the checks (http, https, socks5, socks5h)")
 	doctorCmd.Flags().Bool("eapi", false, "Check the EAPI health endpoint")
 	_ = doctorCmd.Flags().MarkHidden("eapi")
 }

@@ -22,6 +22,7 @@ import (
 var downloadCmd = &cobra.Command{
 	Use:   "download <book-id>",
 	Short: "Download a book by ID",
+	Long:  "Download a book by its id:hash ID from search, favorites, or history results.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir, err := destDirFlag(cmd)
@@ -120,7 +121,7 @@ func (m downloadModel) runPlain() (downloadModel, error) {
 
 func init() {
 	addDestDirFlag(downloadCmd)
-	downloadCmd.Flags().Bool("send-to-kindle", false, "Send the downloaded file to Kindle.")
+	downloadCmd.Flags().Bool("send-to-kindle", false, "Send the downloaded book to Kindle")
 }
 
 // — bubbletea model —

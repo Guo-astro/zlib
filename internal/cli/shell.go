@@ -23,7 +23,7 @@ import (
 
 var tuiCmd = &cobra.Command{
 	Use:   "tui",
-	Short: "Open the interactive shell",
+	Short: "Open the terminal UI",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !isInteractive() {
@@ -70,17 +70,17 @@ func (m *shellModel) setNotice(message string) {
 type shellCommand struct{ name, description string }
 
 var shellCommands = []shellCommand{
-	{"search", "Search books by title, author, or ISBN"},
-	{"favorites", "Show saved books"},
+	{"search", "Search books with filters"},
+	{"favorites", "Show favorite books"},
 	{"recommended", "Show recommended books"},
-	{"most-popular", "Show popular books"},
+	{"most-popular", "Show most popular books"},
 	{"history", "Show download history"},
-	{"profile", "Show profile and quota"},
-	{"config", "Edit network, download, and Kindle settings"},
-	{"theme", "Choose a theme"},
-	{"doctor", "Find available domains"},
+	{"profile", "Show account profile and download quota"},
+	{"config", "View or edit network, download, and Kindle settings"},
+	{"theme", "Choose a color theme"},
+	{"doctor", "Find working Z-Library domains"},
 	{"login", "Log in with email and password"},
-	{"logout", "Remove saved session"},
+	{"logout", "Delete the saved session"},
 	{"kindle", "Send a file to Kindle"},
 	{"quit", "Exit zlib"},
 }

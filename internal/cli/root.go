@@ -19,7 +19,7 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:               "zlib",
-	Short:             "Search and download Z-Library books",
+	Short:             "Search, download, and send Z-Library books to Kindle",
 	Version:           zlib.Version,
 	SilenceUsage:      true,
 	SilenceErrors:     true,
@@ -28,7 +28,7 @@ var rootCmd = &cobra.Command{
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Show zlib version",
+	Short: "Show the zlib version",
 	Run: func(cmd *cobra.Command, args []string) {
 		lipgloss.Fprintf(cmd.OutOrStdout(), "%s version %s\n", rootCmd.Name(), zlib.Version)
 	},

@@ -18,8 +18,8 @@ import (
 
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "Log in or import cookies",
-	Long:  `Log in with email and password or import a Netscape cookie file. The session is saved locally.`,
+	Short: "Log in with a password or cookie file",
+	Long:  `Log in with email and password, or import a Netscape cookie file. The session is saved locally.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		email, _ := cmd.Flags().GetString("email")
 		password, _ := cmd.Flags().GetString("password")
@@ -199,10 +199,10 @@ func rememberLoginEmail(email string) error {
 }
 
 func init() {
-	loginCmd.Flags().String("email", "", "Z-Library email")
-	loginCmd.Flags().String("password", "", "Z-Library password")
-	loginCmd.Flags().String("cookies", "", "Import a Netscape-format cookie file")
-	loginCmd.Flags().String("domain", "", "Login domain (otherwise ZLIB_DOMAIN)")
+	loginCmd.Flags().String("email", "", "Account email")
+	loginCmd.Flags().String("password", "", "Account password")
+	loginCmd.Flags().String("cookies", "", "Import a Netscape cookie file")
+	loginCmd.Flags().String("domain", "", "Login domain (falls back to $ZLIB_DOMAIN)")
 	loginCmd.Flags().Bool("eapi", false, "Use EAPI (now the only mode)")
 	loginCmd.Flags().MarkHidden("eapi")
 }

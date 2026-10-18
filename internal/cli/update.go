@@ -20,7 +20,8 @@ const goInstallPackage = "github.com/heartleo/zlib/cmd/zlib@latest"
 
 var updateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update to the latest release",
+	Short: "Update zlib to the latest release",
+	Long:  "Update zlib through the channel that installed it: Homebrew, winget, go install, or a release download.",
 	Args:  cobra.NoArgs,
 	RunE:  runUpdate,
 }

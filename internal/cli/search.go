@@ -16,7 +16,8 @@ const defaultSearchPageSize = 50
 
 var searchCmd = &cobra.Command{
 	Use:   "search [query]",
-	Short: "Search books by title, author, or ISBN",
+	Short: "Search books with filters",
+	Long:  "Search books by keyword. Without a query, open the search form.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jsonOut, _ := cmd.Flags().GetBool("json")
 
@@ -227,14 +228,14 @@ func init() {
 	searchCmd.Flags().IntP("page", "p", 1, "Page number")
 	searchCmd.Flags().IntP("count", "n", defaultSearchPageSize, "Results per page")
 	addDestDirFlag(searchCmd)
-	searchCmd.Flags().Bool("send-to-kindle", false, "Send the downloaded file to Kindle.")
-	searchCmd.Flags().StringArray("ext", nil, "Filter by file extension (repeatable): epub, pdf, mobi, …")
-	searchCmd.Flags().StringArray("format", nil, "Alias for --ext: filter by file format (repeatable)")
+	searchCmd.Flags().Bool("send-to-kindle", false, "Send the downloaded book to Kindle")
+	searchCmd.Flags().StringArray("ext", nil, "Filter by file extension, e.g. epub or pdf (repeatable)")
+	searchCmd.Flags().StringArray("format", nil, "Alias for --ext")
 	searchCmd.Flags().Int("from-year", 0, "Earliest publication year")
 	searchCmd.Flags().Int("to-year", 0, "Latest publication year")
 	searchCmd.Flags().StringArray("language", nil, "Filter by language (repeatable)")
-	searchCmd.Flags().Bool("exact", false, "Use exact match")
+	searchCmd.Flags().Bool("exact", false, "Match the query exactly")
 	searchCmd.Flags().String("order", "", "Sort: popular, bestmatch, date, titleA, title, year, filesize, filesizeA")
-	searchCmd.Flags().Bool("full-title", false, "Do not truncate book titles in the results table")
-	searchCmd.Flags().Bool("json", false, "Output results as JSON (requires a query)")
+	searchCmd.Flags().Bool("full-title", false, "Show full titles in the results table")
+	searchCmd.Flags().Bool("json", false, "Print results as JSON (requires a query)")
 }
