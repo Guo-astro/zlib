@@ -130,8 +130,8 @@ An existing process variable or working-directory `.env` can still override that
 value. When `ZLIB_DOMAIN` is unset or blank, authenticated commands use the domain
 stored in the session.
 
-Domains must be HTTPS origins accepted by the CLI's allowlist. See
-[EAPI domain rules](eapi.md#域名白名单) for the supported hosts.
+Domains must be HTTPS origins accepted by the CLI's allowlist. Run `zlib doctor`
+to see which supported domains are reachable from your network.
 
 To test a proxy for one request:
 
