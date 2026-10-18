@@ -2,11 +2,13 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"charm.land/bubbles/v2/progress"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	zlib "github.com/heartleo/zlib"
 )
 
@@ -290,7 +292,10 @@ func (m searchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.state = searchStateFilter
 				m.filter = newSearchFilterForm(m.query, m.opts)
-				m.filter.width, m.filter.height = m.width, m.height
+				if m.width > 0 && m.height > 0 {
+					next, _ := m.filter.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+					m.filter = next.(searchFilterForm)
+				}
 				return m, m.filter.Init()
 			case "q", "esc", "ctrl+c":
 				m.err = nil
@@ -334,9 +339,9 @@ func (m searchSelectModel) View() tea.View {
 			if m.inShell {
 				searchKey = "ctrl+f"
 			}
-			v = screenView(m.width, m.height, title, fmt.Sprintf("Could not load page %d", m.retryPage), bookCell(m.err.Error()), "Retry or change the search", uiKey("r", "retry"), uiKey(searchKey, "search"), uiKey("esc", "back"))
+			v = screenView(m.width, m.height, title, fmt.Sprintf("Could not load page %d", m.retryPage), m.errorBody(), "Retry or change the search", uiKey("r", "retry"), uiKey(searchKey, "search"), uiKey("esc", "back"))
 		} else {
-			v = screenView(m.width, m.height, title, "Could not load books", bookCell(m.err.Error()), "", uiKey("r", "retry"), uiKey("esc", "back"))
+			v = screenView(m.width, m.height, title, "Could not load books", m.errorBody(), "", uiKey("r", "retry"), uiKey("esc", "back"))
 		}
 	}
 	if m.confirmDownload {
@@ -351,8 +356,15 @@ func (m searchSelectModel) listView() tea.View {
 	if m.feed == nil && m.feedPage == nil {
 		list := m
 		list.feedTitle = "Search: " + bookCell(m.query)
+		chips := searchFilterChips(m.opts)
+		muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
 		if m.state == searchStateLoading {
-			return screenView(m.width, m.height, list.feedTitle, "", "  "+m.spinner.View(), "", uiKey("esc", "back"))
+			body := []string{"  " + m.spinner.View() + muted.Render("Searching…")}
+			if len(chips) > 0 {
+				body = append(body, "")
+				body = append(body, wrapIndented(strings.Join(chips, " · "), m.width, "  ", muted)...)
+			}
+			return screenView(m.width, m.height, list.feedTitle, "", strings.Join(body, "\n"), "", uiKey("esc", "back"))
 		}
 		status := fmt.Sprintf("Page %d", m.page)
 		if m.totalPages > 0 {
@@ -370,10 +382,18 @@ func (m searchSelectModel) listView() tea.View {
 				searchKey = "Ctrl+F"
 				exitLabel = "back"
 			}
-			return screenView(m.width, m.height, list.feedTitle, status,
-				"  No books found for this search.\n  Try another title, author, or ISBN.", "",
+			body := wrapIndented("No books found for this search.", m.width, "  ", lipgloss.NewStyle().Foreground(currentTheme.Title))
+			hint := "Try another title, author, or ISBN."
+			if len(chips) > 0 {
+				body = append(body, wrapIndented("Filters: "+strings.Join(chips, " · "), m.width, "  ", muted)...)
+				hint = "Try another title, author, or ISBN, or loosen the filters."
+			}
+			body = append(body, "")
+			body = append(body, wrapIndented(hint, m.width, "  ", muted)...)
+			return screenView(m.width, m.height, list.feedTitle, status, strings.Join(body, "\n"), "",
 				uiKey(searchKey, "search"), uiKey("q", exitLabel))
 		}
+		status = withFilterSummary(status, chips, m.width)
 		return fullScreenView(m.width, m.height, list.feedViewWith("Author", "No books found.", status, "/ search · ←/→ page · "))
 	}
 	if m.feed != nil {
@@ -411,4 +431,42 @@ func interactiveSearch(c *zlib.Client, opts *zlib.SearchOptions, fullTitle bool)
 		return "", sm.err
 	}
 	return sm.selectedID, nil
+}
+
+// errorBody wraps a request error to the terminal width instead of cutting
+// off the reason, which usually sits at the end of a network error.
+func (m searchSelectModel) errorBody() string {
+	style := lipgloss.NewStyle().Foreground(currentTheme.Error)
+	return strings.Join(wrapIndented(symbolError+" "+bookCell(m.err.Error()), m.width, "  ", style), "\n")
+}
+
+// withFilterSummary appends active filters to a list status line while they
+// fit; narrow terminals keep the page and position bar instead.
+func withFilterSummary(status string, chips []string, width int) string {
+	if len(chips) == 0 {
+		return status
+	}
+	if width <= 0 {
+		width = 80
+	}
+	const separator = "   ·   "
+	room := width - ansi.StringWidth(status) - len(separator)
+	if room < 12 {
+		return status
+	}
+	muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	return status + muted.Render(separator+ansi.Truncate(strings.Join(chips, " · "), room, "…"))
+}
+
+// wrapIndented word-wraps text to the terminal width with a fixed indent.
+func wrapIndented(text string, width int, indent string, style lipgloss.Style) []string {
+	if width <= 0 {
+		width = 80
+	}
+	inner := max(1, width-ansi.StringWidth(indent))
+	lines := strings.Split(ansi.Wrap(text, inner, ""), "\n")
+	for i, line := range lines {
+		lines[i] = indent + style.Render(line)
+	}
+	return lines
 }

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"slices"
@@ -54,6 +55,7 @@ type searchFilterForm struct {
 	exact                                bool
 	order                                zlib.OrderOption
 	message                              string
+	messageField                         int // field the validation message belongs to
 	accepted                             bool
 	editing                              bool
 }
@@ -84,12 +86,14 @@ func (m searchFilterForm) Init() tea.Cmd { return m.input.Focus() }
 
 func (m *searchFilterForm) startEdit() tea.Cmd {
 	m.editing = true
-	m.input.Prompt = []string{"> ", "Year from > ", "Year to > "}[m.cursor]
+	// Years are edited in place, inside the value column of their row.
+	m.input.Prompt = ""
 	m.input.Placeholder = "Any year"
 	if m.cursor == 0 {
+		m.input.Prompt = "> "
 		m.input.Placeholder = "Title, author, or ISBN"
 	}
-	m.input.SetWidth(max(1, m.width-ansi.StringWidth(m.input.Prompt)-2))
+	m.input.SetWidth(m.inputWidth())
 	m.input.SetValue([]string{m.query, m.yearFrom, m.yearTo}[m.cursor])
 	m.input.CursorEnd()
 	return m.input.Focus()
@@ -107,6 +111,9 @@ func (m *searchFilterForm) finishEdit() {
 	case 2:
 		m.yearTo = m.input.Value()
 	}
+	if m.cursor == m.messageField {
+		m.message = ""
+	}
 	m.editing = false
 	m.input.Blur()
 }
@@ -116,7 +123,7 @@ func (m searchFilterForm) options() (string, []string) {
 	case 3:
 		out := make([]string, len(searchLanguages))
 		for i, v := range searchLanguages {
-			out[i] = strings.ToUpper(string(v[:1])) + string(v[1:])
+			out[i] = languageLabel(v)
 		}
 		return "Languages", out
 	case 4:
@@ -138,7 +145,7 @@ func (m searchFilterForm) options() (string, []string) {
 func (m searchFilterForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if size, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width, m.height = size.Width, size.Height
-		m.input.SetWidth(max(1, size.Width-ansi.StringWidth(m.input.Prompt)-2))
+		m.input.SetWidth(m.inputWidth())
 		return m, nil
 	}
 	if k, ok := msg.(tea.KeyPressMsg); ok {
@@ -237,34 +244,28 @@ func (m searchFilterForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *searchFilterForm) submit() tea.Cmd {
 	if strings.TrimSpace(m.query) == "" {
-		m.message = "Enter a title, author, or ISBN"
-		m.cursor = 0
-		m.startEdit()
-		return nil
+		return m.reject(0, "Enter a title, author, or ISBN")
 	}
 	from, err := parseSearchYear(m.yearFrom)
 	if err != nil {
-		m.message = "Year from must be a four-digit year"
-		m.cursor = 1
-		m.startEdit()
-		return nil
+		return m.reject(1, "Year from must be a four-digit year")
 	}
 	to, err := parseSearchYear(m.yearTo)
 	if err != nil {
-		m.message = "Year to must be a four-digit year"
-		m.cursor = 2
-		m.startEdit()
-		return nil
+		return m.reject(2, "Year to must be a four-digit year")
 	}
 	if from > 0 && to > 0 && from > to {
-		m.message = "Year from must be before year to"
-		m.cursor = 1
-		m.startEdit()
-		return nil
+		return m.reject(1, "Year from must be before year to")
 	}
 	m.message = ""
 	m.accepted = true
 	return tea.Quit
+}
+
+// reject keeps the form open and returns focus to the field that needs a fix.
+func (m *searchFilterForm) reject(field int, message string) tea.Cmd {
+	m.message, m.messageField, m.cursor = message, field, field
+	return m.startEdit()
 }
 
 func parseSearchYear(value string) (int, error) {
@@ -289,67 +290,223 @@ func (m searchFilterForm) View() tea.View {
 	if m.picker >= 0 {
 		return m.pickerView()
 	}
-	selected := func(index int) bool { return m.cursor == index }
-	value := func(index int, text, empty string) string {
-		if selected(index) && m.editing {
-			return m.input.View()
+	width := m.formWidth()
+	muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	label := lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	focusLabel := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
+	value := lipgloss.NewStyle().Foreground(currentTheme.Title)
+
+	var body []string
+	focusStart, focusEnd := 0, 0
+	add := func(field int, lines ...string) {
+		if field == m.cursor {
+			focusStart = len(body)
 		}
-		if text == "" {
-			text = empty
+		body = append(body, lines...)
+		if field == m.messageField && m.message != "" {
+			body = append(body, m.fieldError(width)...)
 		}
-		return selectionRow(text, selected(index), m.width)
+		if field == m.cursor {
+			focusEnd = len(body) - 1
+		}
 	}
+
+	// Query: a labelled prompt box, like a chat composer, when rows allow it.
+	queryLabel := label.Render("Query")
+	if m.cursor == 0 {
+		queryLabel = focusLabel.Render("Query")
+	}
+	prompt := value.Render("> " + m.query)
+	if m.query == "" {
+		prompt = muted.Render("> Title, author, or ISBN")
+	}
+	if m.cursor == 0 && m.editing {
+		prompt = m.input.View()
+	}
+	if m.queryBoxed() {
+		border := currentTheme.Muted
+		if m.cursor == 0 {
+			border = currentTheme.Accent
+		}
+		box := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(border).
+			Padding(0, 1).Width(width).Render(ansi.Truncate(prompt, max(1, width-4), "…"))
+		add(0, append([]string{queryLabel}, strings.Split(box, "\n")...)...)
+	} else {
+		add(0, queryLabel, ansi.Truncate(prompt, width, "…"))
+	}
+
+	opts := m.searchOptions()
+	active := len(searchFilterChips(opts))
+	info := "none set"
+	if active > 0 {
+		info = fmt.Sprintf("%d active", active)
+	}
+	body = append(body, "", sectionHeader("Filters", info, width))
+
+	row := func(field int, name, text string, unset bool) {
+		focused := field == m.cursor
+		name = ansi.Truncate(name, searchLabelWidth-1, "…")
+		pad := strings.Repeat(" ", searchLabelWidth-ansi.StringWidth(name))
+		switch {
+		case focused && m.editing:
+			add(field, "  "+focusLabel.Render(name)+pad+m.input.View())
+		case focused:
+			add(field, styledListRow(name+pad+text, true, width, currentTheme))
+		default:
+			styled := value.Render(text)
+			if unset {
+				styled = muted.Render(text)
+			}
+			add(field, ansi.Truncate("  "+label.Render(name)+pad+styled, width, "…"))
+		}
+	}
+	row(1, "Year from", cmp.Or(m.yearFrom, "Any"), m.yearFrom == "")
+	row(2, "Year to", cmp.Or(m.yearTo, "Any"), m.yearTo == "")
 	langs := make([]string, len(m.languages))
 	for i, v := range m.languages {
-		langs[i] = string(v)
+		langs[i] = languageLabel(v)
 	}
+	row(3, "Languages", cmp.Or(strings.Join(langs, ", "), "Any"), len(langs) == 0)
 	fmts := make([]string, len(m.extensions))
 	for i, v := range m.extensions {
 		fmts[i] = v.String()
 	}
-	order := "Default"
-	for _, item := range searchSorts {
-		if item.value == m.order {
-			order = item.label
-			break
-		}
-	}
-	exact := "[ ] Exact match"
+	row(4, "Formats", cmp.Or(strings.Join(fmts, ", "), "Any"), len(fmts) == 0)
+	exact := "[ ]"
 	if m.exact {
-		exact = "[x] Exact match"
+		exact = "[x]"
 	}
-	body := []string{
-		"Query", value(0, m.query, "Title, author, or ISBN"),
-		value(1, "Year from                 "+displaySearchValue(m.yearFrom), ""),
-		value(2, "Year to                   "+displaySearchValue(m.yearTo), ""),
-		value(3, "Languages                 "+choiceSummary(langs), ""),
-		value(4, "Formats                   "+choiceSummary(fmts), ""),
-		value(5, exact, ""),
-		value(6, "Sort by                   "+order, ""), "",
-	}
-	body = append(body, renderActionButton("Search", selected(7), false))
+	row(5, "Exact match", exact, !m.exact)
+	row(6, "Sort by", sortLabel(m.order), m.order == "")
+	body = append(body, "")
+	add(7, renderActionButton("Search", m.cursor == 7, false))
+
 	visible := max(1, m.height-6)
 	if len(body) > visible {
-		focusRow := []int{1, 2, 3, 4, 5, 6, 7, 9}[m.cursor]
-		start := min(max(0, focusRow-visible+1), len(body)-visible)
+		// Keep the whole focused field, including an inline error, in view.
+		start := min(max(0, focusEnd-visible+1), focusStart, len(body)-visible)
 		body = body[start : start+visible]
 	}
-	return screenView(m.width, m.height, "Search books", "Set filters, then search", strings.Join(body, "\n"), m.message,
-		uiKey("ctrl+s", "search"), uiKey("esc", "back"), uiKey("tab", "next"), uiKey("enter", "edit / select"))
+	return screenView(m.width, m.height, "Search books", "Set filters, then search", strings.Join(body, "\n"),
+		ansi.Truncate(searchFieldHelp[m.cursor], max(1, m.width), "…"),
+		uiKey("ctrl+s", "search"), uiKey("tab", "next"), uiKey("enter", "edit / select"), uiKey("esc", "back"))
 }
 
-func choiceSummary(values []string) string {
-	if len(values) == 0 {
-		return "All"
-	}
-	return strings.Join(values, ", ")
+// searchLabelWidth is the label column width for filter rows, gap included.
+const searchLabelWidth = 12
+
+var searchFieldHelp = [searchFilterFields]string{
+	"Required · title, author, or ISBN",
+	"Four-digit year · leave blank for any",
+	"Four-digit year · leave blank for any",
+	"Enter to choose · pick several or none",
+	"Enter to choose · pick several or none",
+	"Space toggles · match the query as a phrase",
+	"Enter to choose the result order",
+	"Enter or Ctrl+S runs the search",
 }
 
-func displaySearchValue(value string) string {
-	if value == "" {
-		return "Any"
+// formWidth caps the form so long rows stay readable on wide terminals.
+func (m searchFilterForm) formWidth() int {
+	width := m.width
+	if width <= 0 {
+		width = 80
 	}
-	return value
+	return max(1, min(width, 100))
+}
+
+// queryBoxed reports whether the query fits in a bordered box; short or
+// narrow terminals spend those two rows on filters instead.
+func (m searchFilterForm) queryBoxed() bool {
+	return m.height >= 20 && m.formWidth() >= 24
+}
+
+func (m searchFilterForm) inputWidth() int {
+	width := m.formWidth()
+	if m.cursor != 0 {
+		return max(1, width-2-searchLabelWidth-1)
+	}
+	if m.queryBoxed() {
+		width -= 4
+	}
+	// One cell for the cursor and one spare so the input never touches the edge.
+	return max(1, width-ansi.StringWidth(m.input.Prompt)-2)
+}
+
+// fieldError wraps instead of truncating: an error must stay readable at
+// any width. Narrow terminals drop the label-column indent to make room.
+func (m searchFilterForm) fieldError(width int) []string {
+	indent := "  "
+	if m.messageField > 0 && width-searchLabelWidth-2 >= 24 {
+		indent += strings.Repeat(" ", searchLabelWidth)
+	}
+	style := lipgloss.NewStyle().Foreground(currentTheme.Error)
+	return wrapIndented(symbolError+" "+m.message, width, indent, style)
+}
+
+// sectionHeader follows Crush's section rule: a title, a line filling the
+// remaining width, then optional muted information.
+func sectionHeader(title, info string, width int) string {
+	accent := lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true)
+	muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
+	line := width - ansi.StringWidth(title) - 1
+	if info != "" {
+		line -= ansi.StringWidth(info) + 1
+	}
+	if line < 2 {
+		return ansi.Truncate(accent.Render(title), width, "…")
+	}
+	out := accent.Render(title) + " " + muted.Render(strings.Repeat("─", line))
+	if info != "" {
+		out += " " + muted.Render(info)
+	}
+	return out
+}
+
+func languageLabel(language zlib.Language) string {
+	if language == "" {
+		return ""
+	}
+	return strings.ToUpper(string(language[:1])) + string(language[1:])
+}
+
+func sortLabel(order zlib.OrderOption) string {
+	for _, item := range searchSorts {
+		if item.value == order {
+			return item.label
+		}
+	}
+	return string(order)
+}
+
+// searchFilterChips lists the active filters in form order, for the result,
+// loading, and empty states. It is empty when no filter narrows the search.
+func searchFilterChips(opts *zlib.SearchOptions) []string {
+	if opts == nil {
+		return nil
+	}
+	var chips []string
+	switch {
+	case opts.FromYear > 0 && opts.ToYear > 0:
+		chips = append(chips, fmt.Sprintf("%d–%d", opts.FromYear, opts.ToYear))
+	case opts.FromYear > 0:
+		chips = append(chips, fmt.Sprintf("From %d", opts.FromYear))
+	case opts.ToYear > 0:
+		chips = append(chips, fmt.Sprintf("Until %d", opts.ToYear))
+	}
+	for _, language := range opts.Languages {
+		chips = append(chips, languageLabel(language))
+	}
+	for _, extension := range opts.Extensions {
+		chips = append(chips, extension.String())
+	}
+	if opts.Exact {
+		chips = append(chips, "Exact")
+	}
+	if opts.Order != "" {
+		chips = append(chips, sortLabel(opts.Order))
+	}
+	return chips
 }
 
 func (m searchFilterForm) pickerView() tea.View {

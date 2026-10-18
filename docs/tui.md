@@ -49,10 +49,23 @@ on their form or result page.
 
 Direct commands such as `zlib search` and `zlib history --json` still work.
 The Search form shows query, year range, languages, formats, exact match, and sort
-order together. Enter opens a language, format, or sort picker; Space toggles a
+order together. With at least 20 rows the query sits in a rounded box, like a
+chat composer, with an accent border while focused; shorter terminals use a
+plain prompt line. The form is at most 100 columns wide. A Crush-style
+`Filters ─── N active` section header precedes the filter rows, whose labels
+share one 12-cell column; unset values (`Any`, `Default`, `[ ]`) are muted.
+The status line above the key hints describes the focused field. A validation
+error appears directly below its field, wraps instead of truncating, and clears
+once that field is edited.
+Enter opens a language, format, or sort picker; Space toggles a
 language or format. Esc closes the picker. The borderless Search button uses the
 accent background when focused. Tab moves between fields, Enter submits from
 the button, and Ctrl+S submits from any field. Invalid years stay on the form.
+Search loading shows the dot spinner with `Searching…` and the active filters.
+The result status line appends the active filters after the page and position
+bar while at least 12 cells remain; narrower terminals drop them. An empty
+result lists the active filters and suggests loosening them. Request errors
+wrap to the terminal width so the reason stays readable.
 Direct `zlib search <query>` accepts `--from-year`, `--to-year`, repeatable
 `--language` and `--ext`, `--exact`, and `--order`. An unset sort does not send
 an `order` value. The result page reopens the same filters with Ctrl+F in the
