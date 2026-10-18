@@ -1,25 +1,62 @@
 # README style
 
-Start with the name and a one-sentence purpose. Use a small set of working badges,
-a language switch, and links to install, quick start, commands, agent setup, and docs.
-A real product demo can show the interaction before the installation steps.
+## Header
+
+Start with the logo, name, and a one-sentence purpose. Keep the maintainer's badge
+set: Go version (from `go.mod`), CI (`ci.yml`), release, downloads, license, and
+the Trendshift badge below them. Do not drop or add badges without asking. Then
+the language switch and links to the main sections.
+Follow with one short paragraph: what zlib is, what a user does with it, and
+where their data lives. Then show the demo, then a few task bullets.
+
+## Order
+
+Install → Quick start → Terminal interface → Commands → Agent setup →
+Documentation. A reader should reach a working search before any reference
+material. Keep required onboarding outside `<details>` blocks; collapse only
+optional recipes.
+
+## Terminal interface versus commands
+
+Say which entry point opens what: `zlib tui` opens the shell; `zlib search` with
+a query prints a table, without a query it opens a form; `--json` is for scripts.
+Give the TUI a short key table for a first session: open commands, select, page,
+download, refine, back, exit. Every key in it must match `docs/tui.md` and the
+code. The full key list stays in `docs/tui.md`.
+
+## Agent setup
+
+The README's Agent setup covers only the plugin skills users install through
+the Claude Code or Codex marketplace (`zlib`, `kindle`). Do not link
+`.agents/skills/` or `docs/agents.md`, and do not mention repository-level
+skills such as `repo-readme` or `zlib-tui`; those are maintainer tooling, not
+part of what a user installs.
+
+## Wording
 
 Keep feature bullets about user tasks. Describe observed behavior; omit speed,
-quality, popularity, and completeness claims without evidence. Use named commands
-and concrete actions. A prompt that runs on Enter is not live search.
+quality, popularity, and completeness claims without evidence. Use named
+commands and concrete keys. A prompt that runs on Enter is not live search.
+Do not state counts that drift (number of themes, mirrors, formats).
 
 Use short headings and fenced command blocks. Label Bash and PowerShell blocks
-separately where their syntax differs. Keep required onboarding outside collapsed
-sections. Tables work for short task-to-command mappings and guide links.
+separately where their syntax differs. Tables suit short key-to-action,
+task-to-command, and guide-link mappings. No emoji headings, sponsor banners, or
+badge walls beyond the set above.
 
-Keep installation alternatives, environment variables, configuration paths, API
-research, and full keyboard lists in their existing guides. Link to the relevant
-section where readers need it.
+## Media
 
-Use the same examples and links in English and Chinese. Translate explanations,
-not flags, paths, JSON keys, plugin selectors, or command names. Prefer natural
-Chinese over a literal translation of English sentence structure.
+Use a real recording of the current interface. Before keeping a demo, check its
+recording script (`docs/*.tape`) against the current flow. If it shows an older
+interface, say so in the review notes and do not describe it as current.
 
-Apply `no-ai-slop` to the final pass. Cut repeated introductions, promotional
+## Two languages
+
+Use the same examples, keys, and links in English and Chinese. Translate
+explanations, not flags, paths, keys, JSON keys, plugin selectors, or command
+names. Prefer natural Chinese over a literal translation of English sentence
+structure.
+
+Apply [the copy rules](copy.md) to the final pass. Cut repeated introductions, promotional
 adjectives, decorative headings, and recap paragraphs. Preserve technical limits
 that affect whether a command works.
