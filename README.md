@@ -4,23 +4,34 @@
 
 # zlib
 
-Search and download Z-Library books from your terminal.
+A Z-Library CLI to search, download, and send books to Kindle, for you and AI agents like Claude Code and Codex.
 
+[![Go version](https://img.shields.io/github/go-mod/go-version/heartleo/zlib)](go.mod)
 [![CI](https://img.shields.io/github/actions/workflow/status/heartleo/zlib/ci.yml)](https://github.com/heartleo/zlib/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/heartleo/zlib)](https://github.com/heartleo/zlib/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/heartleo/zlib/total)](https://github.com/heartleo/zlib/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+<a href="https://trendshift.io/repositories/135168?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-135168" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/135168/daily?language=Go" alt="heartleo%2Fzlib | Trendshift" width="250" height="55"/></a>
 
 English | [简体中文](README.zh.md)
 
-[Install](#install) · [Quick start](#quick-start) · [Commands](#commands) · [Agent setup](#agent-setup) · [Docs](#documentation)
+[Install](#install) · [Quick start](#quick-start) · [Terminal interface](#terminal-interface) · [Commands](#commands) · [Agent setup](#agent-setup) · [Docs](#documentation)
 
 </div>
 
 ![Book search in the terminal](docs/demo-search.gif)
 
-- Browse search results, favorites, recommendations, popular books, and download history.
-- Inspect book details, choose a download folder, or [send a file to Kindle](docs/kindle.md).
-- Use the full-screen interface or JSON commands for scripts and agents.
+## Features
+
+🔍 **Search** — filter by year, language, and format; sort results\
+📚 **Browse** — favorites, recommendations, popular books, and download history\
+📥 **Download** — view book details and choose a download directory\
+📖 **Send to Kindle** — deliver files to your [Kindle address](docs/kindle.md)\
+🕒 **Profile** — check your daily download quota\
+🎨 **Themes** — switch color themes with `/theme`\
+🌐 **Network** — find working mirrors with `zlib doctor`, or use a proxy\
+🤖 **AI Agent Integration** — integrate with Claude Code and Codex through [Agent plugins](#agent-setup)
 
 ## Install
 
@@ -30,6 +41,12 @@ macOS / Linux with Homebrew:
 brew install heartleo/tap/zlib
 ```
 
+macOS / Linux with the install script (installs to `/usr/local/bin`, may ask for `sudo`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/heartleo/zlib/main/install.sh | sh
+```
+
 Windows with winget:
 
 ```powershell
@@ -37,8 +54,8 @@ winget install --id heartleo.zlib --exact
 ```
 
 Or download a binary from [Releases](https://github.com/heartleo/zlib/releases/latest)
-and put it on your `PATH`. See [Installation](docs/installation.md) for the install
-script, Go installation, source builds, and upgrades.
+and put it on your `PATH`. See [Installation](docs/installation.md) for Go
+installation, source builds, and upgrades.
 
 If your installed version lacks a command shown here, see the
 [source-build instructions](docs/installation.md#build-from-source) for this branch.
@@ -59,18 +76,33 @@ zlib login --domain https://z-lib.gd
 zlib tui
 ```
 
-In the terminal interface:
-
-- Type a title, author, or ISBN and press `Enter` to search.
-- Use `↑/↓` to select a book and `←/→` to change pages. `Enter` opens download confirmation.
-- Type `/` for commands. Use `/config` for network, download, and Kindle settings,
-  `/theme` for colors, and `/quit` to exit.
+Press `/`, choose `/search`, enter a title, author, or ISBN, and press `Ctrl+S`.
+You can also type `/search dune` and press `Enter`. Select a book and press `Enter`
+to confirm the download.
 
 Downloads default to the current directory. You can choose another folder before
 downloading. Login is saved locally; subsequent sessions only need `zlib tui`.
 
 If no domain works or login fails, see [Troubleshooting](docs/troubleshooting.md).
 Existing browser sessions can be [imported as cookies](docs/troubleshooting.md#login-returns-authorization-failed).
+
+## Terminal interface
+
+`zlib tui` opens one persistent shell. Every screen lists its keys at the bottom;
+these cover a first session:
+
+| Key | Action |
+| --- | --- |
+| `/` | Open the command list: search, favorites, history, profile, settings, themes |
+| `↑/↓` or `j/k` | Select a book |
+| `←/→` | Previous or next page of results |
+| `Enter` | Download the selected book, after a confirmation |
+| `Ctrl+F` | Change the query and filters of the current search |
+| `Esc` | Go back |
+| `/quit` | Exit |
+
+Settings live under `/config` (network, downloads, Kindle). See
+[Terminal interface](docs/tui.md) for every screen and key.
 
 ## Commands
 
@@ -88,10 +120,10 @@ zlib search "dune" --ext epub --json --count 10
 | Browse popular books | `zlib most-popular` |
 | Browse download history | `zlib history` |
 | Check account and quota | `zlib profile` |
-| Send a file after [Kindle setup](docs/kindle.md) | `zlib kindle send ./book.epub` |
+| Send to [Kindle](docs/kindle.md) | `zlib kindle send ./book.epub` |
 
-To download from a script, replace `id:hash` with a book's complete `id` from
-the JSON results:
+To download, replace `id:hash` with a book's complete `id` from
+the results:
 
 ```sh
 zlib download "id:hash"
@@ -102,8 +134,8 @@ pagination, and download options.
 
 ## Agent setup
 
-Install zlib and complete the quick start in the same environment your agent uses.
-The plugins provide skills; they require the CLI on `PATH` and a local login.
+Install the plugin. If `zlib` is missing, the agent installs it on first use.
+Log in yourself with `zlib login` so your password stays out of chat.
 
 ### Claude Code
 
@@ -127,9 +159,6 @@ Then ask your agent:
 
 > Use zlib to find The Pragmatic Programmer in EPUB. Show the results before downloading.
 
-Skills live in [`.agents/skills/`](.agents/skills/). See [Agents and scripts](docs/agents.md)
-for JSON formats, local skill discovery, and automation examples.
-
 ## Documentation
 
 | Guide | Covers |
@@ -140,9 +169,9 @@ for JSON formats, local skill discovery, and automation examples.
 | [Configuration](docs/configuration.md) | Domains, proxies, folders, configuration paths |
 | [Themes](docs/themes.md) | Available palettes and preview controls |
 | [Kindle](docs/kindle.md) | SMTP setup and delivery |
-| [Agents and scripts](docs/agents.md) | Plugins, skills, JSON output |
 | [Troubleshooting](docs/troubleshooting.md) | Login and network problems |
 | [EAPI notes](docs/eapi.md) | API behavior and known limits (Chinese) |
 
 Report bugs in [Issues](https://github.com/heartleo/zlib/issues) with your
 `zlib version`, OS, command, and error. Omit passwords, cookies, and session files.
+Report security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).

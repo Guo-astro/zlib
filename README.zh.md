@@ -4,23 +4,34 @@
 
 # zlib
 
-在终端搜索和下载 Z-Library 图书。
+Z-Library 命令行工具，搜索、下载图书并发送到 Kindle，你和 Claude Code、Codex 等 AI Agent 都能用。
 
+[![Go version](https://img.shields.io/github/go-mod/go-version/heartleo/zlib)](go.mod)
 [![CI](https://img.shields.io/github/actions/workflow/status/heartleo/zlib/ci.yml)](https://github.com/heartleo/zlib/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/heartleo/zlib)](https://github.com/heartleo/zlib/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/heartleo/zlib/total)](https://github.com/heartleo/zlib/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+<a href="https://trendshift.io/repositories/135168?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-135168" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/135168/daily?language=Go" alt="heartleo%2Fzlib | Trendshift" width="250" height="55"/></a>
 
 [English](README.md) | 简体中文
 
-[安装](#安装) · [快速开始](#快速开始) · [常用命令](#常用命令) · [Agent 接入](#agent-接入) · [文档](#文档)
+[安装](#安装) · [快速开始](#快速开始) · [终端](#终端) · [常用命令](#常用命令) · [Agent 接入](#agent-接入) · [文档](#文档)
 
 </div>
 
 ![终端搜书演示](docs/demo-search.gif)
 
-- 浏览搜索结果、收藏、推荐、热门图书和下载历史。
-- 查看书籍详情、选择下载目录，或[将文件发送到 Kindle](docs/kindle.md)。
-- 在全屏终端界面中操作，或通过 JSON 命令接入脚本和 Agent。
+## 功能
+
+🔍 **搜索** — 按年份、语言和格式筛选，结果可排序\
+📚 **浏览** — 收藏、推荐、热门图书和下载历史\
+📥 **下载** — 查看书籍详情，选择下载目录\
+📖 **发送到 Kindle** — 把文件投递到你的 [Kindle 邮箱](docs/kindle.md)\
+🕒 **用量查看** — 查看每日下载配额\
+🎨 **主题** — 用 `/theme` 切换配色\
+🌐 **网络** — 用 `zlib doctor` 找到可用镜像，也支持代理\
+🤖 **AI Agent 集成** — 通过 [Agent 插件](#agent-接入)集成 Claude Code 和 Codex
 
 ## 安装
 
@@ -30,6 +41,12 @@ macOS / Linux，使用 Homebrew：
 brew install heartleo/tap/zlib
 ```
 
+macOS / Linux，使用安装脚本（安装到 `/usr/local/bin`，可能需要 `sudo`）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/heartleo/zlib/main/install.sh | sh
+```
+
 Windows，使用 winget：
 
 ```powershell
@@ -37,7 +54,7 @@ winget install --id heartleo.zlib --exact
 ```
 
 也可以从 [Releases](https://github.com/heartleo/zlib/releases/latest) 下载程序，
-放入 `PATH` 目录。安装脚本、Go 安装、源码编译和更新方式见[安装指南](docs/installation.md)。
+放入 `PATH` 目录。Go 安装、源码编译和更新方式见[安装指南](docs/installation.md)。
 
 如果安装版本缺少本文中的命令，可按[源码编译说明](docs/installation.md#build-from-source)
 构建当前分支。
@@ -58,18 +75,31 @@ zlib login --domain https://z-lib.gd
 zlib tui
 ```
 
-进入终端界面后：
-
-- 输入书名、作者或 ISBN，按 `Enter` 搜索。
-- 用 `↑/↓` 选书，`←/→` 翻页，`Enter` 打开下载确认框。
-- 输入 `/` 打开命令菜单。`/config` 配置网络、下载和 Kindle，
-  `/theme` 选择主题，`/quit` 退出。
+按 `/`，选择 `/search`，输入书名、作者或 ISBN，按 `Ctrl+S` 搜索。
+也可以直接输入 `/search dune` 后按 `Enter`。选中图书后按 `Enter`，确认后开始下载。
 
 默认下载到当前目录，也可以在下载前选择其他目录。
 登录状态保存在本地，后续直接运行 `zlib tui` 即可。
 
 没有可用域名或登录失败时，参阅[排障指南](docs/troubleshooting.md)。
 已有浏览器会话也可以通过[导入 Cookie](docs/troubleshooting.md#login-returns-authorization-failed)登录。
+
+## 终端
+
+`zlib tui` 打开一个常驻的终端界面。每个页面底部都会列出可用按键，
+第一次使用记住下面这些就够了：
+
+| 按键 | 作用 |
+| --- | --- |
+| `/` | 打开命令列表：搜索、收藏、历史、账号、设置、主题 |
+| `↑/↓` 或 `j/k` | 选择图书 |
+| `←/→` | 上一页或下一页结果 |
+| `Enter` | 下载选中的图书（先确认） |
+| `Ctrl+F` | 修改当前搜索的查询词和过滤条件 |
+| `Esc` | 返回 |
+| `/quit` | 退出 |
+
+设置在 `/config` 下（网络、下载、Kindle）。全部页面和按键见[终端界面说明](docs/tui.md)。
 
 ## 常用命令
 
@@ -87,9 +117,9 @@ zlib search "dune" --ext epub --json --count 10
 | 浏览热门图书 | `zlib most-popular` |
 | 浏览下载历史 | `zlib history` |
 | 查看账号与配额 | `zlib profile` |
-| 完成 [Kindle 配置](docs/kindle.md)后发送文件 | `zlib kindle send ./book.epub` |
+| 发送到 [Kindle](docs/kindle.md) | `zlib kindle send ./book.epub` |
 
-在脚本中下载时，将 `id:hash` 替换为 JSON 结果中书籍的完整 `id`：
+下载时，将 `id:hash` 替换为结果中书籍的完整 `id`：
 
 ```sh
 zlib download "id:hash"
@@ -100,8 +130,8 @@ zlib download "id:hash"
 
 ## Agent 接入
 
-先在 Agent 使用的环境中安装 zlib，并完成上述登录步骤。
-插件提供技能，运行时需要能从 `PATH` 找到 CLI，并读取本地登录状态。
+安装插件即可。没有 `zlib` 时，Agent 首次使用会自行安装。
+登录请自己运行 `zlib login`，密码不要发到对话里。
 
 ### Claude Code
 
@@ -125,9 +155,6 @@ codex plugin add zlib@zlib
 
 > 用 zlib 搜索 The Pragmatic Programmer 的 EPUB 版本，先列出结果，再决定下载。
 
-技能源文件位于 [`.agents/skills/`](.agents/skills/)。
-JSON 格式、本地技能发现和脚本示例见 [Agent 与脚本](docs/agents.md)。
-
 ## 文档
 
 | 指南 | 内容 |
@@ -138,9 +165,9 @@ JSON 格式、本地技能发现和脚本示例见 [Agent 与脚本](docs/agents
 | [配置指南](docs/configuration.md) | 域名、代理、目录、配置路径 |
 | [主题指南](docs/themes.md) | 配色列表和预览操作 |
 | [Kindle](docs/kindle.md) | SMTP 配置与发送 |
-| [Agent 与脚本](docs/agents.md) | 插件、技能、JSON 输出 |
 | [排障指南](docs/troubleshooting.md) | 登录和网络问题 |
 | [EAPI 笔记](docs/eapi.md) | 接口行为和已知限制（中文） |
 
 遇到问题请在 [Issues](https://github.com/heartleo/zlib/issues) 附上
 `zlib version`、操作系统、所用命令和报错。请勿附带密码、Cookie 或会话文件。
+安全漏洞请按 [SECURITY.md](SECURITY.md) 私下报告，不要公开提 issue。
