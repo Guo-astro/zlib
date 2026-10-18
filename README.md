@@ -167,3 +167,13 @@ Then ask your agent:
 Report bugs in [Issues](https://github.com/heartleo/zlib/issues) with your
 `zlib version`, OS, command, and error. Omit passwords, cookies, and session files.
 Report security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=heartleo%2Fheartleo%2Cheartleo%2Fz+li+b%2Cheartleo%2Fzlib&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=heartleo/heartleo%2Cheartleo/z li b%2Cheartleo/zlib&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=heartleo/heartleo%2Cheartleo/z li b%2Cheartleo/zlib&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=heartleo/heartleo%2Cheartleo/z li b%2Cheartleo/zlib&type=date&legend=top-left" />
+ </picture>
+</a>
