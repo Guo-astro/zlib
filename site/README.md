@@ -50,10 +50,18 @@ python3 -m http.server 8000 --directory site
 
 - Colors are Catppuccin Latte (light) and Mocha (dark), the same two
   palettes the CLI ships as `catppuccin-latte` and `catppuccin-mocha`, so the site and the
-  tool match. Terminal blocks stay Mocha in both modes.
+  tool match. Terminal blocks follow the page theme through the `--t-*`
+  tokens. The Latte terminal colors copy the CLI palette as is, so a few
+  of them sit below WCAG AA contrast on purpose.
 - The hero is a replica of the `zlib search` picker. Key handling mirrors
   `internal/cli/search_interactive.go`: `↑/↓` `j/k` select, `←/→` `h/l`
-  page, `enter` download, `q` quit. Column widths match the Go source.
+  page, `enter` asks to download, `q` quit. Columns follow
+  `internal/cli/book_feed_view.go`.
+- Command transcripts copy the strings the CLI prints. Check them against
+  `internal/cli` when output changes.
+- A small script in `<head>` applies the saved theme and language before
+  first paint. `scripts/build-zh.mjs` relies on the `<html>` tag and the
+  `setLang(...)` call keeping their current form.
 - Copy is bilingual. Each string is a sibling pair of
   `data-i18n="en"` / `data-i18n="zh"` elements; CSS shows one based on
   `<html data-lang>`. Add a language by adding a third value.

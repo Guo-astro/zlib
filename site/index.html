@@ -47,9 +47,24 @@
   "screenshot": "https://zlib.heartleo.dev/og.png"
 }
 </script>
+<script>
+(() => {
+  const r = document.documentElement;
+  let t, l;
+  try { t = localStorage.getItem("zlib.theme"); l = localStorage.getItem("zlib.lang"); } catch {}
+  r.dataset.theme = t || (matchMedia("(prefers-color-scheme: light)").matches ? "latte" : "mocha");
+  /* Mirror setLang() below so Chinese readers never see English first.
+     Only on the English page: /zh/ ships with data-lang="zh". */
+  if (r.dataset.lang === "en" &&
+      (l || ((navigator.language || "en").toLowerCase().startsWith("zh") ? "zh" : "en")) === "zh") {
+    r.dataset.lang = "zh";
+    r.lang = "zh-Hans";
+  }
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,300;7..72,400;7..72,500;7..72,600;7..72,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,500;7..72,600;7..72,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -142,12 +157,12 @@
         <span data-i18n="zh">挑一个包管理器。</span>
       </h2>
       <p class="lede">
-        <span data-i18n="en">Every release ships prebuilt binaries for macOS, Linux, and Windows. Or build it yourself; it is a single Go module.</span>
-        <span data-i18n="zh">每个版本都发 macOS、Linux、Windows 的预编译二进制。也可以自己编译，就一个 Go module。</span>
+        <span data-i18n="en">Every release ships prebuilt binaries for macOS, Linux, and Windows. Or build it yourself; it is a single Go module. Later, <b class="mono">zlib update</b> upgrades through whichever one you used.</span>
+        <span data-i18n="zh">每个版本都发 macOS、Linux、Windows 的预编译二进制。也可以自己编译，就一个 Go module。之后用 <b class="mono">zlib update</b> 升级，它会沿用你当初的安装方式。</span>
       </p>
       <div class="status-key next" style="margin-top:1.6rem">
-        <div><b data-i18n="en">Then</b><b data-i18n="zh">然后</b><span data-i18n="en">run <span style="color:var(--accent)">zlib doctor</span> to pick a domain</span><span data-i18n="zh">跑 <span style="color:var(--accent)">zlib doctor</span> 挑一个可用域名</span></div>
-        <div><b data-i18n="en">And</b><b data-i18n="zh">接着</b><span data-i18n="en"><span style="color:var(--accent)">zlib login</span>, then <span style="color:var(--accent)">zlib search</span></span><span data-i18n="zh"><span style="color:var(--accent)">zlib login</span>，再 <span style="color:var(--accent)">zlib search</span></span></div>
+        <div><b data-i18n="en">Then</b><b data-i18n="zh">然后</b><span data-i18n="en">run <span style="color:var(--accent)">zlib doctor</span> to find a working domain</span><span data-i18n="zh">跑 <span style="color:var(--accent)">zlib doctor</span> 找一个可用域名</span></div>
+        <div><b data-i18n="en">And</b><b data-i18n="zh">接着</b><span data-i18n="en"><span style="color:var(--accent)">zlib login --domain</span> it, then <span style="color:var(--accent)">zlib tui</span></span><span data-i18n="zh">用 <span style="color:var(--accent)">zlib login --domain</span> 登录，再开 <span style="color:var(--accent)">zlib tui</span></span></div>
       </div>
     </div>
 
@@ -169,8 +184,8 @@
       </div>
       <div class="pane" data-pane="winget">
         <div class="cmdline" style="max-width:none">
-          <span class="p">&gt;</span><code>winget install heartleo.zlib</code>
-          <button class="copy" type="button" data-copy="winget install heartleo.zlib"><span data-i18n="en">copy</span><span data-i18n="zh">复制</span></button>
+          <span class="p">&gt;</span><code>winget install --id heartleo.zlib --exact</code>
+          <button class="copy" type="button" data-copy="winget install --id heartleo.zlib --exact"><span data-i18n="en">copy</span><span data-i18n="zh">复制</span></button>
         </div>
         <p class="note"><span data-i18n="en">Windows 10 and later, PowerShell or Terminal.</span><span data-i18n="zh">Windows 10 及以上，PowerShell 或 Terminal 都行。</span></p>
       </div>
@@ -179,7 +194,7 @@
           <span class="p">$</span><code>curl -fsSL https://raw.githubusercontent.com/heartleo/zlib/main/install.sh | sh</code>
           <button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/heartleo/zlib/main/install.sh | sh"><span data-i18n="en">copy</span><span data-i18n="zh">复制</span></button>
         </div>
-        <p class="note"><span data-i18n="en">Detects your OS and architecture, then drops the binary on your PATH.</span><span data-i18n="zh">自动识别系统和架构，把二进制放进 PATH。</span></p>
+        <p class="note"><span data-i18n="en">macOS and Linux. Detects your OS and architecture, then installs to <b>/usr/local/bin</b>, which may need sudo.</span><span data-i18n="zh">macOS 和 Linux。自动识别系统和架构，安装到 <b>/usr/local/bin</b>，可能需要 sudo。</span></p>
       </div>
       <div class="pane" data-pane="go">
         <div class="cmdline" style="max-width:none">
@@ -204,12 +219,12 @@
 <section class="wrap band" id="commands">
   <div class="eyebrow">$ zlib --help</div>
   <h2 class="sec">
-    <span data-i18n="en">Eight subcommands, all scriptable.</span>
-    <span data-i18n="zh">八条子命令，都能写进脚本。</span>
+    <span data-i18n="en">Made for the keyboard and for scripts.</span>
+    <span data-i18n="zh">键盘好用，脚本也好用。</span>
   </h2>
   <p class="lede" style="margin-bottom:1.3rem">
-    <span data-i18n="en"><b class="mono">search</b>, <b class="mono">history</b>, <b class="mono">profile</b>, and <b class="mono">doctor</b> each take <b class="mono">--json</b>, so the same tool works by hand and inside a script. Pick one to see what it prints.</span>
-    <span data-i18n="zh"><b class="mono">search</b>、<b class="mono">history</b>、<b class="mono">profile</b>、<b class="mono">doctor</b> 都支持 <b class="mono">--json</b>，手敲和写脚本用的是同一个工具。点一条看它输出什么。</span>
+    <span data-i18n="en"><b class="mono">zlib tui</b> puts everything in one full-screen app. Each step is also a command, and <b class="mono">search</b>, <b class="mono">favorites</b>, <b class="mono">recommended</b>, <b class="mono">most-popular</b>, <b class="mono">history</b>, <b class="mono">profile</b>, <b class="mono">doctor</b>, and <b class="mono">config</b> take <b class="mono">--json</b>. Pick one to see what it prints.</span>
+    <span data-i18n="zh"><b class="mono">zlib tui</b> 把所有功能放进一个全屏界面。每一步也都是单独的命令，<b class="mono">search</b>、<b class="mono">favorites</b>、<b class="mono">recommended</b>、<b class="mono">most-popular</b>、<b class="mono">history</b>、<b class="mono">profile</b>、<b class="mono">doctor</b>、<b class="mono">config</b> 都支持 <b class="mono">--json</b>。点一条看它输出什么。</span>
   </p>
   <a class="pill-link" href="/send-to-kindle/" style="margin-bottom:2.6rem">
     <span data-i18n="en">Setting up Send to Kindle</span><span data-i18n="zh">发送到 Kindle 怎么配</span>
@@ -219,14 +234,14 @@
 
   <div class="cmd-grid">
     <div class="cmd-list" role="tablist" aria-label="Commands">
-      <button type="button" role="tab" aria-selected="false" data-cmd="login"><span class="k">login</span><span class="d"><span data-i18n="en">Sign in and pin a working domain</span><span data-i18n="zh">登录，并锁定一个可用域名</span></span></button>
-      <button type="button" role="tab" aria-selected="true" data-cmd="search"><span class="k">search</span><span class="d"><span data-i18n="en">Browse results with the keyboard</span><span data-i18n="zh">用键盘翻搜索结果</span></span></button>
-      <button type="button" role="tab" aria-selected="false" data-cmd="download"><span class="k">download</span><span class="d"><span data-i18n="en">Fetch a book by ID, with live progress</span><span data-i18n="zh">按 ID 下载，带实时进度</span></span></button>
-      <button type="button" role="tab" aria-selected="false" data-cmd="history"><span class="k">history</span><span class="d"><span data-i18n="en">Re-download anything you pulled before</span><span data-i18n="zh">重新下载以前拿过的书</span></span></button>
+      <button type="button" role="tab" aria-selected="false" data-cmd="login"><span class="k">login</span><span class="d"><span data-i18n="en">Log in and save the domain</span><span data-i18n="zh">登录，并记住域名</span></span></button>
+      <button type="button" role="tab" aria-selected="true" data-cmd="search"><span class="k">search</span><span class="d"><span data-i18n="en">Filter by year, language, and format</span><span data-i18n="zh">按年份、语言和格式筛选</span></span></button>
+      <button type="button" role="tab" aria-selected="false" data-cmd="download"><span class="k">download</span><span class="d"><span data-i18n="en">Fetch a book by its id:hash</span><span data-i18n="zh">按 id:hash 下载</span></span></button>
+      <button type="button" role="tab" aria-selected="false" data-cmd="history"><span class="k">history</span><span class="d"><span data-i18n="en">Re-download or remove past downloads</span><span data-i18n="zh">重新下载或删除下载记录</span></span></button>
       <button type="button" role="tab" aria-selected="false" data-cmd="profile"><span class="k">profile</span><span class="d"><span data-i18n="en">Check today's download quota</span><span data-i18n="zh">看今天还剩多少下载额度</span></span></button>
       <button type="button" role="tab" aria-selected="false" data-cmd="kindle"><span class="k">kindle</span><span class="d"><span data-i18n="en">Mail a file to your Kindle address</span><span data-i18n="zh">把文件发送到 Kindle 邮箱</span></span></button>
-      <button type="button" role="tab" aria-selected="false" data-cmd="doctor"><span class="k">doctor</span><span class="d"><span data-i18n="en">Probe every mirror before you pick one</span><span data-i18n="zh">先探测所有镜像再决定用哪个</span></span></button>
-      <button type="button" role="tab" aria-selected="false" data-cmd="theme"><span class="k">theme</span><span class="d"><span data-i18n="en">Seven palettes, or follow the terminal</span><span data-i18n="zh">七套配色，或跟随终端背景</span></span></button>
+      <button type="button" role="tab" aria-selected="false" data-cmd="doctor"><span class="k">doctor</span><span class="d"><span data-i18n="en">Find domains that work from your network</span><span data-i18n="zh">找出你的网络能用的域名</span></span></button>
+      <button type="button" role="tab" aria-selected="false" data-cmd="theme"><span class="k">theme</span><span class="d"><span data-i18n="en">Twenty built-in color themes</span><span data-i18n="zh">20 套内置配色</span></span></button>
     </div>
 
     <div class="term">
@@ -249,8 +264,8 @@
     <span data-i18n="zh">交给你的编码 agent。</span>
   </h2>
   <p class="lede" style="margin-bottom:2.4rem">
-    <span data-i18n="en">zlib ships plugins for Claude Code and Codex. The agent calls the same binary you do, and reads the same <b class="mono">--json</b> output.</span>
-    <span data-i18n="zh">zlib 自带 Claude Code 和 Codex 插件。Agent 调用的是同一个二进制，读的是同一份 <b class="mono">--json</b> 输出。</span>
+    <span data-i18n="en">zlib ships plugins for Claude Code and Codex. The agent calls the same binary you do, reads the same <b class="mono">--json</b> output, and installs zlib first if it is missing. Run <b class="mono">zlib login</b> yourself so your password stays out of the chat.</span>
+    <span data-i18n="zh">zlib 自带 Claude Code 和 Codex 插件。Agent 调用的是同一个二进制，读的是同一份 <b class="mono">--json</b> 输出；没装 zlib 时会先自己装上。<b class="mono">zlib login</b> 请自己运行，密码不要发到对话里。</span>
   </p>
   <div class="two">
     <div class="card">
@@ -280,15 +295,15 @@
         <span data-i18n="zh">镜像站不让进的时候。</span>
       </h2>
       <p class="lede">
-        <span data-i18n="en">Most Z-Library web domains now sit behind DiamWall. Run <b class="mono">doctor</b> first: it checks every known mirror without logging you in or touching your saved session, and tells you which ones still answer.</span>
-        <span data-i18n="zh">现在大多数 Z-Library 网页域名都挂在 DiamWall 后面。先跑 <b class="mono">doctor</b>。它不用登录，也不动你已经存好的会话，把所有已知镜像探一遍，然后告诉你哪些还能用。</span>
+        <span data-i18n="en">Most Z-Library web domains now sit behind DiamWall. Run <b class="mono">doctor</b> first: it checks all ten known domains without logging you in or touching your saved session, then lists the ones zlib can use.</span>
+        <span data-i18n="zh">现在大多数 Z-Library 网页域名都挂在 DiamWall 后面。先跑 <b class="mono">doctor</b>。它不用登录，也不动你已经存好的会话，把十个已知域名探一遍，只列出 zlib 能用的那些。</span>
       </p>
       <div class="status-key">
-        <div><b class="ok">healthy</b><span data-i18n="en">answered normally, so use it</span><span data-i18n="zh">正常响应，可以直接用</span></div>
-        <div><b class="warn">challenged</b><span data-i18n="en">served a JS proof-of-work; the client clears it for you</span><span data-i18n="zh">返回了 JS 工作量证明，客户端会自动解掉</span></div>
+        <div><b class="ok">healthy</b><span data-i18n="en">listed; pass it to <b>zlib login --domain</b></span><span data-i18n="zh">会列出来，交给 <b>zlib login --domain</b></span></div>
+        <div><b class="warn">challenged</b><span data-i18n="en">a JS challenge page; the API is unavailable there</span><span data-i18n="zh">返回 JS 验证页，这里的 API 用不了</span></div>
         <div><b class="bad">diamwall_blocked</b><span data-i18n="en">intercepted, so pick another</span><span data-i18n="zh">被拦截了，换一个</span></div>
-        <div><b class="bad">redirect_loop</b><span data-i18n="en">redirects never reached content</span><span data-i18n="zh">重定向绕不出去</span></div>
-        <div><b class="bad">network_error</b><span data-i18n="en">DNS, TLS, timeout, or reset. Try a proxy</span><span data-i18n="zh">DNS、TLS、超时或连接重置，试试代理</span></div>
+        <div><b class="bad">redirect_loop</b><span data-i18n="en">redirects never reached the API</span><span data-i18n="zh">重定向到不了 API</span></div>
+        <div><b class="bad">network_error</b><span data-i18n="en">DNS, TLS, timeout, or reset. Try <b>--proxy</b></span><span data-i18n="zh">DNS、TLS、超时或连接重置，试试 <b>--proxy</b></span></div>
       </div>
     </div>
     <div class="term">
@@ -311,8 +326,8 @@
     <span data-i18n="zh">选择主题。</span>
   </h2>
   <p class="lede">
-    <span data-i18n="en">Run <b class="mono">zlib theme</b> to preview and choose a palette. This page uses <b class="mono">catppuccin-latte</b> in light mode and <b class="mono">catppuccin-mocha</b> in dark mode.</span>
-    <span data-i18n="zh">运行 <b class="mono">zlib theme</b> 可预览并选择配色。本页亮色使用 <b class="mono">catppuccin-latte</b>，暗色使用 <b class="mono">catppuccin-mocha</b>。</span>
+    <span data-i18n="en">Run <b class="mono">zlib theme</b> to preview 20 built-in themes, or add your own as a JSON file in the config folder. This page uses <b class="mono">catppuccin-latte</b> in light mode and <b class="mono">catppuccin-mocha</b> in dark mode.</span>
+    <span data-i18n="zh">运行 <b class="mono">zlib theme</b> 可预览 20 套内置配色，也可以在配置目录放一个 JSON 文件自定义主题。本页亮色使用 <b class="mono">catppuccin-latte</b>，暗色使用 <b class="mono">catppuccin-mocha</b>。</span>
   </p>
   <div class="swatches" id="swatches"></div>
 </section>
@@ -326,8 +341,8 @@
     <span data-i18n="zh">去找本书吧。</span>
   </h2>
   <p>
-    <span data-i18n="en">Free, MIT licensed, and it only ever talks to Z-Library and the SMTP server you configure.</span>
-    <span data-i18n="zh">免费，MIT 协议，只会连 Z-Library 和你自己配的 SMTP 服务器。</span>
+    <span data-i18n="en">Free and MIT licensed. It talks to Z-Library, the SMTP server you configure, and GitHub when you run <b>zlib update</b>.</span>
+    <span data-i18n="zh">免费，MIT 协议。只连 Z-Library、你自己配的 SMTP 服务器，以及运行 <b>zlib update</b> 时的 GitHub。</span>
   </p>
   <div class="btns">
     <a class="btn pri" href="https://github.com/heartleo/zlib/releases/latest" target="_blank" rel="noopener">
@@ -365,7 +380,7 @@
         <ul>
           <li><a href="https://github.com/heartleo/zlib#readme" target="_blank" rel="noopener">README</a></li>
           <li><a href="https://github.com/heartleo/zlib/blob/main/README.zh.md" target="_blank" rel="noopener">中文 README</a></li>
-          <li><a href="https://github.com/heartleo/zlib/blob/main/docs/eapi.md" target="_blank" rel="noopener">EAPI mode</a></li>
+          <li><a href="https://github.com/heartleo/zlib/blob/main/docs/eapi.md" target="_blank" rel="noopener">EAPI notes</a></li>
         </ul>
       </div>
       <div>
@@ -436,107 +451,113 @@
     $$("[data-pane]").forEach(p => p.classList.toggle("on", p.dataset.pane === k));
   }));
 
-  /* ── text helpers, matching the CLI's column widths ──── */
+  /* ── text helpers ────────────────────────────────────── */
   const trunc = (s, n) => (s.length > n ? s.slice(0, n) : s);
   const padR  = (s, n) => trunc(s, n).padEnd(n, " ");
-  const padL  = (s, n) => trunc(s, n).padStart(n, " ");
   const G     = '<span class="gap"> </span>';
 
-  /* ── hero: a replica of `zlib search` ────────────────── */
+  /* ── hero: a replica of the `zlib search` picker ─────── */
+  /* id, hash, title, author, format, size, rating, year (sample data) */
   const PAGES = [
     [
-      ["115066162", "Dune",                       "Frank Herbert",   "EPUB",  "2.8 MB", "5.0"],
-      ["27462851",  "Dune Messiah",               "Frank Herbert",   "EPUB",  "1.4 MB", "4.6"],
-      ["38104421",  "Children of Dune",           "Frank Herbert",   "PDF",   "3.1 MB", "4.4"],
-      ["19288013",  "God Emperor of Dune",        "Frank Herbert",   "EPUB",  "1.9 MB", "4.2"],
-      ["55519037",  "Heretics of Dune",           "Frank Herbert",   "MOBI",  "2.2 MB", "4.1"],
-      ["88214470",  "Chapterhouse: Dune",         "Frank Herbert",   "EPUB",  "2.0 MB", "4.0"],
-      ["41003377",  "The Dune Encyclopedia",      "W. E. McNelly",   "PDF",  "24.6 MB", "4.7"],
-      ["76620518",  "Dune: The Graphic Novel",    "Brian Herbert",   "PDF",  "61.3 MB", "4.3"]
+      ["115066162", "e9f13b", "Dune",                    "Frank Herbert", "EPUB",  "2.8 MB", "5.0", "1965"],
+      ["27462851",  "4c0a7d", "Dune Messiah",            "Frank Herbert", "EPUB",  "1.4 MB", "4.6", "1969"],
+      ["38104421",  "b81e22", "Children of Dune",        "Frank Herbert", "PDF",   "3.1 MB", "4.4", "1976"],
+      ["19288013",  "07d9fa", "God Emperor of Dune",     "Frank Herbert", "EPUB",  "1.9 MB", "4.2", "1981"],
+      ["55519037",  "a3c615", "Heretics of Dune",        "Frank Herbert", "MOBI",  "2.2 MB", "4.1", "1984"],
+      ["88214470",  "5f2e90", "Chapterhouse: Dune",      "Frank Herbert", "EPUB",  "2.0 MB", "4.0", "1985"],
+      ["41003377",  "c47b08", "The Dune Encyclopedia",   "W. E. McNelly", "PDF",  "24.6 MB", "4.7", "1984"],
+      ["76620518",  "19ad53", "Dune: The Graphic Novel", "Brian Herbert", "PDF",  "61.3 MB", "4.3", "2020"]
     ],
     [
-      ["90135520",  "The Road to Dune",           "Frank Herbert",   "EPUB",  "1.6 MB", "4.0"],
-      ["62884051",  "Sisterhood of Dune",         "Brian Herbert",   "EPUB",  "2.4 MB", "3.9"],
-      ["11390745",  "Mentats of Dune",            "Brian Herbert",   "EPUB",  "2.3 MB", "3.8"],
-      ["47712806",  "Navigators of Dune",         "Brian Herbert",   "EPUB",  "2.5 MB", "3.8"],
-      ["30948117",  "Dune: House Atreides",       "Brian Herbert",   "PDF",   "4.8 MB", "4.1"],
-      ["88230948",  "Dune: House Harkonnen",      "Brian Herbert",   "PDF",   "4.6 MB", "4.0"],
-      ["71204458",  "Dune: House Corrino",        "Brian Herbert",   "EPUB",  "2.7 MB", "4.0"],
-      ["55190322",  "Paul of Dune",               "Brian Herbert",   "EPUB",  "2.6 MB", "3.9"]
+      ["90135520",  "e2b4c1", "The Road to Dune",        "Frank Herbert", "EPUB",  "1.6 MB", "4.0", "2005"],
+      ["62884051",  "7a90de", "Sisterhood of Dune",      "Brian Herbert", "EPUB",  "2.4 MB", "3.9", "2012"],
+      ["11390745",  "d05f37", "Mentats of Dune",         "Brian Herbert", "EPUB",  "2.3 MB", "3.8", "2014"],
+      ["47712806",  "3be812", "Navigators of Dune",      "Brian Herbert", "EPUB",  "2.5 MB", "3.8", "2016"],
+      ["30948117",  "f61c4a", "Dune: House Atreides",    "Brian Herbert", "PDF",   "4.8 MB", "4.1", "1999"],
+      ["88230948",  "8e27b5", "Dune: House Harkonnen",   "Brian Herbert", "PDF",   "4.6 MB", "4.0", "2000"],
+      ["71204458",  "2d93f0", "Dune: House Corrino",     "Brian Herbert", "EPUB",  "2.7 MB", "4.0", "2001"],
+      ["55190322",  "c1e86b", "Paul of Dune",            "Brian Herbert", "EPUB",  "2.6 MB", "3.9", "2008"]
     ]
   ];
   const TOTAL_PAGES = 12;
-  const fmtClass = f => ({ EPUB: "f-epub", PDF: "f-pdf", MOBI: "f-mobi", FB2: "f-fb2" }[f] || "ti");
+  const ref = b => b[0] + ":" + b[1];
+  const fileName = b => b[2].replace(/:/g, "") + "." + b[4].toLowerCase();
 
   const picker = $("#picker");
   const out    = $("#pickerOut");
-  let page = 0, cur = 0, busy = false, timer = null;
+  let page = 0, cur = 0, busy = false, confirming = false, onDownload = true, timer = null;
 
   function head() {
     return (
-      '<div>  <span class="mauve">Search:</span> <span class="q">"dune"</span>' +
+      '<div>  <span class="mauve">Search:</span> <span class="q">dune</span>' +
       '  <span class="muted">Page ' + (page + 1) + " / " + TOTAL_PAGES + "</span></div><div>&nbsp;</div>"
     );
   }
 
+  /* Same columns as the picker in internal/cli/book_feed_view.go. */
   function table() {
     let h =
       '<div class="row hdr"><span class="c-cur"> </span><span class="c-num">' + padR("#", 2) + "</span>" + G +
-      '<span class="c-id">'    + padR("ID", 10)     + "</span>" + G +
       '<span class="c-title">' + padR("Title", 40)  + "</span>" + G +
-      '<span class="c-auth">'  + padR("Author", 15) + "</span>" + G +
-      '<span class="c-fmt">'   + padR("Fmt", 4)     + "</span>" + G +
-      '<span class="c-size">'  + padL("Size", 10)   + "</span>" + G +
-      '<span class="c-rate">'  + padL("Rating", 6)  + "</span></div>" +
-      '<div class="sep">  ' + "─".repeat(99) + "</div>";
+      '<span class="c-auth">'  + padR("Author", 15) + "</span></div>" +
+      '<div class="sep">  ' + "─".repeat(63) + "</div>";
 
     PAGES[page].forEach((b, i) => {
       const on = i === cur;
       h +=
         '<div class="row' + (on ? " on" : "") + '">' +
         '<span class="c-cur">' + (on ? "❯ " : "  ") + "</span>" +
-        '<span class="c-num n">'  + padR(String(i + 1), 2) + "</span>" + G +
-        '<span class="c-id id">'  + padR(b[0], 10)         + "</span>" + G +
-        '<span class="c-title ti">' + esc(padR(b[1], 40))  + "</span>" + G +
-        '<span class="c-auth au">'  + esc(padR(b[2], 15))  + "</span>" + G +
-        '<span class="c-fmt ' + fmtClass(b[3]) + '">' + padR(b[3], 4) + "</span>" + G +
-        '<span class="c-size sz">' + padL(b[4], 10) + "</span>" + G +
-        '<span class="c-rate ra">' + padL(b[5], 6)  + "</span></div>";
+        '<span class="c-num n">'    + padR(String(i + 1), 2) + "</span>" + G +
+        '<span class="c-title ti">' + esc(padR(b[2], 40))    + "</span>" + G +
+        '<span class="c-auth au">'  + esc(padR(b[3], 15))    + "</span></div>";
     });
 
     h +=
-      '<div class="help">  <b>↑/↓</b> select  <b>←/→</b> page  <b>/</b> search' +
-      "  <b>enter</b> download  <b>q</b> quit</div>";
+      '<div class="help">  <b>↑/↓</b> select · <b>←/→</b> page · <b>/</b> search' +
+      " · <b>enter</b> download · <b>q</b> quit</div>";
     return h;
   }
 
   const render = () => { out.innerHTML = head() + table(); };
 
-  /* Enter runs the same thing the CLI does: fetch, with a progress bar. */
-  function download() {
-    if (busy) return;
-    busy = true;
-    stopDemo();
+  /* Enter asks first, like the CLI's "Download book?" dialog. */
+  function confirmView() {
     const b = PAGES[page][cur];
-    const file = b[1].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "." + b[3].toLowerCase();
-    const total = parseFloat(b[4]);
+    const btn = (label, on) => on
+      ? '<span class="btn-on"> ' + label + " </span>"
+      : '<span class="muted">[' + label + "]</span>";
+    out.innerHTML =
+      "<div>&nbsp;</div>" +
+      '<div>  <b class="title">Download book?</b></div>' +
+      "<div>&nbsp;</div>" +
+      '<div>  <span class="ti">' + esc(b[2]) + "</span></div>" +
+      '<div>  <span class="muted">ID: ' + ref(b) + "</span></div>" +
+      "<div>&nbsp;</div>" +
+      "<div>  " + btn("Cancel", !onDownload) + "  " + btn("Download", onDownload) + "</div>" +
+      "<div>&nbsp;</div>" +
+      '<div>  <span class="muted">←/→ select · Enter · Esc</span></div>';
+  }
+
+  function download() {
+    busy = true;
+    const b = PAGES[page][cur];
+    const total = parseFloat(b[5]);
     const width = 34;
     let pct = 0;
 
     const frame = () => {
       const done = Math.round((pct / 100) * width);
       out.innerHTML =
-        '<div><span class="mauve">❯</span> <span class="title">zlib download ' + b[0] + "</span></div>" +
         "<div>&nbsp;</div>" +
-        '<div>  <span class="muted">' + esc(b[1]) + "</span></div>" +
+        '<div>  Downloading: <span class="title">' + esc(b[2]) + "</span></div>" +
         '<div>  <span class="bar">' + "█".repeat(done) + "<s>" + "░".repeat(width - done) + "</s></span>" +
-        '  <span class="title">' + String(pct).padStart(3) + "%</span>" +
-        '  <span class="muted">' + (total * pct / 100).toFixed(1) + " / " + b[4] + "</span></div>" +
+        '<span class="muted">  ' + (total * pct / 100).toFixed(1) + " MB / " + total.toFixed(1) + " MB</span></div>" +
         "<div>&nbsp;</div>" +
         (pct >= 100
-          ? '<div>  <span class="green">✓</span> <span class="title">' + file + "</span></div>" +
-            '<div>  <span class="muted">saved to ./' + file + "</span></div>"
-          : '<div>  <span class="muted">press ctrl+c to cancel</span></div><div>&nbsp;</div>');
+          ? '<div>  <span class="green">✓</span> Saved to: <span class="title">~/' + esc(fileName(b)) + "</span>" +
+            ' <span class="muted">(' + Math.round(total * 1048576) + " bytes)</span></div>"
+          : '<div>  <span class="muted">esc cancel</span></div>');
     };
 
     frame();
@@ -555,11 +576,23 @@
   picker.addEventListener("keydown", e => {
     if (busy) return;
     const k = e.key;
+    if (confirming) {
+      if (k === "ArrowLeft" || k === "ArrowRight" || k === "h" || k === "l" || k === "Tab") {
+        onDownload = !onDownload; confirmView();
+      } else if (k === "Enter") {
+        confirming = false;
+        if (onDownload) download(); else render();
+      } else if (k === "Escape" || k === "q") {
+        confirming = false; render();
+      } else return;
+      e.preventDefault();
+      return;
+    }
     if (k === "ArrowDown" || k === "j")      { cur = (cur + 1) % rows(); }
     else if (k === "ArrowUp" || k === "k")   { cur = (cur - 1 + rows()) % rows(); }
     else if (k === "ArrowRight" || k === "l"){ page = (page + 1) % PAGES.length; cur = 0; }
     else if (k === "ArrowLeft"  || k === "h"){ page = (page - 1 + PAGES.length) % PAGES.length; cur = 0; }
-    else if (k === "Enter")                  { download(); e.preventDefault(); return; }
+    else if (k === "Enter")                  { stopDemo(); confirming = true; onDownload = true; confirmView(); e.preventDefault(); return; }
     else if (k === "q" || k === "Escape")    { picker.blur(); return; }
     else return;
     e.preventDefault();
@@ -569,7 +602,7 @@
   /* idle demo: drift the cursor so the page isn't dead, stop the moment
      someone takes over with the keyboard or the pointer */
   function startDemo() {
-    if (reduced || timer || busy) return;
+    if (reduced || timer || busy || confirming) return;
     timer = setInterval(() => {
       cur = (cur + 1) % rows();
       if (cur === 0) page = (page + 1) % PAGES.length;
@@ -580,7 +613,10 @@
 
   picker.addEventListener("focus", stopDemo);
   picker.addEventListener("pointerenter", stopDemo);
-  picker.addEventListener("blur", startDemo);
+  picker.addEventListener("blur", () => {
+    if (confirming) { confirming = false; render(); }
+    startDemo();
+  });
   picker.addEventListener("pointerleave", () => { if (document.activeElement !== picker) startDemo(); });
   picker.addEventListener("click", () => picker.focus());
 
@@ -588,103 +624,111 @@
   new IntersectionObserver(es => es.forEach(en => en.isIntersecting ? startDemo() : stopDemo()), { threshold: .25 })
     .observe(picker);
 
-  /* ── commands: one terminal, eight transcripts ───────── */
+  /* ── commands: one terminal, one transcript each ─────── */
+  /* Strings follow what the CLI prints; book and account data are samples. */
   const L = (cls, s) => '<div><span class="' + cls + '">' + s + "</span></div>";
   const P = s => '<div><span class="mauve">❯</span> <span class="title">' + s + "</span></div>";
+  const OK = s => '<div><span class="green">✓</span> ' + s + "</div>";
+  const INFO = s => '<div><span class="muted">→ ' + s + "</span></div>";
   const BLANK = "<div>&nbsp;</div>";
+
+  /* A lipgloss rounded-border table: header row, header rule, no row rules.
+     The web font has no box-drawing glyphs and the fallback fonts differ in
+     width, so borders are CSS lines in ch-sized cells (see .bx i in style.css). */
+  const box = (heads, rowsIn, cls, hot = -1) => {
+    const w = heads.map((hd, i) => Math.max(hd.length, ...rowsIn.map(r => r[i].length)));
+    const G = c => '<i class="' + c + '"></i>';
+    const B = '<i class="v mauve"></i>';
+    const run = n => '<i class="h" style="width:' + n + 'ch"></i>';
+    const rule = (l, m, r) => '<div class="bx mauve">' + G(l) + w.map(n => run(n + 2)).join(G(m)) + G(r) + "</div>";
+    const line = (cells, cs) => '<div class="bx">' + B +
+      cells.map((c, i) => " " + '<span class="' + cs[i] + '">' + esc(c.padEnd(w[i])) + "</span> ").join(B) + B + "</div>";
+    return rule("tl", "t", "tr") +
+      line(heads, heads.map(() => "mauve hb")) +
+      rule("vr", "x", "vl") +
+      rowsIn.map((r, i) => line(r, i === hot ? r.map(() => "mauve hb") : cls)).join("") +
+      rule("bl", "b", "br");
+  };
+
+  const EPUBS = [PAGES[0][0], PAGES[0][1], PAGES[0][3], PAGES[0][5], PAGES[1][0]];
 
   const TRANSCRIPTS = {
     login: P("zlib login --domain https://z-lib.gd") + BLANK +
-      L("muted", "  Checking https://z-lib.gd …") +
-      '<div>  <span class="green">✓</span> <span class="muted">reachable via EAPI</span></div>' + BLANK +
-      '<div>  <span class="mauve">Email</span>    <span class="title">you@example.com</span></div>' +
-      '<div>  <span class="mauve">Password</span> <span class="muted">••••••••••</span></div>' + BLANK +
-      '<div>  <span class="green">✓</span> <span class="title">Signed in as you@example.com</span></div>' +
-      L("muted", "  session → ~/.config/zlib/session.json") + BLANK +
-      L("muted", "  The password is never written to disk."),
+      '<div>  <b class="mauve">Log in</b></div>' + BLANK +
+      '<div>  <span class="mauve">Email</span>     <span class="title">you@example.com</span></div>' +
+      '<div>  <span class="mauve">Password</span>  <span class="muted">••••••••••</span></div>' +
+      L("muted", "            Password is not saved") + BLANK +
+      OK('<span class="title">Logged in successfully.</span>') +
+      INFO("Wrote ZLIB_DOMAIN=https://z-lib.gd to ~/.config/zlib/.env") + BLANK +
+      L("muted", "The session is kept in ~/.config/zlib/session.json.") +
+      L("muted", "Logged in through a browser? Use --cookies FILE."),
 
-    search: P('zlib search "dune" --ext epub --page 1') + BLANK +
-      '<div class="row hdr"><span class="c-cur"> </span><span class="c-num">' + padR("#", 2) + "</span>" + G +
-      '<span class="c-id">'    + padR("ID", 10)     + "</span>" + G +
-      '<span class="c-title">' + padR("Title", 34)  + "</span>" + G +
-      '<span class="c-auth">'  + padR("Author", 15) + "</span>" + G +
-      '<span class="c-fmt">'   + padR("Fmt", 4)     + "</span>" + G +
-      '<span class="c-size">'  + padL("Size", 9)    + "</span></div>" +
-      '<div class="sep">  ' + "─".repeat(82) + "</div>" +
-      PAGES[0].slice(0, 6).map((b, i) =>
-        '<div class="row"><span class="c-cur">  </span>' +
-        '<span class="c-num n">'    + padR(String(i + 1), 2) + "</span>" + G +
-        '<span class="c-id id">'    + padR(b[0], 10)         + "</span>" + G +
-        '<span class="c-title ti">' + esc(padR(b[1], 34))    + "</span>" + G +
-        '<span class="c-auth au">'  + esc(padR(b[2], 15))    + "</span>" + G +
-        '<span class="c-fmt ' + fmtClass(b[3]) + '">' + padR(b[3], 4) + "</span>" + G +
-        '<span class="c-size sz">'  + padL(b[4], 9) + "</span></div>").join("") + BLANK +
-      L("muted", "  Run it without a query to get the interactive picker") +
-      L("muted", "  at the top of this page. --json prints the same rows") +
-      L("muted", "  for scripts, --full-title stops the truncation."),
+    search: P('zlib search "dune" --ext epub --count 5') +
+      OK('Found <b class="title">5 results</b> · Page 1 / 10') + BLANK +
+      box(["#", "ID", "Title", "Authors", "Year", "Format", "Size", "Rating"],
+        EPUBS.map((b, i) => [String(i + 1), ref(b), b[2], b[3], b[7], b[4], b[5], b[6]]),
+        ["n", "id", "ti", "au", "muted", "f-epub", "sz", "ra"]) + BLANK +
+      L("muted", "Without a query, search opens a filter form, then the") +
+      L("muted", "picker at the top of this page. --json prints the same") +
+      L("muted", "books for scripts, with IDs that download accepts."),
 
-    download: P("zlib download 115066162:e9f13b --dir ./books") + BLANK +
-      '<div>  <span class="muted">Dune · Frank Herbert</span></div>' +
-      '<div>  <span class="bar">' + "█".repeat(34) + '</span>  <span class="title">100%</span>  <span class="muted">2.8 / 2.8 MB</span></div>' + BLANK +
-      '<div>  <span class="green">✓</span> <span class="title">books/dune.epub</span></div>' + BLANK +
-      L("muted", "  Ctrl+C cancels, and partial files are removed.") +
-      L("muted", "  Add --send-to-kindle to mail it on as soon as it lands."),
+    download: P("zlib download 115066162:e9f13b --dir ~/books") + BLANK +
+      '<div>  Downloading: <span class="title">Dune</span></div>' +
+      '<div>  <span class="bar">' + "█".repeat(34) + '</span><span class="muted">  2.8 MB / 2.8 MB</span></div>' + BLANK +
+      OK('Saved to: <span class="title">~/books/Dune.epub</span> <span class="muted">(2936013 bytes)</span>') + BLANK +
+      L("muted", "Ctrl+C removes the partial file, and a failed download") +
+      L("muted", "never replaces a file that is already there.") +
+      L("muted", "--send-to-kindle mails the book once it lands."),
 
-    history: P("zlib history --format epub") + BLANK +
-      '<div class="row hdr"><span class="c-cur"> </span><span class="c-num"># </span>' + G +
-      '<span class="c-id">' + padR("ID", 10) + "</span>" + G +
-      '<span class="c-title">' + padR("Title", 40) + "</span>" + G +
-      '<span class="c-auth">' + padR("Downloaded", 15) + "</span></div>" +
-      '<div class="sep">  ' + "─".repeat(74) + "</div>" +
-      '<div class="row on"><span class="c-cur mauve">❯ </span><span class="c-num n">1 </span>' + G +
-      '<span class="c-id id">' + padR("115066162", 10) + "</span>" + G +
-      '<span class="c-title ti">' + padR("Dune", 40) + "</span>" + G +
-      '<span class="c-auth au">' + padR("2 hours ago", 15) + "</span></div>" +
-      '<div class="row"><span class="c-cur">  </span><span class="c-num n">2 </span>' + G +
-      '<span class="c-id id">' + padR("27462851", 10) + "</span>" + G +
-      '<span class="c-title ti">' + padR("Dune Messiah", 40) + "</span>" + G +
-      '<span class="c-auth au">' + padR("yesterday", 15) + "</span></div>" +
-      '<div class="row"><span class="c-cur">  </span><span class="c-num n">3 </span>' + G +
-      '<span class="c-id id">' + padR("41003377", 10) + "</span>" + G +
-      '<span class="c-title ti">' + padR("The Dune Encyclopedia", 40) + "</span>" + G +
-      '<span class="c-auth au">' + padR("Mar 12", 15) + "</span></div>" + BLANK +
-      L("muted", "  ↑/↓ select   ←/→ page   enter re-download"),
+    history: P("zlib history --page 1") +
+      '<div><b class="title">Download history page 1</b></div>' + BLANK +
+      box(["#", "ID", "Title", "Format", "Size", "Date"], [
+        ["1", ref(PAGES[0][0]), "Dune",                  "epub", "2.8 MB",  "2026-10-18"],
+        ["2", ref(PAGES[0][1]), "Dune Messiah",          "epub", "1.4 MB",  "2026-10-17"],
+        ["3", ref(PAGES[0][6]), "The Dune Encyclopedia", "pdf",  "24.6 MB", "2026-09-12"]
+      ], ["n", "id", "ti", "muted", "sz", "muted"]) + BLANK +
+      L("muted", "Run it bare for the picker: enter downloads again, d") +
+      L("muted", "removes the entry. Local files stay where they are."),
 
     profile: P("zlib profile") + BLANK +
-      '<div>  <span class="mauve">Account</span>    <span class="title">you@example.com</span></div>' +
-      '<div>  <span class="mauve">Plan</span>       <span class="title">Free</span></div>' +
-      '<div>  <span class="mauve">Today</span>      <span class="bar">' + "█".repeat(6) + "<s>" + "░".repeat(18) + '</s></span>  <span class="title">6 / 10</span></div>' +
-      '<div>  <span class="mauve">Resets</span>     <span class="muted">in 7h 41m</span></div>' + BLANK +
-      L("muted", "  Turns yellow at 3 downloads left, red at 0.") +
-      L("muted", "  --json prints the same numbers for your status bar."),
+      '<div><b class="title">Reader</b></div>' + BLANK +
+      '<div><b class="mauve">DAILY DOWNLOADS</b>                 <b class="title">6 / 10 used</b></div>' +
+      '<div><span class="green">' + "━".repeat(26) + '</span><span class="muted">' + "─".repeat(18) + "</span></div>" +
+      '<div><span class="muted">Resets at</span> <span class="title">2026-10-19 00:00</span></div>' + BLANK +
+      '<div><b class="mauve">ACCOUNT</b></div>' +
+      '<div><span class="muted">Email          </span><span class="title">you@example.com</span></div>' +
+      '<div><span class="muted">Kindle email   </span><span class="title">you@kindle.com</span></div>' +
+      '<div><span class="muted">Plan           </span><span class="title">Standard</span></div>' + BLANK +
+      L("muted", "The bar turns yellow at 3 downloads left, red at 0.") +
+      L("muted", "--json prints the same numbers for your status bar."),
 
-    kindle: P("zlib kindle send ./dune.epub") + BLANK +
-      '<div>  <span class="mauve">To</span>    <span class="title">you@kindle.com</span></div>' +
-      '<div>  <span class="mauve">From</span>  <span class="title">you@example.com</span></div>' +
-      '<div>  <span class="mauve">SMTP</span>  <span class="muted">smtp.gmail.com:587</span></div>' + BLANK +
-      '<div>  <span class="green">✓</span> <span class="title">Sent dune.epub (2.8 MB)</span></div>' + BLANK +
-      L("muted", "  EPUB · PDF · MOBI · TXT · DOC · DOCX · RTF · HTML") +
-      L("muted", "  The SMTP password lives in ZLIB_SMTP_PWD, never on disk."),
+    kindle: P("zlib kindle send ./dune.epub") +
+      L("muted", "  Sending to Kindle...") +
+      OK('Email sent to Kindle address: <span class="blue">you@kindle.com</span>') +
+      INFO("Final delivery depends on Amazon approval and file compatibility.") + BLANK +
+      L("muted", "In a terminal, zlib asks before it sends.") +
+      L("muted", "EPUB · PDF · TXT · DOC · DOCX · HTML · RTF · JPG · PNG · BMP · GIF") +
+      L("muted", "The SMTP password comes from ZLIB_SMTP_PWD, never kindle.json."),
 
-    doctor: P("zlib doctor") + BLANK +
-      L("muted", "  Probing 8 known domains …") + BLANK +
-      '<div>  <span class="green">healthy</span>           <span class="title">z-lib.gd</span></div>' +
-      '<div>  <span class="green">healthy</span>           <span class="title">1lib.sk</span></div>' +
-      '<div>  <span class="yellow">challenged</span>        <span class="title">z-library.gs</span>  <span class="muted">js proof-of-work</span></div>' +
-      '<div>  <span class="red">diamwall_blocked</span>  <span class="muted">z-lib.fm</span></div>' +
-      '<div>  <span class="red">network_error</span>     <span class="muted">zliba.ru</span></div>' + BLANK +
-      '<div>  <span class="green">✓</span> <span class="title">3 of 8 usable.</span> <span class="muted">export ZLIB_DOMAIN=https://z-lib.gd</span></div>',
+    doctor: P("zlib doctor") +
+      box(["Available domains"], [
+        ["https://article.sk"],
+        ["https://z-lib.gd  · Current domain"],
+        ["https://z-lib.gl"],
+        ["https://zlib.bz"]
+      ], ["title"], 1) + BLANK +
+      L("muted", "Only domains whose API answered are listed. Pass one") +
+      L("muted", "to zlib login --domain, or set ZLIB_DOMAIN."),
 
-    theme: P("zlib theme") + BLANK +
-      '<div>  <span class="mauve">Current</span>  <span class="title">auto</span> <span class="muted">→ mocha (dark terminal)</span></div>' + BLANK +
-      L("muted", "  auto     follow the terminal background") +
-      '<div>  <span class="mauve">mocha</span>    <span class="muted">catppuccin, dark</span></div>' +
-      '<div>  <span class="mauve">latte</span>    <span class="muted">catppuccin, light</span></div>' +
-      '<div>  <span class="mauve">dracula</span>  <span class="muted">high contrast</span></div>' +
-      '<div>  <span class="mauve">tokyo</span>    <span class="muted">tokyo night</span></div>' +
-      '<div>  <span class="mauve">nord</span>     <span class="muted">cool and low contrast</span></div>' +
-      '<div>  <span class="mauve">gruvbox</span>  <span class="muted">warm and retro</span></div>' + BLANK +
-      L("muted", "  zlib theme nord   sets it globally")
+    theme: P("zlib theme nord") +
+      OK("Theme set to <b class=\"title\">nord</b>") +
+      INFO("Saved to: ~/.config/zlib/config.json") + BLANK +
+      L("muted", "Run zlib theme with no name to preview all 20:") +
+      '<div><span class="mauve">dark </span>  <span class="muted">catppuccin-mocha, gruvbox-dark, dracula, tokyo,</span></div>' +
+      L("muted", "       nord, solarized-dark, two-dark, … 12 in all") +
+      '<div><span class="mauve">light</span>  <span class="muted">github, catppuccin-latte, gruvbox-light,</span></div>' +
+      L("muted", "       solarized-light, coldark-cold, … 8 in all") + BLANK +
+      L("muted", "ZLIB_THEME overrides the saved choice.")
   };
 
   const cmdOut = $("#cmdOut"), cmdTitle = $("#cmdTitle");
@@ -699,14 +743,14 @@
   /* ── access panel ────────────────────────────────────── */
   $("#doctorOut").innerHTML = TRANSCRIPTS.doctor;
 
-  /* ── theme swatches: the real palettes from the source ─ */
+  /* ── theme swatches: built-in themes shipped by the CLI ─ */
   const THEMES = [
-    ["mocha",   "catppuccin",  "#1e1e2e", ["#cba6f7", "#89b4fa", "#a6e3a1", "#f9e2af", "#f38ba8"], "#b4befe", "#6c7086"],
-    ["latte",   "catppuccin",  "#eff1f5", ["#8839ef", "#1e66f5", "#40a02b", "#df8e1d", "#d20f39"], "#4c4f69", "#9ca0b0"],
-    ["dracula", "high contrast","#282a36", ["#bd93f9", "#8be9fd", "#50fa7b", "#f1fa8c", "#ff5555"], "#f8f8f2", "#6272a4"],
-    ["tokyo",   "tokyo night", "#1a1b26", ["#7aa2f7", "#7dcfff", "#9ece6a", "#e0af68", "#f7768e"], "#a9b1d6", "#565f89"],
-    ["nord",    "low contrast","#2e3440", ["#81a1c1", "#88c0d0", "#a3be8c", "#ebcb8b", "#bf616a"], "#eceff4", "#4c566a"],
-    ["gruvbox", "retro",       "#282828", ["#fe8019", "#83a598", "#b8bb26", "#fabd2f", "#fb4934"], "#ebdbb2", "#928374"]
+    ["catppuccin-mocha", "dark",  "#1e1e2e", ["#cba6f7", "#89b4fa", "#a6e3a1", "#f9e2af", "#f38ba8"], "#b4befe", "#6c7086"],
+    ["catppuccin-latte", "light", "#eff1f5", ["#8839ef", "#1e66f5", "#40a02b", "#df8e1d", "#d20f39"], "#4c4f69", "#9ca0b0"],
+    ["dracula",          "dark",  "#282a36", ["#bd93f9", "#8be9fd", "#50fa7b", "#f1fa8c", "#ff5555"], "#f8f8f2", "#6272a4"],
+    ["tokyo",            "dark",  "#1a1b26", ["#7aa2f7", "#7dcfff", "#9ece6a", "#e0af68", "#f7768e"], "#a9b1d6", "#565f89"],
+    ["nord",             "dark",  "#2e3440", ["#81a1c1", "#88c0d0", "#a3be8c", "#ebcb8b", "#bf616a"], "#eceff4", "#4c566a"],
+    ["gruvbox-dark",     "dark",  "#282828", ["#fe8019", "#83a598", "#b8bb26", "#fabd2f", "#fb4934"], "#ebdbb2", "#928374"]
   ];
   $("#swatches").innerHTML = THEMES.map(([name, note, bg, cols, fg, mut]) =>
     '<div class="sw"><div class="top" style="background:' + bg + '">' +

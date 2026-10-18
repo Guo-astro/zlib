@@ -163,7 +163,7 @@ table.doc-t td:first-child{color:var(--strong)}
     <div class="meta">
       <span><i></i>EPUB · PDF · DOCX · and more</span>
       <span><i></i>Any SMTP server</span>
-      <span><i></i>Password never written to disk</span>
+      <span><i></i>Password kept out of kindle.json</span>
     </div>
   </div>
 </section>
@@ -190,13 +190,13 @@ table.doc-t td:first-child{color:var(--strong)}
       <li>
         <h3>Point it at your mail server</h3>
         <p>
-          Running <code>zlib kindle</code> with no arguments opens a short form:
+          Running <code>zlib kindle config</code> opens a short form:
           your Kindle address, the address you are sending from, and the SMTP
           host and port. It defaults to <code>smtp.gmail.com</code> on port
           <code>587</code>. The answers are saved to
           <code>~/.config/zlib/kindle.json</code>.
         </p>
-<pre><span class="p">$</span> zlib kindle
+<pre><span class="p">$</span> zlib kindle config
 
   Kindle address   you@kindle.com
   From address     you@gmail.com
@@ -208,7 +208,7 @@ table.doc-t td:first-child{color:var(--strong)}
         <h3>Put the password in the environment</h3>
         <p>
           zlib reads the mail password from <code>ZLIB_SMTP_PWD</code> at send
-          time and never writes it to the config file. On Gmail this has to be
+          time and never writes it to <code>kindle.json</code>. On Gmail this has to be
           an App Password, which requires 2-step verification on the account;
           your normal login password will be rejected by the server.
         </p>
@@ -218,7 +218,9 @@ table.doc-t td:first-child{color:var(--strong)}
             Putting it in your shell profile makes it permanent. Putting it in a
             <code>.env</code> file next to the project also works, since zlib
             reads <code>.env</code> from the working directory and from
-            <code>~/.config/zlib/</code>.
+            <code>~/.config/zlib/</code>. If the variable is missing when you
+            send from the terminal UI, zlib asks for the password and saves it
+            to <code>~/.config/zlib/.env</code>.
           </p>
         </div>
       </li>
@@ -237,11 +239,14 @@ table.doc-t td:first-child{color:var(--strong)}
       <li>
         <h3>Send something</h3>
         <p>
-          Pass a path, or run it bare to get a file picker filtered to the
-          formats Amazon accepts.
+          Pass a path, or run <code>zlib kindle</code> bare to get a file picker
+          filtered to the formats Amazon accepts. In a terminal, zlib asks
+          before it sends.
         </p>
 <pre><span class="p">$</span> zlib kindle send ./dune.epub
-<span class="c">  ✓ Sent dune.epub to you@kindle.com</span></pre>
+<span class="c">  Sending to Kindle...
+✓ Email sent to Kindle address: you@kindle.com
+→ Final delivery depends on Amazon approval and file compatibility.</span></pre>
       </li>
     </ol>
   </div>
@@ -305,15 +310,18 @@ table.doc-t td:first-child{color:var(--strong)}
     <p>
       Every command that ends in a downloaded file takes
       <code>--send-to-kindle</code>, which mails it on as soon as the download
-      lands. That works on <code>search</code>, <code>download</code>, and
-      <code>history</code>.
+      lands: <code>download</code>, <code>history</code>, <code>search</code>,
+      <code>favorites</code>, <code>recommended</code>, and
+      <code>most-popular</code>.
     </p>
-<pre><span class="p">$</span> zlib download 12345678 --send-to-kindle
-<span class="p">$</span> zlib search "the dispossessed" --send-to-kindle
-<span class="p">$</span> zlib history --send-to-kindle</pre>
+<pre><span class="p">$</span> zlib download 12345678:a1b2c3 --send-to-kindle
+<span class="p">$</span> zlib history -D 12345678:a1b2c3 --send-to-kindle
+<span class="p">$</span> zlib search --send-to-kindle</pre>
     <p style="margin-top:1.2rem">
-      Because none of this needs a terminal UI, the same flags work inside a
-      script or a cron job.
+      The first two take an ID, so they run without a terminal UI, inside a
+      script or a cron job, as long as <code>ZLIB_SMTP_PWD</code> is set. On
+      the browsing commands the flag applies to the book you pick in the
+      interactive list.
     </p>
   </div>
 </section>
@@ -390,9 +398,11 @@ table.doc-t td:first-child{color:var(--strong)}
       <details>
         <summary>Does zlib store my email password?</summary>
         <p>
-          No. <code>~/.config/zlib/kindle.json</code> holds the addresses, host,
-          and port only. The password is read from the
+          Not in <code>~/.config/zlib/kindle.json</code>, which holds the
+          addresses, host, and port only. The password is read from the
           <code>ZLIB_SMTP_PWD</code> environment variable each time a send runs.
+          If you type it into the terminal UI prompt, zlib saves it to
+          <code>~/.config/zlib/.env</code> so the next send can use it.
         </p>
       </details>
       <details>
@@ -425,7 +435,7 @@ table.doc-t td:first-child{color:var(--strong)}
 <!-- ── cta ─────────────────────────────────────────────────── -->
 <section class="wrap cta">
   <h2>Get it installed.</h2>
-  <p>Free, MIT licensed, and it only ever talks to Z-Library and the SMTP server you configure.</p>
+  <p>Free and MIT licensed. It talks to Z-Library, the SMTP server you configure, and GitHub when you run <code>zlib update</code>.</p>
   <div class="btns">
     <a class="btn pri" href="/#install">Installation options</a>
     <a class="btn" href="https://github.com/heartleo/zlib" target="_blank" rel="noopener">

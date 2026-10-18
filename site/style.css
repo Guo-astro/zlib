@@ -12,10 +12,12 @@
 :root{
   /* Catppuccin Latte */
   --base:#eff1f5; --mantle:#e6e9ef; --card:#ffffff;
-  --text:#4c4f69; --strong:#2b2d3f; --subtext:#6c6f85; --faint:#8c8fa1;
+  --text:#4c4f69; --strong:#2b2d3f; --subtext:#5c5f77; --faint:#62657b;
   --rule:#ccd0da; --rule-soft:#dce0e8;
   --accent:#8839ef; --accent-ink:#ffffff; --accent-wash:rgba(136,57,239,.08);
   --green:#40a02b; --yellow:#df8e1d; --red:#d20f39; --blue:#1e66f5; --teal:#179299;
+  /* Darker green and yellow for small text, so it passes WCAG AA on Latte. */
+  --ok-ink:#276e17; --warn-ink:#8f5506;
   --shadow:0 1px 2px rgba(76,79,105,.06), 0 12px 32px -18px rgba(76,79,105,.28);
 
   /* Terminal chrome — Catppuccin Latte, matching `zlib theme catppuccin-latte` */
@@ -39,6 +41,7 @@ html[data-theme="mocha"]{
   --rule:#313244; --rule-soft:#292a3d;
   --accent:#cba6f7; --accent-ink:#1e1e2e; --accent-wash:rgba(203,166,247,.12);
   --green:#a6e3a1; --yellow:#f9e2af; --red:#f38ba8; --blue:#89b4fa; --teal:#94e2d5;
+  --ok-ink:#a6e3a1; --warn-ink:#f9e2af;
   --shadow:0 1px 2px rgba(0,0,0,.3), 0 16px 40px -20px rgba(0,0,0,.7);
 
   /* Terminal chrome — Catppuccin Mocha, matching `zlib theme catppuccin-mocha` */
@@ -182,6 +185,9 @@ h1 .z{color:var(--accent);font-style:italic;font-weight:500}
 /* ── terminal ─────────────────────────────────────────── */
 #picker{container-type:inline-size}
 #picker .term-body{font-size:clamp(10px,1.6cqi,13px)}
+/* Reserve the picker's height (2 header lines, table header, rule, 8 rows,
+   help line) so the script that fills it does not shift the page. */
+#pickerOut{min-height:calc(13lh + .85rem)}
 .term{
   background:var(--t-base);border:1px solid var(--t-edge);border-radius:10px;overflow:hidden;
   box-shadow:0 2px 4px rgba(0,0,0,.16),0 28px 60px -28px rgba(0,0,0,.55);
@@ -203,11 +209,31 @@ h1 .z{color:var(--accent);font-style:italic;font-weight:500}
 }
 .term:focus-within .term-hint{color:var(--t-green);border-color:var(--t-green)}
 .term-body{padding:.9rem .95rem 1rem;overflow-x:auto;scrollbar-width:thin}
-#cmdOut{min-height:310px}
+/* Keep transcript spacing; box tables never wrap. */
+.term-body div{white-space:pre-wrap}
+.term-body .bx,.term-body .row,.term-body .sep{white-space:pre}
+.term-body .bx{font-size:12px}
+/* Box borders: h/v lines, t/b/x joints, vr/vl side joints, rounded corners. */
+.bx i{display:inline-block;width:1ch;height:1lh;vertical-align:top;position:relative;background-repeat:no-repeat}
+.bx .h{background-image:linear-gradient(currentColor,currentColor);background-position:0 50%;background-size:100% 1px}
+.bx .v{background:linear-gradient(currentColor,currentColor) 50% 0/1px 100% no-repeat}
+.bx .x{background:linear-gradient(currentColor,currentColor) 0 50%/100% 1px no-repeat,linear-gradient(currentColor,currentColor) 50% 0/1px 100% no-repeat}
+.bx .t{background:linear-gradient(currentColor,currentColor) 0 50%/100% 1px no-repeat,linear-gradient(currentColor,currentColor) 50% 100%/1px 50% no-repeat}
+.bx .b{background:linear-gradient(currentColor,currentColor) 0 50%/100% 1px no-repeat,linear-gradient(currentColor,currentColor) 50% 0/1px 50% no-repeat}
+.bx .vr{background:linear-gradient(currentColor,currentColor) 50% 0/1px 100% no-repeat,linear-gradient(currentColor,currentColor) 100% 50%/50% 1px no-repeat}
+.bx .vl{background:linear-gradient(currentColor,currentColor) 50% 0/1px 100% no-repeat,linear-gradient(currentColor,currentColor) 0 50%/50% 1px no-repeat}
+.bx .tl::before,.bx .tr::before,.bx .bl::before,.bx .br::before{content:"";position:absolute;border:0 solid}
+.bx .tl::before{left:calc(50% - .5px);top:calc(50% - .5px);right:0;bottom:0;border-width:1px 0 0 1px;border-top-left-radius:4px}
+.bx .tr::before{left:0;top:calc(50% - .5px);right:calc(50% - .5px);bottom:0;border-width:1px 1px 0 0;border-top-right-radius:4px}
+.bx .bl::before{left:calc(50% - .5px);top:0;right:0;bottom:calc(50% - .5px);border-width:0 0 1px 1px;border-bottom-left-radius:4px}
+.bx .br::before{left:0;top:0;right:calc(50% - .5px);bottom:calc(50% - .5px);border-width:0 1px 1px 0;border-bottom-right-radius:4px}
+.hb{font-weight:700}
+.btn-on{background:var(--t-mauve);color:var(--t-base);font-weight:700}
+#cmdOut{min-height:348px}
 .term-body::-webkit-scrollbar{height:6px}
 .term-body::-webkit-scrollbar-thumb{background:var(--t-surface);border-radius:3px}
 
-/* faithful to internal/cli/search_interactive.go column widths */
+/* the hero picker uses the columns of internal/cli/book_feed_view.go */
 .row{display:flex;white-space:pre;width:max-content;min-width:100%}
 .row>*{flex:none;overflow:hidden}
 .c-cur{width:2ch}.c-num{width:2ch}.c-id{width:10ch}.c-title{width:40ch}
@@ -302,7 +328,7 @@ h1 .z{color:var(--accent);font-style:italic;font-weight:500}
 .status-key div{display:flex;gap:.7rem;align-items:baseline;color:var(--subtext)}
 .status-key b{font-weight:500;flex:none;width:16ch}
 .status-key.next b{width:auto;min-width:4.5ch;color:var(--faint)}
-.status-key .ok{color:var(--green)}.status-key .warn{color:var(--yellow)}.status-key .bad{color:var(--red)}
+.status-key .ok{color:var(--ok-ink)}.status-key .warn{color:var(--warn-ink)}.status-key .bad{color:var(--red)}
 
 /* ── cta + footer ─────────────────────────────────────── */
 .cta{text-align:center;padding-block:clamp(52px,6vw,84px) clamp(80px,10vw,128px)}
@@ -330,7 +356,8 @@ footer{border-top:1px solid var(--rule-soft);background:var(--mantle);padding-bl
 .f-grid{display:grid;grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr));gap:32px}
 .f-brand p{color:var(--faint);font-size:.9rem;margin-top:.6rem;max-width:30ch}
 footer h3{font-family:var(--mono);font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);font-weight:500;margin-bottom:.9rem}
-footer ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
+footer ul{list-style:none;margin:0;padding:0;display:grid;gap:.2rem}
+footer ul a{display:inline-block;padding-block:.15rem}
 footer a{color:var(--subtext);text-decoration:none;font-size:.9rem}
 footer a:hover{color:var(--accent)}
 
