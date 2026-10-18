@@ -1,4 +1,7 @@
 // .agents/skills is the source; plugins/zlib/skills is the distributable copy.
+// Only the skills in pluginSkills ship with the plugin. Everything else under
+// .agents/skills (repo-readme, zlib-tui, ...) is repository-level maintainer
+// tooling and must not reach users.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = join(root, '.agents', 'skills');
 const target = join(root, 'plugins', 'zlib', 'skills');
+const pluginSkills = ['kindle', 'zlib'];
 const args = process.argv.slice(2);
 if (args.some(arg => arg !== '--check')) {
   throw new Error('Usage: node scripts/sync-plugin-skills.mjs [--check]');
@@ -21,8 +25,11 @@ function filesUnder(directory, base = directory) {
   }).sort();
 }
 
-const sourceFiles = filesUnder(source);
-if (!sourceFiles.length) throw new Error('No source skills found in .agents/skills');
+const sourceFiles = pluginSkills.flatMap(name => {
+  const files = filesUnder(join(source, name)).map(file => join(name, file));
+  if (!files.length) throw new Error(`Plugin skill not found: .agents/skills/${name}`);
+  return files;
+});
 const sourceSet = new Set(sourceFiles);
 const extra = filesUnder(target).filter(file => !sourceSet.has(file));
 if (extra.length) {

@@ -103,7 +103,9 @@ authentication keys. Handle that output as private account data.
 
 Edit `.agents/skills/<name>/SKILL.md` and its `references/` files. Run
 `node scripts/sync-plugin-skills.mjs` to generate `plugins/zlib/skills/` for both
-plugin packages. `node scripts/sync-plugin-skills.mjs --check` verifies the bundle
+plugin packages. Only the plugin skills listed in the script (`zlib`, `kindle`)
+are copied; the other folders in `.agents/skills/` are repository-level skills
+for maintaining this repo and are not part of the plugin. `node scripts/sync-plugin-skills.mjs --check` verifies the bundle
 without changing files; CI runs that check on every pull request.
 
 The generated copies are committed so plugin installations work without Node.js
