@@ -88,12 +88,12 @@ changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
-      - '^chore:'
-      - '^ci:'
-      - '^refactor:'
-      - '^style:'
+      - '^docs(\(.+\))?!?:'
+      - '^test(\(.+\))?!?:'
+      - '^chore(\(.+\))?!?:'
+      - '^ci(\(.+\))?!?:'
+      - '^refactor(\(.+\))?!?:'
+      - '^style(\(.+\))?!?:'
       - '^Merge '
 
 release:
