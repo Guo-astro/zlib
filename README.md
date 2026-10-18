@@ -53,9 +53,6 @@ Or download a binary from [Releases](https://github.com/heartleo/zlib/releases/l
 and put it on your `PATH`. See [Installation](docs/installation.md) for Go
 installation, source builds, and upgrades.
 
-If your installed version lacks a command shown here, see the
-[source-build instructions](docs/installation.md#build-from-source) for this branch.
-
 ## Quick start
 
 You need a Z-Library account. First, find a domain reachable from your network:

@@ -52,9 +52,6 @@ winget install --id heartleo.zlib --exact
 也可以从 [Releases](https://github.com/heartleo/zlib/releases/latest) 下载程序，
 放入 `PATH` 目录。Go 安装、源码编译和更新方式见[安装指南](docs/installation.md)。
 
-如果安装版本缺少本文中的命令，可按[源码编译说明](docs/installation.md#build-from-source)
-构建当前分支。
-
 ## 快速开始
 
 使用前需要一个 Z-Library 账号。先检测当前网络可用的域名：
