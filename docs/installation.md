@@ -77,6 +77,9 @@ zlib version
 zlib update
 ```
 
+`zlib version` prints the version as `vX.Y.Z`, the same form as the release
+tag, for example `zlib version v0.0.10`. See [Versioning](versioning.md).
+
 `zlib update` uses Homebrew, winget or Go when it can identify that installation.
 For a standalone binary, it downloads the latest GitHub release for the current
 OS and architecture, verifies the release checksum, then replaces the executable.

@@ -35,23 +35,6 @@ func TestReleaseArtifact(t *testing.T) {
 	}
 }
 
-func TestNormalizedVersion(t *testing.T) {
-	for _, tt := range []struct {
-		input, want string
-		valid       bool
-	}{
-		{"v0.0.8", "v0.0.8", true},
-		{"0.0.8", "v0.0.8", true},
-		{"v0.0.9-0.20261015033749-d94e112583df+dirty", "v0.0.9-0.20261015033749-d94e112583df+dirty", true},
-		{"dev", "", false},
-	} {
-		got, valid := normalizedVersion(tt.input)
-		if valid != tt.valid || valid && got != tt.want {
-			t.Fatalf("normalizedVersion(%q) = %q, %v", tt.input, got, valid)
-		}
-	}
-}
-
 func TestUpdateMethodCommands(t *testing.T) {
 	for _, tt := range []struct {
 		method updateMethod

@@ -60,8 +60,8 @@ func runUpdate(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	currentVersion, ok := normalizedVersion(zlib.Version)
-	if !ok {
+	currentVersion := zlib.Version
+	if !semver.IsValid(currentVersion) {
 		return fmt.Errorf("cannot update a development build (%s); install a release or update the source checkout", zlib.Version)
 	}
 	result, err := newReleaseUpdater().update(cmd.Context(), executable, currentVersion, runtime.GOOS, runtime.GOARCH)
@@ -77,13 +77,6 @@ func runUpdate(cmd *cobra.Command, _ []string) error {
 		fmt.Fprintf(cmd.OutOrStdout(), "zlib %s is already up to date (latest release: %s).\n", zlib.Version, result.version)
 	}
 	return nil
-}
-
-func normalizedVersion(value string) (string, bool) {
-	if !strings.HasPrefix(value, "v") {
-		value = "v" + value
-	}
-	return value, semver.IsValid(value)
 }
 
 func updateCommand(method updateMethod) (string, []string) {
