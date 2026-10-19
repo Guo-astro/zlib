@@ -24,7 +24,7 @@ func (m *shellModel) openKindle(arg string) tea.Cmd {
 		if cfg.SMTPPort == 0 {
 			cfg.SMTPPort = defaultKindleSMTPPort
 		}
-		form := newInlineForm("Kindle settings", "Save", []formField{{label: "Kindle address", value: cfg.To}, {label: "From address", value: cfg.From}, {label: "SMTP host", value: cfg.SMTPHost}, {label: "SMTP port", value: strconv.Itoa(cfg.SMTPPort)}})
+		form := newInlineForm("Kindle settings", "Save", []formField{{label: "Kindle address", value: cfg.To}, {label: "From address", value: cfg.From}, {label: "SMTP host", value: cfg.SMTPHost}, {label: "SMTP port", value: strconv.Itoa(cfg.SMTPPort)}, {label: "SMTP security", value: cfg.SMTPSecurity, hint: "tls (SSL/TLS) or starttls; empty follows the port"}})
 		form.validate = func(fields []formField) error {
 			draft, err := shellKindleConfig(fields)
 			if err != nil {
@@ -66,7 +66,8 @@ func shellKindleConfig(fields []formField) (zlib.KindleConfig, error) {
 	if err != nil {
 		return zlib.KindleConfig{}, fmt.Errorf("invalid SMTP port")
 	}
-	return zlib.KindleConfig{To: fields[0].value, From: fields[1].value, SMTPHost: fields[2].value, SMTPPort: port}, nil
+	security := strings.ToLower(strings.TrimSpace(fields[4].value))
+	return zlib.KindleConfig{To: fields[0].value, From: fields[1].value, SMTPHost: fields[2].value, SMTPPort: port, SMTPSecurity: security}, nil
 }
 func (m *shellModel) saveKindle(fields []formField) tea.Cmd {
 	cfg, err := shellKindleConfig(fields)

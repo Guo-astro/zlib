@@ -14,19 +14,24 @@ your sender email to the approved sender list. Then run:
 zlib kindle config
 ```
 
-Enter the Kindle address, sender address, SMTP host and port. You can also edit
-each value with `zlib config kindle` or `/config kindle` in the shell. The CLI
-saves these settings in `~/.config/zlib/kindle.json`.
+Enter the Kindle address, sender address, SMTP host, port and security. You can
+also edit each value with `zlib config kindle` or `/config kindle` in the shell.
+The CLI saves these settings in `~/.config/zlib/kindle.json`.
 
-The port selects how zlib secures the connection. zlib sends the password only
-after TLS is established, and fails if the server offers no TLS.
+SMTP security (`smtp_security`) selects how zlib protects the connection. Use
+the mode and port that your provider documents together.
 
-| Port | Connection | Example |
-| --- | --- | --- |
-| `465` or `994` | Implicit TLS: TLS starts as soon as zlib connects. Providers often call this SSL. | `smtp.163.com:465`, `smtp.qq.com:465` |
-| Any other port, normally `587` | Plain connection, upgraded with STARTTLS | `smtp.gmail.com:587` |
+| `smtp_security` | Connection | Standard port | Examples |
+| --- | --- | --- | --- |
+| `tls` | TLS starts as soon as zlib connects. Providers often label this SSL or SSL/TLS. | `465` | `smtp.qq.com:465`, `smtp.163.com:465` or `994` |
+| `starttls` | zlib connects in plain text, then upgrades with STARTTLS before logging in | `587` | `smtp.gmail.com:587` |
+| empty | Port `465` uses `tls`; every other port uses `starttls` | | |
 
-Use the port your provider documents for the connection type you choose.
+Set `tls` explicitly for any other SSL/TLS port, such as 163.com's `994`.
+
+zlib always requires TLS. If a `starttls` server does not offer STARTTLS, zlib
+stops before it sends the password or the book. A missing STARTTLS can also
+mean someone on the network removed it.
 
 When you send interactively without `ZLIB_SMTP_PWD`, a masked prompt asks for the
 SMTP password. Saving writes it to the [global `.env`
@@ -62,7 +67,8 @@ sender and document checks.
 | --- | --- |
 | SMTP password not set | Enter it in the TUI prompt, or set `ZLIB_SMTP_PWD` in the global `.env` for non-interactive use |
 | SMTP authentication failed | Check the sender account and provider's app-password requirements |
-| `smtp send failed: host:port (mode): …` | The error shows the server, the port and the TLS mode zlib used. A timeout or `EOF` usually means the port expects the other TLS mode: use `465` for SSL/TLS or `587` for STARTTLS. Otherwise, check the host and network access |
+| `smtp send failed: host:port (smtp_security …): …` | The error names the server, the port and the security mode. When the failure looks like the wrong mode, such as a timeout, `EOF` or a non-TLS reply, the error suggests the other `smtp_security` value. Otherwise, check the host and network access |
+| `server does not offer STARTTLS` | The port does not support STARTTLS, or something on the network removed it. Use the provider's SSL/TLS port with `smtp_security` set to `tls` |
 | Send succeeded but no book arrived | Check the Kindle address, approved sender list and Amazon's response email |
 
 Use `zlib kindle --help` and `zlib kindle send --help` for command options.

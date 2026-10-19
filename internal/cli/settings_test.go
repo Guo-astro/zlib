@@ -23,13 +23,13 @@ func TestSettingsCommandRoutesAndJSON(t *testing.T) {
 		args  []string
 		count int
 	}{
-		{[]string{"config"}, 8}, {[]string{"config", "network"}, 2},
+		{[]string{"config"}, 9}, {[]string{"config", "network"}, 2},
 		{[]string{"config", "network", "domain"}, 1}, {[]string{"config", "network", "proxy"}, 1},
 		{[]string{"config", "download"}, 2}, {[]string{"config", "download", "directory"}, 1},
 		{[]string{"config", "download", "retries"}, 1},
-		{[]string{"config", "kindle"}, 4}, {[]string{"config", "kindle", "to"}, 1},
+		{[]string{"config", "kindle"}, 5}, {[]string{"config", "kindle", "to"}, 1},
 		{[]string{"config", "kindle", "from"}, 1}, {[]string{"config", "kindle", "host"}, 1},
-		{[]string{"config", "kindle", "port"}, 1},
+		{[]string{"config", "kindle", "port"}, 1}, {[]string{"config", "kindle", "security"}, 1},
 	} {
 		out, err := executeRootForTest(t, append(tc.args, "--json")...)
 		if err != nil {
@@ -235,7 +235,7 @@ func TestSettingsHomeShowsEveryFieldAndReturnsToSelection(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {40, 16}, {32, 12}} {
 		m.width, m.height = size[0], size[1]
 		view := ansi.Strip(m.View().Content)
-		labels := []string{"NETWORK", "Domain", "Proxy URL", "DOWNLOADS", "Default directory", "Download retries", "KINDLE", "Kindle address", "From address", "SMTP host", "SMTP port"}
+		labels := []string{"NETWORK", "Domain", "Proxy URL", "DOWNLOADS", "Default directory", "Download retries", "KINDLE", "Kindle address", "From address", "SMTP host", "SMTP port", "SMTP security"}
 		if size[1] < 20 {
 			labels = labels[:3]
 		}
@@ -312,9 +312,35 @@ func TestSettingsKindleSaveAndNavigation(t *testing.T) {
 	if m.value(kindlePortKey).Value != "465" {
 		t.Fatal("SMTP port not saved")
 	}
+	if v := m.value(kindleSecurityKey); v.Value != zlib.SMTPSecurityTLS || v.Source != "Default" {
+		t.Fatalf("port 465 should imply tls by default, got %+v", v)
+	}
+	// smtp.163.com documents 994 as an SSL/TLS port; IANA does not, so the
+	// mode has to be set explicitly.
+	m.edit(kindlePortKey)
+	m.input.SetValue("994")
+	next, _ = m.Update(key("enter"))
+	m = next.(settingsModel)
+	m.edit(kindleSecurityKey)
+	m.input.SetValue("ssl")
+	next, _ = m.Update(key("enter"))
+	m = next.(settingsModel)
+	if m.page != "edit" || !strings.Contains(m.message, "starttls") {
+		t.Fatal("invalid SMTP security was accepted")
+	}
+	m.input.SetValue("TLS")
+	next, _ = m.Update(key("enter"))
+	m = next.(settingsModel)
+	if v := m.value(kindleSecurityKey); v.Value != zlib.SMTPSecurityTLS || v.Saved != zlib.SMTPSecurityTLS {
+		t.Fatalf("SMTP security not saved: %+v", v)
+	}
 	loaded, err := newSettingsModel(t.Context(), s, "kindle")
-	if err != nil || loaded.value(kindleToKey).Value != "reader@kindle.com" || loaded.value(kindlePortKey).Value != "465" {
+	if err != nil || loaded.value(kindleToKey).Value != "reader@kindle.com" || loaded.value(kindlePortKey).Value != "994" || loaded.value(kindleSecurityKey).Value != zlib.SMTPSecurityTLS {
 		t.Fatal("Kindle values did not reload")
+	}
+	data, err = os.ReadFile(s.kindle)
+	if err != nil || !strings.Contains(string(data), `"smtp_security": "tls"`) {
+		t.Fatalf("smtp_security not written to kindle.json: %s, %v", data, err)
 	}
 }
 

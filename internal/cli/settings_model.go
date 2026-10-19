@@ -23,13 +23,14 @@ import (
 )
 
 const (
-	kindleToKey   = "KINDLE_TO"
-	kindleFromKey = "KINDLE_FROM"
-	kindleHostKey = "KINDLE_SMTP_HOST"
-	kindlePortKey = "KINDLE_SMTP_PORT"
+	kindleToKey       = "KINDLE_TO"
+	kindleFromKey     = "KINDLE_FROM"
+	kindleHostKey     = "KINDLE_SMTP_HOST"
+	kindlePortKey     = "KINDLE_SMTP_PORT"
+	kindleSecurityKey = "KINDLE_SMTP_SECURITY"
 )
 
-var kindleSettingKeys = []string{kindleToKey, kindleFromKey, kindleHostKey, kindlePortKey}
+var kindleSettingKeys = []string{kindleToKey, kindleFromKey, kindleHostKey, kindlePortKey, kindleSecurityKey}
 
 type settingsProbeMsg struct {
 	generation int
@@ -93,12 +94,16 @@ func kindleSettingValues(cfg zlib.KindleConfig) []settingValue {
 		{Key: kindleFromKey, Value: cfg.From, Saved: cfg.From},
 		{Key: kindleHostKey, Value: cfg.SMTPHost, Saved: cfg.SMTPHost},
 		{Key: kindlePortKey, Saved: strconv.Itoa(cfg.SMTPPort)},
+		{Key: kindleSecurityKey, Saved: cfg.SMTPSecurity},
 	}
 	if cfg.SMTPPort > 0 {
 		values[3].Value = strconv.Itoa(cfg.SMTPPort)
 	} else {
 		values[3].Value, values[3].Saved = strconv.Itoa(defaultKindleSMTPPort), ""
+		cfg.SMTPPort = defaultKindleSMTPPort
 	}
+	// Without a saved mode, show the one the port implies.
+	values[4].Value = cfg.Security()
 	if cfg.SMTPHost == "" {
 		values[2].Value = defaultKindleSMTPHost
 	}
@@ -113,7 +118,7 @@ func kindleSettingValues(cfg zlib.KindleConfig) []settingValue {
 
 func isKindleSetting(key string) bool {
 	switch key {
-	case kindleToKey, kindleFromKey, kindleHostKey, kindlePortKey:
+	case kindleToKey, kindleFromKey, kindleHostKey, kindlePortKey, kindleSecurityKey:
 		return true
 	}
 	return false
@@ -135,13 +140,13 @@ func (m settingsModel) rows() []string {
 	case "download":
 		return []string{"Default directory", "Download retries"}
 	case "kindle":
-		return []string{"Kindle address", "From address", "SMTP host", "SMTP port"}
+		return []string{"Kindle address", "From address", "SMTP host", "SMTP port", "SMTP security"}
 	case "domain":
 		return m.domains
 	case "browse":
 		return append([]string{".."}, m.directories...)
 	default:
-		return []string{"Domain", "Proxy URL", "Default directory", "Download retries", "Kindle address", "From address", "SMTP host", "SMTP port"}
+		return []string{"Domain", "Proxy URL", "Default directory", "Download retries", "Kindle address", "From address", "SMTP host", "SMTP port", "SMTP security"}
 	}
 }
 
@@ -302,6 +307,14 @@ func (m *settingsModel) saveKindle(value string) {
 			}
 			cfg.SMTPPort = port
 		}
+	case kindleSecurityKey:
+		// Empty resets to the port's standard mode.
+		value = strings.ToLower(value)
+		if value != "" && value != zlib.SMTPSecurityTLS && value != zlib.SMTPSecuritySTARTTLS {
+			m.message = `Enter "tls" (SSL/TLS) or "starttls"`
+			return
+		}
+		cfg.SMTPSecurity = value
 	}
 	if cfg.SMTPHost == "" {
 		cfg.SMTPHost = defaultKindleSMTPHost
@@ -705,11 +718,14 @@ func (m settingsModel) View() tea.View {
 		return m.settingsListView(w, h, titles[m.page])
 	} else if m.page == "edit" {
 		v := m.value(m.key)
-		labels := map[string]string{zlib.EnvProxy: "Proxy URL", downloadDirEnvVar: "Download directory", zlib.EnvRetries: "Download retries", kindleToKey: "Kindle address", kindleFromKey: "From address", kindleHostKey: "SMTP host", kindlePortKey: "SMTP port"}
+		labels := map[string]string{zlib.EnvProxy: "Proxy URL", downloadDirEnvVar: "Download directory", zlib.EnvRetries: "Download retries", kindleToKey: "Kindle address", kindleFromKey: "From address", kindleHostKey: "SMTP host", kindlePortKey: "SMTP port", kindleSecurityKey: "SMTP security"}
 		if v.Override != "" {
 			subtitle = "Using " + v.Override
 		}
 		lines = append(lines, labels[m.key], m.input.View(), "")
+		if m.key == kindleSecurityKey {
+			lines = append(lines, "tls: SSL/TLS on connect (port 465)", "starttls: upgrade after connect (port 587)", "Empty: follow the port", "")
+		}
 		if isKindleSetting(m.key) {
 			lines = append(lines, "SMTP password: ZLIB_SMTP_PWD", "")
 		}

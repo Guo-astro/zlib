@@ -5,7 +5,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/smtp"
 	"net/url"
@@ -22,7 +24,20 @@ type KindleConfig struct {
 	From     string `json:"from"`
 	SMTPHost string `json:"smtp_host"`
 	SMTPPort int    `json:"smtp_port"`
+	// SMTPSecurity is SMTPSecurityTLS or SMTPSecuritySTARTTLS. Empty picks the
+	// port's standard mode; see Security.
+	SMTPSecurity string `json:"smtp_security,omitempty"`
 }
+
+// SMTP connection security modes, as mail clients label them.
+const (
+	// SMTPSecurityTLS starts TLS as soon as the connection opens: implicit
+	// TLS (RFC 8314), often labelled "SSL/TLS". The standard port is 465.
+	SMTPSecurityTLS = "tls"
+	// SMTPSecuritySTARTTLS connects in plain text and must upgrade with
+	// STARTTLS before anything else is sent. The standard port is 587.
+	SMTPSecuritySTARTTLS = "starttls"
+)
 
 const (
 	kindleMaxFileSizeBytes     = 200 * 1024 * 1024
@@ -31,6 +46,20 @@ const (
 	base64LineBreakLength      = 2
 	kindleEstimatedHeaderBytes = 2048
 )
+
+// Security returns the connection mode to use. Without an explicit setting it
+// follows the port's IANA assignment: 465 is submissions (implicit TLS), and
+// every other port uses STARTTLS. Providers that document another implicit-TLS
+// port, such as smtp.163.com on 994, need SMTPSecurity set to "tls".
+func (c KindleConfig) Security() string {
+	if s := strings.ToLower(strings.TrimSpace(c.SMTPSecurity)); s != "" {
+		return s
+	}
+	if c.SMTPPort == 465 {
+		return SMTPSecurityTLS
+	}
+	return SMTPSecuritySTARTTLS
+}
 
 func (c KindleConfig) Validate() error {
 	if strings.TrimSpace(c.To) == "" {
@@ -44,6 +73,9 @@ func (c KindleConfig) Validate() error {
 	}
 	if c.SMTPPort <= 0 {
 		return fmt.Errorf("kindle smtp port must be greater than 0")
+	}
+	if s := c.Security(); s != SMTPSecurityTLS && s != SMTPSecuritySTARTTLS {
+		return fmt.Errorf("kindle smtp security must be %q or %q, not %q", SMTPSecurityTLS, SMTPSecuritySTARTTLS, c.SMTPSecurity)
 	}
 	return nil
 }
@@ -64,23 +96,35 @@ func SendToKindle(filePath string, cfg KindleConfig, smtpPassword string) error 
 		return err
 	}
 
+	security := cfg.Security()
 	auth := smtp.PlainAuth("", cfg.From, smtpPassword, cfg.SMTPHost)
-	if err := sendMail(cfg.SMTPHost, cfg.SMTPPort, auth, cfg.From, cfg.To, msg); err != nil {
-		mode := "STARTTLS"
-		if implicitTLSPorts[cfg.SMTPPort] {
-			mode = "implicit TLS"
-		}
+	if err := sendMail(cfg.SMTPHost, cfg.SMTPPort, security == SMTPSecurityTLS, auth, cfg.From, cfg.To, msg); err != nil {
 		addr := net.JoinHostPort(cfg.SMTPHost, strconv.Itoa(cfg.SMTPPort))
-		return fmt.Errorf("%w: %s (%s): %w", ErrSMTPSend, addr, mode, err)
+		return fmt.Errorf("%w: %s (smtp_security %s): %w%s", ErrSMTPSend, addr, security, err, smtpModeHint(security, err))
 	}
 	return nil
 }
 
-// implicitTLSPorts lists the ports whose servers expect a TLS handshake right
-// after connecting (RFC 8314): 465 is SMTP submission over TLS, and 994 is an
-// alternative some providers such as smtp.163.com document. Every other port
-// connects in plain text and upgrades with STARTTLS (normally 587).
-var implicitTLSPorts = map[int]bool{465: true, 994: true}
+// smtpModeHint suggests the other security mode when the failure looks like a
+// mode mismatch: a plain client waiting on an implicit-TLS server sees a
+// timeout or EOF, and a TLS client talking to a plain server reads a record
+// that is not a TLS handshake.
+func smtpModeHint(security string, err error) string {
+	var netErr net.Error
+	var recordErr tls.RecordHeaderError
+	switch {
+	case security == SMTPSecuritySTARTTLS && (errors.Is(err, io.EOF) || errors.As(err, &netErr) && netErr.Timeout()):
+		return `. If your provider lists this port as SSL/TLS, set smtp_security to "tls"`
+	case security == SMTPSecurityTLS && errors.As(err, &recordErr):
+		return `. This port does not start TLS on connect; if your provider lists it as STARTTLS, set smtp_security to "starttls"`
+	}
+	return ""
+}
+
+// errNoSTARTTLS is returned when a STARTTLS-mode server does not offer the
+// upgrade. Continuing would send the credentials and the book in plain text,
+// and a missing STARTTLS is also what a downgrade attack looks like.
+var errNoSTARTTLS = errors.New("server does not offer STARTTLS; refusing to continue without TLS")
 
 var (
 	smtpDialTimeout = 30 * time.Second
@@ -92,12 +136,12 @@ var (
 	smtpRootCAs *x509.CertPool
 )
 
-// sendMail delivers msg like smtp.SendMail, but also speaks implicit TLS and
-// bounds every network step with a timeout. net/smtp.SendMail only supports
-// plain connections upgraded with STARTTLS and has no timeouts, so an
+// sendMail delivers msg like smtp.SendMail, but also speaks implicit TLS,
+// requires TLS before AUTH, MAIL or DATA, and bounds every network step with a
+// timeout. net/smtp.SendMail only supports STARTTLS, silently continues in
+// plain text when the server does not offer it, and has no timeouts, so an
 // implicit-TLS server left it waiting for a greeting that never comes.
-// smtp.PlainAuth refuses to send credentials before TLS is established.
-func sendMail(host string, port int, auth smtp.Auth, from, to string, msg []byte) error {
+func sendMail(host string, port int, implicitTLS bool, auth smtp.Auth, from, to string, msg []byte) error {
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	raw, err := (&net.Dialer{Timeout: smtpDialTimeout}).Dial("tcp", addr)
 	if err != nil {
@@ -105,7 +149,7 @@ func sendMail(host string, port int, auth smtp.Auth, from, to string, msg []byte
 	}
 	tlsConfig := &tls.Config{ServerName: host, RootCAs: smtpRootCAs, MinVersion: tls.VersionTLS12}
 	conn := net.Conn(&idleTimeoutConn{Conn: raw, timeout: smtpIdleTimeout})
-	if implicitTLSPorts[port] {
+	if implicitTLS {
 		conn = tls.Client(conn, tlsConfig)
 	}
 	c, err := smtp.NewClient(conn, host)
@@ -115,11 +159,12 @@ func sendMail(host string, port int, auth smtp.Auth, from, to string, msg []byte
 	}
 	defer c.Close()
 
-	if !implicitTLSPorts[port] {
-		if ok, _ := c.Extension("STARTTLS"); ok {
-			if err := c.StartTLS(tlsConfig); err != nil {
-				return err
-			}
+	if !implicitTLS {
+		if ok, _ := c.Extension("STARTTLS"); !ok {
+			return errNoSTARTTLS
+		}
+		if err := c.StartTLS(tlsConfig); err != nil {
+			return err
 		}
 	}
 	if err := c.Auth(auth); err != nil {

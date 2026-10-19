@@ -38,8 +38,8 @@ func TestFormatCLIErrorLeavesNonNetworkErrorsUntouched(t *testing.T) {
 }
 
 func TestFormatCLIErrorKeepsSMTPCause(t *testing.T) {
-	got := formatCLIError(fmt.Errorf("%w: smtp.163.com:587 (STARTTLS): %w", zlib.ErrSMTPSend, io.EOF))
-	want := "✗ Error: zlibrary: smtp send failed: smtp.163.com:587 (STARTTLS): EOF"
+	got := formatCLIError(fmt.Errorf("%w: smtp.163.com:587 (smtp_security starttls): %w", zlib.ErrSMTPSend, io.EOF))
+	want := "✗ Error: zlibrary: smtp send failed: smtp.163.com:587 (smtp_security starttls): EOF"
 	if ansi.Strip(got) != want {
 		t.Fatalf("expected %q, got %q", want, got)
 	}

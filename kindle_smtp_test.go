@@ -17,6 +17,7 @@ import (
 
 // smtpSession records what the fake SMTP server saw.
 type smtpSession struct {
+	verbs       []string
 	authOverTLS bool
 	from, to    string
 	data        string
@@ -72,6 +73,7 @@ func startFakeSMTP(t *testing.T, tlsConfig *tls.Config, implicitTLS, offerSTARTT
 func (f *fakeSMTP) serve(conn net.Conn, tlsConfig *tls.Config, overTLS, offerSTARTTLS bool) {
 	tp := textproto.NewConn(conn)
 	var s smtpSession
+	defer func() { f.sessions <- s }()
 	_ = tp.PrintfLine("220 fake ESMTP")
 	for {
 		line, err := tp.ReadLine()
@@ -79,6 +81,7 @@ func (f *fakeSMTP) serve(conn net.Conn, tlsConfig *tls.Config, overTLS, offerSTA
 			return
 		}
 		verb := strings.ToUpper(strings.Fields(line + " ")[0])
+		s.verbs = append(s.verbs, verb)
 		switch verb {
 		case "EHLO":
 			_ = tp.PrintfLine("250-fake")
@@ -110,7 +113,6 @@ func (f *fakeSMTP) serve(conn net.Conn, tlsConfig *tls.Config, overTLS, offerSTA
 			_ = tp.PrintfLine("250 queued")
 		case "QUIT":
 			_ = tp.PrintfLine("221 bye")
-			f.sessions <- s
 			return
 		default:
 			_ = tp.PrintfLine("502 unsupported")
@@ -127,17 +129,39 @@ func kindleTestFile(t *testing.T) string {
 	return path
 }
 
-func kindleTestConfig(port int) KindleConfig {
-	return KindleConfig{To: "reader@kindle.com", From: "sender@example.com", SMTPHost: "127.0.0.1", SMTPPort: port}
+func kindleTestConfig(port int, security string) KindleConfig {
+	return KindleConfig{To: "reader@kindle.com", From: "sender@example.com", SMTPHost: "127.0.0.1", SMTPPort: port, SMTPSecurity: security}
+}
+
+func TestKindleConfigSecurity(t *testing.T) {
+	for _, tt := range []struct {
+		port     int
+		security string
+		want     string
+	}{
+		{465, "", SMTPSecurityTLS},
+		{587, "", SMTPSecuritySTARTTLS},
+		{25, "", SMTPSecuritySTARTTLS},
+		// 994 is IANA's ircs port; smtp.163.com uses it for implicit TLS, so
+		// it needs the explicit setting rather than a port guess.
+		{994, "", SMTPSecuritySTARTTLS},
+		{994, "tls", SMTPSecurityTLS},
+		{465, " STARTTLS ", SMTPSecuritySTARTTLS},
+	} {
+		if got := kindleTestConfig(tt.port, tt.security).Security(); got != tt.want {
+			t.Errorf("Security(port %d, %q) = %q, want %q", tt.port, tt.security, got, tt.want)
+		}
+	}
+	if err := kindleTestConfig(465, "ssl").Validate(); err == nil || !strings.Contains(err.Error(), `"ssl"`) {
+		t.Fatalf("Validate() accepted smtp_security ssl: %v", err)
+	}
 }
 
 func TestSendToKindleOverImplicitTLS(t *testing.T) {
 	tlsConfig := smtpTestTLS(t)
 	f := startFakeSMTP(t, tlsConfig, true, false)
-	implicitTLSPorts[f.port] = true
-	t.Cleanup(func() { delete(implicitTLSPorts, f.port) })
 
-	if err := SendToKindle(kindleTestFile(t), kindleTestConfig(f.port), "app-password"); err != nil {
+	if err := SendToKindle(kindleTestFile(t), kindleTestConfig(f.port, SMTPSecurityTLS), "app-password"); err != nil {
 		t.Fatalf("SendToKindle() error = %v", err)
 	}
 	s := <-f.sessions
@@ -156,11 +180,31 @@ func TestSendToKindleUpgradesWithSTARTTLS(t *testing.T) {
 	tlsConfig := smtpTestTLS(t)
 	f := startFakeSMTP(t, tlsConfig, false, true)
 
-	if err := SendToKindle(kindleTestFile(t), kindleTestConfig(f.port), "app-password"); err != nil {
+	if err := SendToKindle(kindleTestFile(t), kindleTestConfig(f.port, ""), "app-password"); err != nil {
 		t.Fatalf("SendToKindle() error = %v", err)
 	}
 	if s := <-f.sessions; !s.authOverTLS {
 		t.Fatal("credentials were sent before STARTTLS")
+	}
+}
+
+// A server that does not offer STARTTLS, or an attacker who strips it from
+// the EHLO reply, must not get the credentials or the book in plain text.
+// The loopback address also proves the check does not rely on
+// smtp.PlainAuth, which allows plain-text AUTH to localhost.
+func TestSendToKindleRefusesMissingSTARTTLS(t *testing.T) {
+	smtpTestTLS(t)
+	f := startFakeSMTP(t, nil, false, false)
+
+	err := SendToKindle(kindleTestFile(t), kindleTestConfig(f.port, ""), "app-password")
+	if !errors.Is(err, ErrSMTPSend) || !errors.Is(err, errNoSTARTTLS) {
+		t.Fatalf("SendToKindle() error = %v, want errNoSTARTTLS", err)
+	}
+	s := <-f.sessions
+	for _, verb := range s.verbs {
+		if verb == "AUTH" || verb == "MAIL" || verb == "DATA" {
+			t.Fatalf("client sent %s without TLS; verbs = %v", verb, s.verbs)
+		}
 	}
 }
 
@@ -174,7 +218,7 @@ func TestSendToKindleTimesOutOnWrongTLSMode(t *testing.T) {
 	t.Cleanup(func() { smtpIdleTimeout = original })
 
 	start := time.Now()
-	err := SendToKindle(kindleTestFile(t), kindleTestConfig(f.port), "app-password")
+	err := SendToKindle(kindleTestFile(t), kindleTestConfig(f.port, ""), "app-password")
 	if !errors.Is(err, ErrSMTPSend) {
 		t.Fatalf("SendToKindle() error = %v, want ErrSMTPSend", err)
 	}
@@ -185,25 +229,34 @@ func TestSendToKindleTimesOutOnWrongTLSMode(t *testing.T) {
 	if elapsed := time.Since(start); elapsed > 5*time.Second {
 		t.Fatalf("SendToKindle() took %v", elapsed)
 	}
-	want := net.JoinHostPort("127.0.0.1", strconv.Itoa(f.port)) + " (STARTTLS)"
-	if !strings.Contains(err.Error(), want) {
-		t.Fatalf("error %q does not name %q", err, want)
+	for _, want := range []string{
+		net.JoinHostPort("127.0.0.1", strconv.Itoa(f.port)) + " (smtp_security starttls)",
+		`set smtp_security to "tls"`,
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not contain %q", err, want)
+		}
 	}
 }
 
-func TestSendToKindleRejectsPlainServerOnImplicitTLSPort(t *testing.T) {
+func TestSendToKindleRejectsPlainServerInTLSMode(t *testing.T) {
 	smtpTestTLS(t)
 	f := startFakeSMTP(t, nil, false, false)
-	implicitTLSPorts[f.port] = true
-	t.Cleanup(func() { delete(implicitTLSPorts, f.port) })
 
-	err := SendToKindle(kindleTestFile(t), kindleTestConfig(f.port), "app-password")
-	if !errors.Is(err, ErrSMTPSend) || !strings.Contains(err.Error(), "(implicit TLS)") {
-		t.Fatalf("SendToKindle() error = %v, want an implicit TLS ErrSMTPSend", err)
+	err := SendToKindle(kindleTestFile(t), kindleTestConfig(f.port, SMTPSecurityTLS), "app-password")
+	if !errors.Is(err, ErrSMTPSend) {
+		t.Fatalf("SendToKindle() error = %v, want ErrSMTPSend", err)
 	}
-	select {
-	case <-f.sessions:
-		t.Fatal("mail was delivered over a plain connection")
-	default:
+	for _, want := range []string{"(smtp_security tls)", `set smtp_security to "starttls"`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not contain %q", err, want)
+		}
+	}
+	// The server may log the ClientHello bytes as a garbage line; only real
+	// SMTP commands would mean the client fell back to plain text.
+	for _, verb := range (<-f.sessions).verbs {
+		if verb == "EHLO" || verb == "AUTH" || verb == "MAIL" {
+			t.Fatalf("client sent %s in plain text to a TLS-mode port", verb)
+		}
 	}
 }

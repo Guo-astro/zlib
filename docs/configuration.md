@@ -39,6 +39,7 @@ zlib config kindle to
 zlib config kindle from
 zlib config kindle host
 zlib config kindle port
+zlib config kindle security
 ```
 
 `zlib config` shows network, download and Kindle settings together. The
