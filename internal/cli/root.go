@@ -93,6 +93,11 @@ func formatCLIError(err error) string {
 	}
 
 	prefix := colorRed(symbolError + " Error:")
+	// SMTP errors already name the server, port and TLS mode; a generic
+	// network message would hide whether TLS, auth or the port is wrong.
+	if errors.Is(err, zlib.ErrSMTPSend) {
+		return prefix + " " + err.Error()
+	}
 	if msg, ok := classifyNetworkError(err); ok {
 		return prefix + " " + msg
 	}

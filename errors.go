@@ -17,6 +17,9 @@ var (
 	ErrPhraseMinWords = errors.New("zlibrary: phrase search requires at least 2 words")
 	ErrUnsupported    = errors.New("zlibrary: feature unavailable in EAPI")
 	ErrDownloadFailed = errors.New("zlibrary: download failed")
+	// ErrSMTPSend wraps every failure to deliver a Send-to-Kindle email after
+	// the message was built, so the CLI can show the SMTP cause verbatim.
+	ErrSMTPSend = errors.New("zlibrary: smtp send failed")
 	// ErrBotProtection is returned when an upstream anti-bot page is served
 	// instead of the requested Z-Library response.
 	ErrBotProtection = errors.New("zlibrary: blocked by anti-bot protection")

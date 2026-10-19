@@ -3,12 +3,14 @@ package cli
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/heartleo/zlib"
 )
 
 func TestFormatCLIErrorConvertsEOFToFriendlyMessage(t *testing.T) {
@@ -30,6 +32,14 @@ func TestFormatCLIErrorConvertsWrappedEOFToFriendlyMessage(t *testing.T) {
 func TestFormatCLIErrorLeavesNonNetworkErrorsUntouched(t *testing.T) {
 	got := formatCLIError(errors.New("search query is empty"))
 	want := "✗ Error: search query is empty"
+	if ansi.Strip(got) != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestFormatCLIErrorKeepsSMTPCause(t *testing.T) {
+	got := formatCLIError(fmt.Errorf("%w: smtp.163.com:587 (STARTTLS): %w", zlib.ErrSMTPSend, io.EOF))
+	want := "✗ Error: zlibrary: smtp send failed: smtp.163.com:587 (STARTTLS): EOF"
 	if ansi.Strip(got) != want {
 		t.Fatalf("expected %q, got %q", want, got)
 	}

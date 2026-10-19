@@ -50,6 +50,8 @@ result, check the failure before retrying to avoid duplicate messages.
 | Send succeeded, book missing | Check recipient, Amazon's approved sender list and any delivery response email |
 
 The current CLI validates file types and size before sending. It rejects MOBI.
-Its SMTP transport supports STARTTLS when offered, not implicit TLS on port 465;
-use a provider endpoint compatible with that transport. Do not guess SMTP settings
-from the email domain or promise that switching ports will fix an error.
+From v0.0.11, ports 465 and 994 use implicit TLS, and other ports upgrade with
+STARTTLS. Earlier versions support only STARTTLS (check `zlib version`). SMTP
+errors name the host, the port and the TLS mode. A timeout or `EOF` there usually
+means the port expects the other mode. Do not guess SMTP settings from the email
+domain or promise that switching ports will fix an error.

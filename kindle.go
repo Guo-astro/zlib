@@ -2,12 +2,16 @@ package zlib
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/smtp"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -60,12 +64,100 @@ func SendToKindle(filePath string, cfg KindleConfig, smtpPassword string) error 
 		return err
 	}
 
-	addr := fmt.Sprintf("%s:%d", cfg.SMTPHost, cfg.SMTPPort)
 	auth := smtp.PlainAuth("", cfg.From, smtpPassword, cfg.SMTPHost)
-	if err := smtp.SendMail(addr, auth, cfg.From, []string{cfg.To}, msg); err != nil {
-		return fmt.Errorf("smtp send failed: %w", err)
+	if err := sendMail(cfg.SMTPHost, cfg.SMTPPort, auth, cfg.From, cfg.To, msg); err != nil {
+		mode := "STARTTLS"
+		if implicitTLSPorts[cfg.SMTPPort] {
+			mode = "implicit TLS"
+		}
+		addr := net.JoinHostPort(cfg.SMTPHost, strconv.Itoa(cfg.SMTPPort))
+		return fmt.Errorf("%w: %s (%s): %w", ErrSMTPSend, addr, mode, err)
 	}
 	return nil
+}
+
+// implicitTLSPorts lists the ports whose servers expect a TLS handshake right
+// after connecting (RFC 8314): 465 is SMTP submission over TLS, and 994 is an
+// alternative some providers such as smtp.163.com document. Every other port
+// connects in plain text and upgrades with STARTTLS (normally 587).
+var implicitTLSPorts = map[int]bool{465: true, 994: true}
+
+var (
+	smtpDialTimeout = 30 * time.Second
+	// smtpIdleTimeout ends a send when the server stops reading or answering.
+	// It restarts on every read and write, so a slow upload of a large
+	// attachment survives while a silent server does not hang the command.
+	smtpIdleTimeout = 2 * time.Minute
+	// smtpRootCAs is nil in production (system roots); tests set it.
+	smtpRootCAs *x509.CertPool
+)
+
+// sendMail delivers msg like smtp.SendMail, but also speaks implicit TLS and
+// bounds every network step with a timeout. net/smtp.SendMail only supports
+// plain connections upgraded with STARTTLS and has no timeouts, so an
+// implicit-TLS server left it waiting for a greeting that never comes.
+// smtp.PlainAuth refuses to send credentials before TLS is established.
+func sendMail(host string, port int, auth smtp.Auth, from, to string, msg []byte) error {
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+	raw, err := (&net.Dialer{Timeout: smtpDialTimeout}).Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+	tlsConfig := &tls.Config{ServerName: host, RootCAs: smtpRootCAs, MinVersion: tls.VersionTLS12}
+	conn := net.Conn(&idleTimeoutConn{Conn: raw, timeout: smtpIdleTimeout})
+	if implicitTLSPorts[port] {
+		conn = tls.Client(conn, tlsConfig)
+	}
+	c, err := smtp.NewClient(conn, host)
+	if err != nil {
+		conn.Close()
+		return err
+	}
+	defer c.Close()
+
+	if !implicitTLSPorts[port] {
+		if ok, _ := c.Extension("STARTTLS"); ok {
+			if err := c.StartTLS(tlsConfig); err != nil {
+				return err
+			}
+		}
+	}
+	if err := c.Auth(auth); err != nil {
+		return err
+	}
+	if err := c.Mail(from); err != nil {
+		return err
+	}
+	if err := c.Rcpt(to); err != nil {
+		return err
+	}
+	w, err := c.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(msg); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+	return c.Quit()
+}
+
+// idleTimeoutConn pushes the deadline forward before every read and write.
+type idleTimeoutConn struct {
+	net.Conn
+	timeout time.Duration
+}
+
+func (c *idleTimeoutConn) Read(b []byte) (int, error) {
+	_ = c.Conn.SetReadDeadline(time.Now().Add(c.timeout))
+	return c.Conn.Read(b)
+}
+
+func (c *idleTimeoutConn) Write(b []byte) (int, error) {
+	_ = c.Conn.SetWriteDeadline(time.Now().Add(c.timeout))
+	return c.Conn.Write(b)
 }
 
 func validateKindleAttachment(filePath string, cfg KindleConfig) error {

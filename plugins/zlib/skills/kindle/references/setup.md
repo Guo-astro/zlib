@@ -8,8 +8,9 @@ error. Keep existing valid values and ask only for information still needed.
 Ask together for the Kindle recipient address, sender address, SMTP host and port.
 The user can find the Kindle address in Amazon's Personal Document Settings and
 must allow the sender there. Obtain the SMTP endpoint from the provider's current
-documentation or the user's known configuration. The CLI uses `net/smtp.SendMail`
-with STARTTLS where offered; it does not implement implicit TLS on port 465 or
+documentation or the user's known configuration. From v0.0.11, the CLI uses
+implicit TLS on ports 465 and 994 and STARTTLS on other ports. Earlier versions
+support only STARTTLS. It sends the password only over TLS and does not implement
 OAuth SMTP login.
 
 Read `~/.config/zlib/kindle.json` only if needed to reuse existing settings; avoid
