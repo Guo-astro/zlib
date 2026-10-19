@@ -181,9 +181,12 @@ func (c *Client) SetCookies(cookies map[string]string) {
 	c.cookiesMu.Unlock()
 
 	u, _ := url.Parse(c.domain)
+	// Secure keeps the jar from replaying an HTTPS session over plain HTTP,
+	// for example after a redirect that downgrades the scheme.
+	secure := u != nil && u.Scheme == "https"
 	var httpCookies []*http.Cookie
 	for k, v := range cookies {
-		httpCookies = append(httpCookies, &http.Cookie{Name: k, Value: v})
+		httpCookies = append(httpCookies, &http.Cookie{Name: k, Value: v, Secure: secure})
 	}
 	c.httpClient.Jar.SetCookies(u, httpCookies)
 }

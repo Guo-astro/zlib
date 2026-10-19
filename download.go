@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -91,8 +92,9 @@ func (c *Client) download(ctx context.Context, downloadURL, destDir string, prog
 	// Use a separate client with no timeout for downloads (CDN can be slow);
 	// DownloadWithContext bounds stalls instead of total duration.
 	dlClient := &http.Client{
-		Jar:       c.httpClient.Jar,
-		Transport: c.httpClient.Transport,
+		Jar:           c.httpClient.Jar,
+		Transport:     c.httpClient.Transport,
+		CheckRedirect: c.checkDownloadRedirect,
 	}
 
 	resp, err := c.openDownload(ctx, dlClient, downloadURL)
@@ -101,13 +103,6 @@ func (c *Client) download(ctx context.Context, downloadURL, destDir string, prog
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
-		loc := resp.Header.Get("Location")
-		resp.Body.Close()
-		if loc != "" {
-			return c.download(ctx, loc, destDir, progressFn)
-		}
-	}
 	if resp.StatusCode != http.StatusOK {
 		return DownloadResult{}, fmt.Errorf("%w: HTTP %d", ErrDownloadFailed, resp.StatusCode)
 	}
@@ -223,10 +218,46 @@ func (c *Client) newDownloadRequest(ctx context.Context, rawURL string) (*http.R
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	req.Header.Set("Referer", c.domain+"/")
-	for k, v := range c.cookies {
-		req.AddCookie(&http.Cookie{Name: k, Value: v})
+	if c.sendsCredentials(req.URL) {
+		for k, v := range c.cookieSnapshot() {
+			req.AddCookie(&http.Cookie{Name: k, Value: v})
+		}
 	}
 	return req, nil
+}
+
+// sendsCredentials reports whether a download request to u may carry the
+// account cookies. Only the configured mirror's own origin qualifies: the
+// file link EAPI returns usually points at a CDN host, and a signed CDN link
+// needs no account credentials, so handing remix_userkey to it would only
+// leak a reusable session. Comparing the scheme too keeps an HTTPS session
+// off a plain-HTTP URL on the same host.
+func (c *Client) sendsCredentials(u *url.URL) bool {
+	if u == nil {
+		return false
+	}
+	base, err := url.Parse(c.domain)
+	if err != nil {
+		return false
+	}
+	return u.Scheme == base.Scheme && strings.EqualFold(u.Host, base.Host)
+}
+
+// checkDownloadRedirect applies checkRedirect and additionally drops the
+// manually attached Cookie header on every hop that leaves the mirror's
+// origin. net/http strips Cookie only on a change of domain, so without this
+// an HTTPS-to-HTTP redirect on the same host would resend the session in
+// clear text. Cookies the jar adds afterwards follow its own scoping.
+func (c *Client) checkDownloadRedirect(req *http.Request, via []*http.Request) error {
+	if err := checkRedirect(req, via); err != nil {
+		return err
+	}
+	if !c.sendsCredentials(req.URL) {
+		req.Header.Del("Cookie")
+		req.Header.Del("remix-userid")
+		req.Header.Del("remix-userkey")
+	}
+	return nil
 }
 
 // isRetryableStatus reports whether a status code is a gateway failure the
