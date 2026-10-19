@@ -268,16 +268,20 @@ func checkRedirect(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
-// stripEAPICredentialsOffAllowlist removes the EAPI credential headers when a
-// redirect leaves the allowed Z-Library hosts.
+// stripEAPICredentialsOffAllowlist removes the EAPI credential headers and the
+// manually attached Cookie header when a redirect leaves the allowed
+// Z-Library HTTPS origins.
 //
 // eapiRequest carries remix-userid/remix-userkey as custom headers, and
 // net/http only strips Authorization, Cookie and WWW-Authenticate on a
 // cross-host redirect. Without this, a mirror answering 30x with an
 // attacker-controlled Location would receive the user key verbatim, which is
-// exactly what the ParseAllowedDomain allowlist exists to prevent. Downloads
-// legitimately redirect to CDN hosts that are not on the allowlist, so the
-// redirect itself is still followed; only the credentials are dropped.
+// exactly what the ParseAllowedDomain allowlist exists to prevent. net/http
+// also keeps Cookie on a same-host HTTPS-to-HTTP redirect; ParseAllowedDomain
+// rejects plain HTTP, so that hop loses the cookies too instead of sending
+// them in clear text. Downloads legitimately redirect to CDN hosts that are
+// not on the allowlist, so the redirect itself is still followed; only the
+// credentials are dropped.
 func stripEAPICredentialsOffAllowlist(req *http.Request) {
 	if req.URL == nil {
 		return
@@ -287,4 +291,5 @@ func stripEAPICredentialsOffAllowlist(req *http.Request) {
 	}
 	req.Header.Del("remix-userid")
 	req.Header.Del("remix-userkey")
+	req.Header.Del("Cookie")
 }

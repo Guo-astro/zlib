@@ -1,6 +1,7 @@
 package zlib
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -118,5 +119,33 @@ func TestCheckRedirectStripsEAPICredentialsOffAllowlist(t *testing.T) {
 	}
 	if got := req.Header.Get("remix-userid"); got != "" {
 		t.Errorf("checkRedirect() forwarded remix-userid to a foreign host: %q", got)
+	}
+}
+
+func TestEAPIRedirectKeepsCredentialsOffDowngradedURL(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		target string
+		want   bool
+	}{
+		{"https to http downgrade", "http://" + credMirror + "/eapi/user/profile", false},
+		{"foreign host", "https://" + credCDN + "/eapi/user/profile", false},
+		{"same mirror", "https://" + credMirror + "/eapi/user/profile/v2", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			start := "https://" + credMirror + "/eapi/user/profile"
+			c, rec := newCredentialTestClient(t, func(r *http.Request) *http.Response {
+				if r.URL.String() == start {
+					return redirectResponse(r, tc.target)
+				}
+				return fakeResponse(r, http.StatusOK, http.Header{"Content-Type": {"application/json"}}, `{"success":1}`)
+			})
+
+			if _, err := c.eapiRequest(context.Background(), http.MethodGet, "/eapi/user/profile", nil); err != nil {
+				t.Fatalf("eapiRequest() error = %v", err)
+			}
+			assertCredentials(t, rec, start, true)
+			assertCredentials(t, rec, tc.target, tc.want)
+		})
 	}
 }
