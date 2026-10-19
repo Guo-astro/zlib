@@ -22,6 +22,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # Release binaries embed this toolchain's standard library; it must
+      # match the toolchain line in go.mod.
+      - name: Go version
+        run: go version
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
