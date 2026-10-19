@@ -23,7 +23,7 @@ jobs:
           go-version-file: go.mod
 
       # Release binaries embed this toolchain's standard library; it must
-      # match the toolchain line in go.mod.
+      # match the go line in go.mod.
       - name: Go version
         run: go version
 

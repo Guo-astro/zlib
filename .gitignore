@@ -35,6 +35,8 @@ Thumbs.db
 credentials*.json
 *.log
 bin/
+# GoReleaser output; untracked files here mark release binaries +dirty
+/dist/
 *.env
 *.yaml
 !.goreleaser.yaml

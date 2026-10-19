@@ -4,7 +4,9 @@ project_name: zlib
 
 before:
   hooks:
-    - go mod tidy
+    # Fail instead of rewriting go.mod/go.sum: a tidy that changes files
+    # would build from a tree that differs from the tag.
+    - go mod tidy -diff
     - go test ./...
 
 builds:
