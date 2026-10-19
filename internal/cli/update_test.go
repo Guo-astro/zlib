@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 )
@@ -71,6 +72,28 @@ func TestUpdateMethodCommands(t *testing.T) {
 	}
 	if got := detectUpdateMethod(t.Context(), `C:\Users\test\AppData\Local\Microsoft\WinGet\Packages\heartleo.zlib_123\zlib.exe`); got != updateWinget {
 		t.Fatalf("winget path detected as %s", got)
+	}
+}
+
+func TestIsModuleBuild(t *testing.T) {
+	build := func(path, version string) *debug.BuildInfo {
+		return &debug.BuildInfo{Path: path, Main: debug.Module{Path: "github.com/heartleo/zlib", Version: version}}
+	}
+	for _, tt := range []struct {
+		name string
+		info *debug.BuildInfo
+		ok   bool
+		want bool
+	}{
+		{"go install @latest", build("github.com/heartleo/zlib/cmd/zlib", "v0.0.10"), true, true},
+		{"pseudo-version", build("github.com/heartleo/zlib/cmd/zlib", "v0.0.11-0.20261019105317-fb0e24860942"), true, true},
+		{"devel build", build("github.com/heartleo/zlib/cmd/zlib", "(devel)"), true, false},
+		{"other main package", build("example.com/other", "v1.0.0"), true, false},
+		{"no build info", nil, false, false},
+	} {
+		if got := isModuleBuild(tt.info, tt.ok); got != tt.want {
+			t.Errorf("%s: isModuleBuild = %v, want %v", tt.name, got, tt.want)
+		}
 	}
 }
 

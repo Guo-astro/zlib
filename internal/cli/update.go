@@ -107,14 +107,17 @@ func detectUpdateMethod(ctx context.Context, executable string) updateMethod {
 	if strings.Contains(path, "/microsoft/winget/packages/heartleo.zlib_") {
 		return updateWinget
 	}
-	info, ok := debug.ReadBuildInfo()
-	if !ok || info.Main.Path != "github.com/heartleo/zlib/cmd/zlib" || !semver.IsValid(info.Main.Version) {
-		return updateRelease
-	}
-	if goBinPath(ctx, executable) {
+	if isModuleBuild(debug.ReadBuildInfo()) && goBinPath(ctx, executable) {
 		return updateGo
 	}
 	return updateRelease
+}
+
+// isModuleBuild reports whether the binary is the zlib command built from a
+// versioned module, as go install produces. info.Path is the main package;
+// info.Main.Path is the module path and never names cmd/zlib.
+func isModuleBuild(info *debug.BuildInfo, ok bool) bool {
+	return ok && info.Path == "github.com/heartleo/zlib/cmd/zlib" && semver.IsValid(info.Main.Version)
 }
 
 func goBinPath(ctx context.Context, executable string) bool {
