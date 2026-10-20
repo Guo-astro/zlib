@@ -1064,6 +1064,32 @@ func TestShellListUsesAvailableRowsAndRestoresFocus(t *testing.T) {
 	}
 }
 
+// The shell footer offered "ctrl+f refine" on every list, but only search
+// results have filters to reopen; on the others the key did nothing.
+func TestShellOffersRefineOnlyOnSearchResults(t *testing.T) {
+	results := newSearchSelectModel("golang", nil, nil, false)
+	results.state = searchStateResults
+	results.books = []zlib.Book{{ID: "1", Hash: "a", Name: "Book"}}
+	feed := newBookFeedSelectModel("Recommended", func() ([]zlib.Book, error) { return results.books, nil })
+	feed.books = results.books
+	for _, tc := range []struct {
+		name string
+		page tea.Model
+		want bool
+	}{
+		{"search", results, true},
+		{"recommended", feed, false},
+		{"history", newHistorySelectModel(nil), false},
+	} {
+		m := newShellModel()
+		m.width, m.height = 100, 30
+		m.open("list", tc.page)
+		if got := strings.Contains(ansi.Strip(m.footerView()), "ctrl+f refine"); got != tc.want {
+			t.Errorf("%s: footer offers ctrl+f refine = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 func TestShellSearchErrorCanRefineQuery(t *testing.T) {
 	m := newShellModel()
 	list := newSearchSelectModel("golang", nil, nil, false)

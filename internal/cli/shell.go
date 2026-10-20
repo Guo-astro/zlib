@@ -502,10 +502,8 @@ func (m shellModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.resizePage()
 				return m, m.input.Focus()
 			}
-			if k.String() == "ctrl+f" {
-				if list, ok := m.page.(searchSelectModel); ok && list.feed == nil && list.feedPage == nil {
-					msg = tea.KeyPressMsg{Code: '/', Text: "/"}
-				}
+			if k.String() == "ctrl+f" && m.canRefine() {
+				msg = tea.KeyPressMsg{Code: '/', Text: "/"}
 			}
 		}
 	}
@@ -827,6 +825,13 @@ func (m *shellModel) completed() tea.Cmd {
 	return nil
 }
 
+// canRefine reports whether Ctrl+F reopens search filters on the current page.
+// Only search results have filters; Favorites, the feeds and History do not.
+func (m shellModel) canRefine() bool {
+	list, ok := m.page.(searchSelectModel)
+	return ok && list.feed == nil && list.feedPage == nil
+}
+
 // stopLogin releases the context of an in-flight login, if any.
 func (m *shellModel) stopLogin() {
 	if m.loginCancel != nil {
@@ -1000,8 +1005,10 @@ func (m shellModel) footerView() string {
 		} else {
 			bindings = []keys.Binding{uiKey("enter", "search"), uiKey("/", "commands"), uiKey("esc", "clear")}
 		}
-	case m.kind == "list":
+	case m.kind == "list" && m.canRefine():
 		bindings = []keys.Binding{uiKey("/", "commands"), uiKey("ctrl+f", "refine"), uiKey("esc", "back")}
+	case m.kind == "list":
+		bindings = []keys.Binding{uiKey("/", "commands"), uiKey("esc", "back")}
 	case m.kind == "info" || m.page == nil && m.kind == "":
 		bindings = []keys.Binding{uiKey("/", "commands"), uiKey("esc", "back")}
 	}

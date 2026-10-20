@@ -156,7 +156,8 @@ selection style.
 | Profile | Full-screen account and daily download quota; the used count sits above a width-aware horizontal bar. Wide terminals show account fields in two columns. ↑/↓ or PgUp/PgDn scrolls when needed; r retries a failed request; Esc returns. |
 | Doctor | Full-screen available-domain list; the focused row has an accent border and the current configured domain has a separate marker; ↑/↓ selects, PgUp/PgDn scrolls, r checks again, Esc returns |
 | Book lists | ↑/↓ or j/k select; PgUp/PgDn scroll; Home/End jump; Enter opens download confirmation; q or Esc exits |
-| Search, saved books, history | ←/→ changes page; Ctrl+F reopens Search filters in the shell; `/` reopens them in direct `zlib search` |
+| Search, saved books, history | ←/→ changes page |
+| Search results | Ctrl+F reopens Search filters in the shell; `/` reopens them in direct `zlib search`. Other lists have no filters, so their footer does not offer Ctrl+F |
 | Failed list request | r retries the failed page; Esc closes |
 | Login, search options, Kindle settings | Enter edits a field; Enter applies an edit; Tab advances; choose the final action or press Ctrl+S to submit; Esc cancels |
 | Format selection | Huh checkbox list: ↑/↓ moves; Space toggles; Ctrl+A selects all or clears all; Enter continues; no selected formats means all formats |
