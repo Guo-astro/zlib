@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -293,17 +292,17 @@ func (m historySelectModel) View() tea.View {
 		book := zlib.Book{ID: item.ID, Hash: item.Hash, URL: item.URL, Name: item.Name, Authors: item.Authors, Extension: item.Extension, Size: item.Size}
 		list.books = append(list.books, m.details.book(historyCommandID(item), book))
 	}
-	status := fmt.Sprintf("Page %d", m.page)
-	if m.totalPages > 0 {
-		status += fmt.Sprintf(" / %d", m.totalPages)
-	}
+	status := pageLabel(m.page, m.totalPages)
 	if m.state == historyStateResults && m.cursor < len(m.items) {
-		if date := bookCell(m.items[m.cursor].Date); date != "" {
-			if m.width > 0 && m.width < 40 {
-				status += " · " + date
-			} else {
-				status += " · Downloaded " + date
+		date := bookCell(m.items[m.cursor].Date)
+		if m.width > 0 && m.width < 40 {
+			// The date matters more than the position on a narrow terminal.
+			status = joinStatus(status, date)
+		} else {
+			if date != "" {
+				date = "Downloaded " + date
 			}
+			status = joinStatus(status, list.positionLabel(), date)
 		}
 	}
 	v := themedView(list.feedViewWith("Author", "No history on this page.", status, "←/→ page · "))

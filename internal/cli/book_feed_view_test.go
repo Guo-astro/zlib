@@ -50,14 +50,44 @@ func TestSearchResultPositionAppearsOnce(t *testing.T) {
 		m.books[i].Name = fmt.Sprintf("Book %d", i+1)
 	}
 	m.page, m.totalPages, m.cursor = 1, 6, 4
-	for _, width := range []int{80, 40} {
+	for _, width := range []int{80, 40, 30} {
 		m.width, m.height = width, 24
-		view := ansi.Strip(m.View().Content)
-		if !strings.Contains(view, "Search: 鬼吹灯  5 / 50") || strings.Count(view, "5 / 50") != 1 {
-			t.Fatalf("width %d repeats or omits the selected position", width)
+		lines := strings.Split(ansi.Strip(m.View().Content), "\n")
+		if strings.TrimSpace(lines[0]) != "Search: 鬼吹灯" {
+			t.Fatalf("width %d: title row carries more than the title: %q", width, lines[0])
 		}
-		if !strings.Contains(view, "Page 1 / 6") {
-			t.Fatalf("width %d omits server pagination", width)
+		if !strings.Contains(lines[1], "Page 1 of 6 · Book 5 of 50") {
+			t.Fatalf("width %d: status row %q lacks the labeled page and position", width, lines[1])
+		}
+		view := strings.Join(lines, "\n")
+		if strings.Count(view, "5 of 50") != 1 || strings.Contains(view, "━") {
+			t.Fatalf("width %d repeats the position or draws a progress bar", width)
+		}
+	}
+}
+
+// Every list shows the selected position once, labeled, on the status row.
+// Search used to show it three times (highlighted row, an unlabeled "5 / 50"
+// beside the title, and a progress bar that read as progress through all
+// pages), while feeds and favorites showed it differently.
+func TestBookListsShowOneLabeledPosition(t *testing.T) {
+	books := []zlib.Book{{ID: "1", Hash: "a", Name: "One"}, {ID: "2", Hash: "b", Name: "Two"}, {ID: "3", Hash: "c", Name: "Three"}}
+	feed := newBookFeedSelectModel("Recommended", func() ([]zlib.Book, error) { return books, nil })
+	feed.books, feed.state, feed.cursor = books, searchStateResults, 1
+	saved := newSavedBooksSelectModel(nil)
+	saved.books, saved.state, saved.cursor, saved.page, saved.totalPages = books, searchStateResults, 1, 2, 4
+	for _, tc := range []struct {
+		name string
+		page searchSelectModel
+		want string
+	}{
+		{"recommended", feed, "Book 2 of 3"},
+		{"favorites", saved, "Page 2 of 4 · Book 2 of 3"},
+	} {
+		tc.page.width, tc.page.height = 80, 24
+		lines := strings.Split(ansi.Strip(tc.page.View().Content), "\n")
+		if !strings.Contains(lines[1], tc.want) || strings.Contains(lines[0], "of 3") {
+			t.Errorf("%s header = %q / %q, want %q on the status row only", tc.name, lines[0], lines[1], tc.want)
 		}
 	}
 }
@@ -299,7 +329,7 @@ func TestSearchLoadingAndEmptyKeepControlsAtBottom(t *testing.T) {
 			if inShell {
 				searchKey = "Ctrl+F search"
 			}
-			if len(empty) != size[1] || !strings.Contains(empty[len(empty)-1], searchKey) || !strings.Contains(empty[1], "Page 1 / 3") {
+			if len(empty) != size[1] || !strings.Contains(empty[len(empty)-1], searchKey) || !strings.Contains(empty[1], "Page 1 of 3") {
 				t.Fatalf("empty search lost page or controls at %v, shell=%v", size, inShell)
 			}
 		}

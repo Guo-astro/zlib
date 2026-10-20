@@ -97,7 +97,10 @@ only available domains, without a status label on each row. The accent border
 marks the focused row; `Current domain` marks the configured domain, which gets
 initial focus when available. Moving the focus does not change configuration.
 Redirected output uses a single-column table; `--json` keeps the probe fields.
-The position bar follows the selected book.
+The status row below the list title is the only position indicator: it reads
+`Page 1 of 10 · Book 5 of 50` (feeds without pages show only `Book 5 of 50`).
+The title row carries no counter and there is no progress bar; the EAPI reports
+a page count but no total number of books, so lists never show one.
 Search loads up to 50 books per server page, matching the direct `search` command.
 The number of visible rows follows the terminal height; scroll within a page with
 ↑/↓ or PgUp/PgDn and change server pages with ←/→.
@@ -128,7 +131,7 @@ The selected book's EAPI details load after the selection settles. Results are
 cached by `id:hash`; moving to another book keeps an older response from
 replacing its card. The list response remains visible while details load.
 The card border uses the theme accent, and its author uses the theme's primary
-text color. Moving the selection updates the card and position bar immediately,
+text color. Moving the selection updates the card and status position immediately,
 without a color flash or animated position change.
 History uses the same `#`, `Title`, and `Author` columns as the other book lists.
 The selected entry's download date appears beside the page status. Its card uses

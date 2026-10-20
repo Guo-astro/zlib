@@ -49,7 +49,38 @@ func visibleListOffset(offset, cursor, count, rows int) int {
 }
 
 func (m searchSelectModel) feedView() string {
-	return m.feedViewWith("Author", "No books found.", "", "")
+	return m.feedViewWith("Author", "No books found.", m.positionLabel(), "")
+}
+
+// pageLabel names the server page, e.g. "Page 1 of 10". The EAPI reports only
+// a page count, so lists never claim a total number of books.
+func pageLabel(page, totalPages int) string {
+	if totalPages > 0 {
+		return fmt.Sprintf("Page %d of %d", page, totalPages)
+	}
+	return fmt.Sprintf("Page %d", page)
+}
+
+// positionLabel names the selected row within the loaded page, e.g. "Book 5 of
+// 50". It is the list's only position indicator: the title row carries no
+// counter and there is no progress bar, which used to repeat the same number
+// and read as progress through all pages.
+func (m searchSelectModel) positionLabel() string {
+	if len(m.books) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("Book %d of %d", min(max(0, m.cursor), len(m.books)-1)+1, len(m.books))
+}
+
+// joinStatus joins the non-empty parts of a list status line.
+func joinStatus(parts ...string) string {
+	kept := parts[:0]
+	for _, p := range parts {
+		if p != "" {
+			kept = append(kept, p)
+		}
+	}
+	return strings.Join(kept, " · ")
 }
 
 func (m searchSelectModel) feedViewWith(column, empty, status, navigation string) string {
@@ -158,7 +189,7 @@ func (m searchSelectModel) feedViewWith(column, empty, status, navigation string
 		lines = append(lines, ansi.Truncate(feedBookMetadata(book), width, "…"), "")
 	}
 	help := "↑/↓ select · PgUp/PgDn scroll · enter download · " + m.exitHint()
-	lines[0] = accent.Render(ansi.Truncate(title, max(1, width-20), "…")) + muted.Render(fmt.Sprintf("  %d / %d", cursor+1, len(m.books)))
+	lines[0] = accent.Render(ansi.Truncate(title, width, "…"))
 	if navigation != "" {
 		help = "↑/↓ select · ←/→ page · enter download · " + m.exitHint()
 	}

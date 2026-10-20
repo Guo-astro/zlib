@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/bubbles/v2/progress"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -43,7 +42,6 @@ type searchSelectModel struct {
 	listAction      string
 	state           searchState
 	spinner         spinner.Model
-	progress        progress.Model
 	reducedMotion   bool
 	selectedID      string // set when user presses Enter
 	confirmDownload bool
@@ -94,8 +92,6 @@ func newSearchSelectModel(query string, c *zlib.Client, opts *zlib.SearchOptions
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(currentTheme.Accent)
-	p := progress.New(progress.WithWidth(12), progress.WithColors(currentTheme.Accent, currentTheme.Info),
-		progress.WithoutPercentage(), progress.WithFillCharacters('━', '─'))
 
 	return searchSelectModel{
 		client:        c,
@@ -105,7 +101,6 @@ func newSearchSelectModel(query string, c *zlib.Client, opts *zlib.SearchOptions
 		loadingPage:   1,
 		state:         searchStateLoading,
 		spinner:       s,
-		progress:      p,
 		reducedMotion: searchReducedMotion,
 		fullTitle:     fullTitle,
 	}
@@ -366,15 +361,7 @@ func (m searchSelectModel) listView() tea.View {
 			}
 			return screenView(m.width, m.height, list.feedTitle, "", strings.Join(body, "\n"), "", uiKey("esc", "back"))
 		}
-		status := fmt.Sprintf("Page %d", m.page)
-		if m.totalPages > 0 {
-			status += fmt.Sprintf(" / %d", m.totalPages)
-		}
-		if m.state == searchStateResults && len(m.books) > 0 {
-			if m.width >= 55 {
-				status += "   " + m.progress.ViewAs(float64(m.cursor+1)/float64(len(m.books)))
-			}
-		}
+		status := pageLabel(m.page, m.totalPages)
 		if m.state == searchStateResults && len(m.books) == 0 {
 			searchKey := "/"
 			exitLabel := "quit"
@@ -393,16 +380,13 @@ func (m searchSelectModel) listView() tea.View {
 			return screenView(m.width, m.height, list.feedTitle, status, strings.Join(body, "\n"), "",
 				uiKey(searchKey, "search"), uiKey("q", exitLabel))
 		}
-		status = withFilterSummary(status, chips, m.width)
+		status = withFilterSummary(joinStatus(status, m.positionLabel()), chips, m.width)
 		return fullScreenView(m.width, m.height, list.feedViewWith("Author", "No books found.", status, "/ search · ←/→ page · "))
 	}
 	if m.feed != nil {
 		return fullScreenView(m.width, m.height, m.feedView())
 	}
-	status := fmt.Sprintf("Page %d", m.page)
-	if m.totalPages > 0 {
-		status += fmt.Sprintf(" / %d", m.totalPages)
-	}
+	status := joinStatus(pageLabel(m.page, m.totalPages), m.positionLabel())
 	return fullScreenView(m.width, m.height, m.feedViewWith("Author", "No favorites on this page.", status, "←/→ page · "))
 }
 
@@ -441,7 +425,7 @@ func (m searchSelectModel) errorBody() string {
 }
 
 // withFilterSummary appends active filters to a list status line while they
-// fit; narrow terminals keep the page and position bar instead.
+// fit; narrow terminals keep the page and selected position instead.
 func withFilterSummary(status string, chips []string, width int) string {
 	if len(chips) == 0 {
 		return status
