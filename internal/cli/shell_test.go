@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -627,6 +628,59 @@ func TestShellLoginFailureReturnsToForm(t *testing.T) {
 	got := m.page.(inlineForm)
 	if got.message != "invalid credentials" || got.fields[0].value != "reader@example.com" || got.fields[1].value != "" || got.cursor != 1 {
 		t.Fatalf("retry form lost its state: message=%q cursor=%d", got.message, got.cursor)
+	}
+}
+
+// A slow mirror used to leave the user on a bare spinner for up to three
+// minutes with no way out; "/" even opened a palette hidden behind it.
+func TestShellLoginWaitCanBeCancelled(t *testing.T) {
+	m := newShellModel()
+	m.signedIn = false
+	form := newInlineForm("Log in", "Log in", []formField{{label: "Email", value: "reader@example.com"}, {label: "Password", value: "secret", secret: true}})
+	m.loginForm = new(form)
+	m.kind = "login-wait"
+	m.typing = false
+	cancelled := false
+	m.loginCancel = func() { cancelled = true }
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "Signing in") || !strings.Contains(view, "cancel") {
+		t.Fatalf("login wait does not say what it is doing or how to cancel:\n%s", view)
+	}
+	m, _ = shellStep(m, key("/"))
+	if m.typing || m.kind != "login-wait" {
+		t.Fatal(`"/" opened the palette during login`)
+	}
+	generation := m.generation
+	m, _ = shellStep(m, key("esc"))
+	if !cancelled || m.loginCancel != nil {
+		t.Fatal("esc did not cancel the login request")
+	}
+	if m.kind != "login" || m.generation == generation {
+		t.Fatalf("esc did not return to the form: kind=%q", m.kind)
+	}
+	got := m.page.(inlineForm)
+	if got.message != "Login cancelled" || got.fields[0].value != "reader@example.com" || got.fields[1].value != "" {
+		t.Fatalf("cancelled form state: message=%q", got.message)
+	}
+	// The abandoned login's result arrives under the old generation and must
+	// not sign the user in.
+	m, _ = shellStep(m, shellEvent{generation: generation, msg: shellText{text: "Logged in"}})
+	if m.signedIn {
+		t.Fatal("a cancelled login signed the user in")
+	}
+}
+
+func TestShellLoginStopsBeforeSavingWhenCancelled(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv(zlib.EnvDomain, "https://z-lib.gd")
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel() // a cancelled context fails before any request leaves the machine
+	if got := shellLogin(ctx, []formField{{value: "reader@example.com"}, {value: "secret"}}); got.err == nil {
+		t.Fatal("shellLogin with a cancelled context succeeded")
+	}
+	if _, err := os.Stat(config.SessionPath()); !os.IsNotExist(err) {
+		t.Fatalf("a cancelled login wrote a session: %v", err)
 	}
 }
 

@@ -54,8 +54,14 @@ type eapiPagination struct {
 }
 
 func (c *Client) LoginEAPI(email, password string) error {
+	return c.LoginEAPIContext(context.Background(), email, password)
+}
+
+// LoginEAPIContext is LoginEAPI with a context, so an interactive caller can
+// abandon a login that a slow mirror leaves hanging.
+func (c *Client) LoginEAPIContext(ctx context.Context, email, password string) error {
 	c.SetMode(ClientModeEAPI)
-	body, err := c.eapiPost(eapiLoginPath, url.Values{
+	body, err := c.eapiRequest(ctx, http.MethodPost, eapiLoginPath, url.Values{
 		"email":    {email},
 		"password": {password},
 	})

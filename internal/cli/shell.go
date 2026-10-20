@@ -54,6 +54,7 @@ type shellModel struct {
 	kindleReturn                                                    *downloadModel
 	kindlePath                                                      string
 	loginForm                                                       *inlineForm
+	loginCancel                                                     context.CancelFunc
 	spinner                                                         spinner.Model
 	noticeVersion                                                   uint64
 	standalone                                                      bool
@@ -323,16 +324,10 @@ func (m shellModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if result, ok := event.msg.(shellText); ok {
 			loginFinished := m.kind == "login-wait"
 			if loginFinished {
+				m.stopLogin()
 				if result.err != nil {
 					if m.loginForm != nil {
-						form := *m.loginForm
-						m.loginForm = nil
-						form.accepted = false
-						form.message = result.err.Error()
-						form.fields[1].value = ""
-						form.inputs[1].SetValue("")
-						form.focus(1)
-						return m, m.open("login", form)
+						return m, m.reopenLoginForm(result.err.Error())
 					}
 					m.home()
 					m.setNotice(result.err.Error())
@@ -368,6 +363,19 @@ func (m shellModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if k, ok := msg.(tea.KeyPressMsg); ok {
+		// While signing in only cancel is meaningful: other keys used to open
+		// an invisible command palette behind the spinner.
+		if m.kind == "login-wait" {
+			if s := k.String(); s == "esc" || s == "ctrl+c" {
+				m.stopLogin()
+				m.generation++ // drop the late result of the abandoned login
+				if m.loginForm != nil {
+					return m, m.reopenLoginForm("Login cancelled")
+				}
+				m.home()
+			}
+			return m, nil
+		}
 		if m.homeIdle() {
 			switch k.String() {
 			case "/":
@@ -761,7 +769,9 @@ func (m *shellModel) completed() tea.Cmd {
 			m.typing = false
 			m.status = ""
 			m.spinner = newLoadingSpinner()
-			return tea.Batch(m.spinner.Tick, shellCmd(m.generation, func() tea.Msg { return shellLogin(fields) }))
+			ctx, cancel := context.WithCancel(context.Background())
+			m.loginCancel = cancel
+			return tea.Batch(m.spinner.Tick, shellCmd(m.generation, func() tea.Msg { return shellLogin(ctx, fields) }))
 		case "kindle-config":
 			return m.saveKindle(page.fields)
 		case "kindle-password":
@@ -817,18 +827,43 @@ func (m *shellModel) completed() tea.Cmd {
 	return nil
 }
 
-func shellLogin(fields []formField) shellText {
+// stopLogin releases the context of an in-flight login, if any.
+func (m *shellModel) stopLogin() {
+	if m.loginCancel != nil {
+		m.loginCancel()
+		m.loginCancel = nil
+	}
+}
+
+// reopenLoginForm returns to the login form with the email kept and the
+// password cleared, showing message.
+func (m *shellModel) reopenLoginForm(message string) tea.Cmd {
+	form := *m.loginForm
+	m.loginForm = nil
+	form.accepted = false
+	form.message = message
+	form.fields[1].value = ""
+	form.inputs[1].SetValue("")
+	form.focus(1)
+	return m.open("login", form)
+}
+
+func shellLogin(ctx context.Context, fields []formField) shellText {
 	domain, err := resolveLoginDomain("")
 	if err != nil {
 		return shellText{err: err}
 	}
-	domain, err = resolveEAPIDomain(context.Background(), domain)
+	domain, err = resolveEAPIDomain(ctx, domain)
 	if err != nil {
 		return shellText{err: err}
 	}
 	c := zlib.NewClient()
 	c.SetDomain(domain)
-	if err = c.LoginEAPI(fields[0].value, fields[1].value); err != nil {
+	if err = c.LoginEAPIContext(ctx, fields[0].value, fields[1].value); err != nil {
+		return shellText{err: err}
+	}
+	// A login cancelled after the server answered must not sign in silently.
+	if err = ctx.Err(); err != nil {
 		return shellText{err: err}
 	}
 	err = config.SaveSession(config.Session{Cookies: c.Cookies(), Domain: c.Domain(), Mode: string(zlib.ClientModeEAPI)})
@@ -840,7 +875,7 @@ func shellLogin(fields []formField) shellText {
 
 func (m shellModel) View() tea.View {
 	if m.kind == "login-wait" {
-		return screenView(m.width, m.height, "Log in", "", m.spinner.View(), "")
+		return screenView(m.width, m.height, "Log in", "", m.spinner.View()+" Signing in…", "", uiKey("esc", "cancel"))
 	}
 	if m.paletteOpen() {
 		base := m.commandDialogView()
