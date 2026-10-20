@@ -53,6 +53,7 @@ func runSavedBooks(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if jsonOut {
+		books.Books = downloadableBooks(books.Books)
 		return printJSON(books)
 	}
 	if len(books.Books) == 0 {

@@ -61,12 +61,7 @@ var searchCmd = &cobra.Command{
 		}
 
 		if jsonOut {
-			// Keep references accepted by `zlib download` in JSON output.
-			for i, b := range result.Books {
-				if id := bookCommandID(b); id != "" {
-					result.Books[i].ID = id
-				}
-			}
+			result.Books = downloadableBooks(result.Books)
 			return printJSON(result)
 		}
 
@@ -156,6 +151,17 @@ func bookIDFromURL(u string) string {
 		}
 	}
 	return u
+}
+
+// downloadableBooks rewrites each book's ID to the id:hash reference that
+// `zlib download` accepts, so every --json book list can be piped into it.
+func downloadableBooks(books []zlib.Book) []zlib.Book {
+	for i, b := range books {
+		if id := bookCommandID(b); id != "" {
+			books[i].ID = id
+		}
+	}
+	return books
 }
 
 func bookCommandID(book zlib.Book) string {

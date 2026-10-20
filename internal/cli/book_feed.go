@@ -57,7 +57,7 @@ func newBookFeedCommand(name, description, summary string, load func(*zlib.Clien
 				return err
 			}
 			if jsonOut {
-				return printJSON(books)
+				return printJSON(downloadableBooks(books))
 			}
 			if len(books) == 0 {
 				lipgloss.Fprintln(cmd.OutOrStdout(), "No books found.")
