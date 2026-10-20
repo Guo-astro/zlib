@@ -37,11 +37,13 @@ var doctorCmd = &cobra.Command{
 		}
 		results := checkAvailableDomains(cmd.Context(), zlib.KnownDomains(), proxyURL)
 		if jsonOut {
-			return printJSON(results)
+			if err := printJSON(results); err != nil {
+				return err
+			}
+			return noDomainsError(results)
 		}
-		if len(results) == 0 {
-			lipgloss.Fprintln(cmd.OutOrStdout(), "No available EAPI domains found.")
-			return nil
+		if err := noDomainsError(results); err != nil {
+			return err
 		}
 
 		current := doctorCurrentDomain()
@@ -70,6 +72,15 @@ var doctorCmd = &cobra.Command{
 		lipgloss.Fprintln(cmd.OutOrStdout(), t)
 		return nil
 	},
+}
+
+// noDomainsError makes doctor fail when nothing is usable, so a script can
+// tell "no domain reachable" from success instead of parsing an empty list.
+func noDomainsError(results []zlib.DomainCheck) error {
+	if len(results) > 0 {
+		return nil
+	}
+	return fmt.Errorf("%w: none of the known domains answered; check your network, or retry with --proxy URL (or set %s)", zlib.ErrNoDomain, zlib.EnvProxy)
 }
 
 func doctorCurrentDomain() string {

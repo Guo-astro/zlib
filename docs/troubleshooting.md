@@ -8,7 +8,9 @@
 zlib doctor
 ```
 
-`doctor` probes known domains using EAPI and lists usable results. The focused
+`doctor` probes known domains using EAPI and lists usable results. When none is
+reachable it exits with an error (and `--json` prints `[]`); check your network
+or retry through a proxy as shown below. The focused
 row shows your position; `Current domain` marks the configured domain. It does
 not log in or change your configured domain. Availability
 depends on your network and can change; use the current result rather than a

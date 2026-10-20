@@ -1,10 +1,24 @@
 package cli
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	zlib "github.com/heartleo/zlib"
 )
+
+// doctor used to exit 0 with "No available EAPI domains found." (or `[]`),
+// so a script could not tell an unreachable network from success.
+func TestNoDomainsErrorFailsOnlyWhenNothingIsUsable(t *testing.T) {
+	err := noDomainsError(nil)
+	if !errors.Is(err, zlib.ErrNoDomain) || !strings.Contains(err.Error(), "--proxy") {
+		t.Fatalf("noDomainsError(nil) = %v, want ErrNoDomain with a --proxy hint", err)
+	}
+	if err := noDomainsError([]zlib.DomainCheck{{Domain: "https://z-lib.gd"}}); err != nil {
+		t.Fatalf("noDomainsError with a usable domain = %v", err)
+	}
+}
 
 func TestAvailableDomains(t *testing.T) {
 	results := []zlib.DomainCheck{

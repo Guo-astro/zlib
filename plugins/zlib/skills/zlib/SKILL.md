@@ -41,7 +41,7 @@ the non-interactive forms below.
 | Popular books | `zlib most-popular --json` | Array of books |
 | Download history | `zlib history --json --page 1` | Object with `items`, `page`, `total_pages`; empty-page exception below |
 | Account or quota | `zlib profile --json` | Account fields and quota fields |
-| Available domains | `zlib doctor --json` | Array of available domain checks |
+| Available domains | `zlib doctor --json` | Array of available domain checks; `[]` with a non-zero exit when none is reachable |
 
 Use `--page` to continue search, saved books or history. Recommendations and popular
 books have no pagination or count flag. `history --format epub --json` filters
