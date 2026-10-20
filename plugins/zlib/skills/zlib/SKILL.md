@@ -39,7 +39,7 @@ the non-interactive forms below.
 | Browse saved books | `zlib favorites --json --page 1` | Object with `books`, `page`, `total_pages` |
 | Recommendations | `zlib recommended --json` | Array of books |
 | Popular books | `zlib most-popular --json` | Array of books |
-| Download history | `zlib history --json --page 1` | Object with `items`, `page`, `total_pages`; empty-page exception below |
+| Download history | `zlib history --json --page 1` | Object with `items`, `page`, `total_pages`; an empty page has `"items": []` |
 | Account or quota | `zlib profile --json` | Account fields and quota fields |
 | Available domains | `zlib doctor --json` | Array of available domain checks; `[]` with a non-zero exit when none is reachable |
 
@@ -50,10 +50,9 @@ for additional flags. Research-only endpoints such as similar books and formats
 are not CLI commands yet.
 
 Parse complete stdout as JSON before selecting fields or limiting rows. Handle
-nonzero exit status as failure and retain the error message. Current empty history
-pages print `No download history found on page N.` even with `--json`; treat only
-that message with exit code zero as an empty page. Other non-JSON output is an
-unexpected response, not an empty result.
+nonzero exit status as failure and retain the error message. An empty result is
+still JSON: an empty `items` array for history, an empty `books` array or `[]` for
+book lists. Any non-JSON output is an unexpected response, not an empty result.
 
 Show a compact table with title, author, year, format and size where present.
 For long recommendation lists, show a useful subset and state the displayed and

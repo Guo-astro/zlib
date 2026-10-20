@@ -61,9 +61,9 @@ Parse the complete JSON document. The search response has `books`, `page` and
 Do not truncate raw JSON or parse the display table.
 
 Saved books use the same paginated shape as search. History uses `items` instead
-of `books`; recommendations and popular books return arrays. Current empty history
-pages print `No download history found on page N.` even with `--json`. Handle that
-specific successful response as an empty page and report other parsing failures.
+of `books`; recommendations and popular books return arrays. An empty page is
+still JSON (`"items": []` for history), so report any output that does not parse
+as a failure.
 
 Profile's `quota_known` indicates whether the quota fields are available. When it
 is false, a zero `daily_remaining` does not mean the account has exhausted its quota.

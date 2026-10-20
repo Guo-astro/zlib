@@ -154,8 +154,12 @@ func bookIDFromURL(u string) string {
 }
 
 // downloadableBooks rewrites each book's ID to the id:hash reference that
-// `zlib download` accepts, so every --json book list can be piped into it.
+// `zlib download` accepts, so every --json book list can be piped into it. An
+// empty list stays a JSON array rather than null.
 func downloadableBooks(books []zlib.Book) []zlib.Book {
+	if books == nil {
+		return []zlib.Book{}
+	}
 	for i, b := range books {
 		if id := bookCommandID(b); id != "" {
 			books[i].ID = id

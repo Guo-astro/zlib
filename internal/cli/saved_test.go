@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"testing"
 
 	zlib "github.com/heartleo/zlib"
@@ -19,6 +20,11 @@ func TestDownloadableBooksUseIDHash(t *testing.T) {
 	}
 	if books[1].ID != "456" {
 		t.Fatalf("book without a hash changed to %q", books[1].ID)
+	}
+	// Agents treat non-array output as a failure, so an empty page must not
+	// encode as null.
+	if data, _ := json.Marshal(downloadableBooks(nil)); string(data) != "[]" {
+		t.Fatalf("empty book list encodes as %s, want []", data)
 	}
 }
 
