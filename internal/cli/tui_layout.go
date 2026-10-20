@@ -66,8 +66,21 @@ func fullScreenView(width, height int, content string) tea.View {
 		line = ansi.Truncate(line, width, "…")
 		lines[i] = line + strings.Repeat(" ", max(0, width-ansi.StringWidth(line)))
 	}
-	v := tea.NewView(strings.Join(lines, "\n"))
+	return themedView(strings.Join(lines, "\n"))
+}
+
+// themedView is the full-screen view every program renders. It sets the
+// terminal's default background and foreground to the theme's own, which
+// Bubble Tea restores on exit. Without it every screen but the theme picker
+// drew the palette on the terminal's background, so a light theme on a dark
+// terminal (or the reverse) left titles near 1:1 contrast.
+func themedView(content string) tea.View {
+	v := tea.NewView(content)
 	v.AltScreen = true
+	if currentTheme.Background != nil {
+		v.BackgroundColor = currentTheme.Background
+		v.ForegroundColor = currentTheme.Title
+	}
 	return v
 }
 

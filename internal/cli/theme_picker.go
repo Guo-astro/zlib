@@ -264,8 +264,7 @@ func (m themePickerModel) View() tea.View {
 		return m.editorView()
 	}
 	w, h := max(1, m.width), max(1, m.height)
-	v := tea.NewView("")
-	v.AltScreen = true
+	v := themedView("")
 	if w < 32 || h < 17 {
 		v.SetContent(fullScreenView(w, h, ansi.Truncate("Enlarge terminal · Esc cancel", w, "…")).Content)
 		return v

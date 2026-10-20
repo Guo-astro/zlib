@@ -10,6 +10,40 @@ import (
 	zlib "github.com/heartleo/zlib"
 )
 
+// Only the theme picker used to paint the theme's background, so a light
+// theme on a dark terminal (or the reverse) left titles near 1:1 contrast on
+// every other screen.
+func TestScreensUseTheThemeBackground(t *testing.T) {
+	previous := currentTheme
+	t.Cleanup(func() { currentTheme = previous })
+	for _, name := range []string{"catppuccin-latte", "dracula"} {
+		currentTheme = themes[name]
+		if currentTheme.Background == nil {
+			t.Fatalf("%s has no background", name)
+		}
+		shell := newShellModel()
+		shell.width, shell.height = 80, 24
+		notice := shell
+		notice.setNotice("Theme saved")
+		views := map[string]tea.View{
+			"screenView":     screenView(80, 24, "Title", "", "body", ""),
+			"fullScreenView": fullScreenView(80, 24, "body"),
+			"history":        newHistorySelectModel(nil).View(),
+			"shell home":     shell.View(),
+			"shell notice":   notice.View(),
+		}
+		for label, v := range views {
+			if v.BackgroundColor != currentTheme.Background || v.ForegroundColor != currentTheme.Title {
+				t.Errorf("%s %s: background %v / foreground %v, want the theme's", name, label, v.BackgroundColor, v.ForegroundColor)
+			}
+		}
+	}
+	currentTheme = Theme{}
+	if v := fullScreenView(80, 24, "body"); v.BackgroundColor != nil || v.ForegroundColor != nil {
+		t.Fatal("a theme without a background must leave the terminal's colors alone")
+	}
+}
+
 func TestFullScreenViewFillsAndClipsViewport(t *testing.T) {
 	styled := lipgloss.NewStyle().Foreground(currentTheme.Accent).Render("书名")
 	for _, size := range [][2]int{{80, 24}, {40, 16}, {20, 5}, {1, 1}} {

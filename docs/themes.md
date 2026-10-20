@@ -19,6 +19,11 @@ their backgrounds, including blank cells, so light and dark previews stay
 readable regardless of the terminal background. Moving through the list does not
 save a preference; Enter selects and Esc cancels.
 
+Every other screen sets the terminal's default background and text color to the
+theme's own while zlib runs, so a light theme stays readable on a dark terminal
+and the reverse. zlib restores the terminal's colors on exit. Terminals that do
+not support changing their default colors keep their own background.
+
 Run `zlib theme <name>` to set a built-in or saved custom theme directly.
 `ZLIB_THEME=<name>` overrides
 the saved choice for one process. With redirected output, `zlib theme` prints

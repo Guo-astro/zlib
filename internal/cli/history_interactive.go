@@ -306,8 +306,7 @@ func (m historySelectModel) View() tea.View {
 			}
 		}
 	}
-	v := tea.NewView(list.feedViewWith("Author", "No history on this page.", status, "←/→ page · "))
-	v.AltScreen = true
+	v := themedView(list.feedViewWith("Author", "No history on this page.", status, "←/→ page · "))
 	if m.state == historyStateDeleting || m.deleteError != nil {
 		lines := strings.Split(v.Content, "\n")
 		muted := lipgloss.NewStyle().Foreground(currentTheme.Muted)
