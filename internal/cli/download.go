@@ -157,7 +157,8 @@ func (m downloadModel) runPlain(status io.Writer) (downloadModel, error) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	fmt.Fprintf(status, "Downloading: %s\n", name)
+	// The title comes from the server; bookCell strips control sequences.
+	fmt.Fprintf(status, "Downloading: %s\n", bookCell(name))
 	progress := plainProgress{w: status}
 	result, err := m.client.DownloadWithContext(ctx, downloadURL, m.dir, progress.report)
 	if err != nil {

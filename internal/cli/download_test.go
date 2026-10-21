@@ -148,6 +148,23 @@ func TestPlainDownloadTextKeepsProgressOffStdout(t *testing.T) {
 	}
 }
 
+func TestPlainDownloadStripsControlSequencesFromTitle(t *testing.T) {
+	isolateConfigHome(t)
+	server := newDownloadTestServer(t, []byte("book"))
+	client := zlib.NewClient(zlib.WithDomain(server.URL))
+	client.SetCookies(map[string]string{"remix_userid": "1", "remix_userkey": "key"})
+
+	_, stderr := captureOutput(t, func() {
+		m := newDirectDownloadModel("Dune\x1b]0;owned\x07\x1b[2J", server.URL+"/files/dune", t.TempDir(), client)
+		if err := runDownload(m, false, downloadTestCommand(t, true)); err != nil {
+			t.Error(err)
+		}
+	})
+	if strings.Contains(stderr, "\x1b") || !strings.Contains(stderr, "Downloading: Dune") {
+		t.Fatalf("stderr = %q", stderr)
+	}
+}
+
 func TestPlainProgressReportsEachTenPercentOnce(t *testing.T) {
 	var out bytes.Buffer
 	p := plainProgress{w: &out}
