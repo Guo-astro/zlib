@@ -97,6 +97,25 @@ func TestDownloadJSONPrintsOnlyTheResultOnStdout(t *testing.T) {
 	}
 }
 
+// history --download fetches from a known URL; its JSON must still carry the
+// id:hash reference like every other download.
+func TestHistoryDirectDownloadJSONKeepsReference(t *testing.T) {
+	isolateConfigHome(t)
+	server := newDownloadTestServer(t, []byte("book"))
+	client := zlib.NewClient(zlib.WithDomain(server.URL))
+	client.SetCookies(map[string]string{"remix_userid": "1", "remix_userkey": "key"})
+	item := zlib.DownloadHistoryItem{ID: "7", Hash: "h1", Name: "Dune", DownloadURL: server.URL + "/files/dune"}
+
+	var runErr error
+	stdout, _ := captureOutput(t, func() {
+		runErr = runDownload(historyDirectDownload(item, item.Name, t.TempDir(), client), false, downloadTestCommand(t, true))
+	})
+	var result downloadResult
+	if runErr != nil || json.Unmarshal([]byte(stdout), &result) != nil || result.ID != "7:h1" {
+		t.Fatalf("error = %v, stdout = %q", runErr, stdout)
+	}
+}
+
 func TestDownloadReportsKindleFailureAfterSavingAsPartial(t *testing.T) {
 	isolateConfigHome(t)
 	server := newDownloadTestServer(t, []byte("book"))

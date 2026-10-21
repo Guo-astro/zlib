@@ -57,7 +57,7 @@ var historyCmd = &cobra.Command{
 			if bookName == "" {
 				bookName = downloadID
 			}
-			return runDownload(newDirectDownloadModel(bookName, item.DownloadURL, dir, c), sendToKindle, cmd)
+			return runDownload(historyDirectDownload(item, bookName, dir, c), sendToKindle, cmd)
 		}
 
 		// No flags: interactive mode (--json always forces the static path)
@@ -82,7 +82,7 @@ var historyCmd = &cobra.Command{
 			if bookName == "" {
 				bookName = bookIDFromURL(item.URL)
 			}
-			return runDownload(newDirectDownloadModel(bookName, item.DownloadURL, dir, c), sendToKindle, cmd)
+			return runDownload(historyDirectDownload(*item, bookName, dir, c), sendToKindle, cmd)
 		}
 
 		result, err := c.DownloadHistory(page)
@@ -227,4 +227,12 @@ func findHistoryItemByBookID(c *zlib.Client, bookID string) (zlib.DownloadHistor
 	}
 
 	return zlib.DownloadHistoryItem{}, fmt.Errorf("book %s not found in the first %d history pages", bookID, maxHistoryPages)
+}
+
+// historyDirectDownload downloads a history entry from its known URL. It keeps
+// the entry's id:hash reference so `history --download --json` reports it.
+func historyDirectDownload(item zlib.DownloadHistoryItem, bookName, dir string, c *zlib.Client) downloadModel {
+	m := newDirectDownloadModel(bookName, item.DownloadURL, dir, c)
+	m.id = historyCommandID(item)
+	return m
 }

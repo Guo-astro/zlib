@@ -223,8 +223,8 @@
     <span data-i18n="zh">键盘好用，脚本也好用。</span>
   </h2>
   <p class="lede" style="margin-bottom:1.3rem">
-    <span data-i18n="en"><b class="mono">zlib tui</b> puts everything in one full-screen app. Each step is also a command, and <b class="mono">search</b>, <b class="mono">favorites</b>, <b class="mono">recommended</b>, <b class="mono">most-popular</b>, <b class="mono">history</b>, <b class="mono">profile</b>, <b class="mono">doctor</b>, and <b class="mono">config</b> take <b class="mono">--json</b>. Pick one to see what it prints.</span>
-    <span data-i18n="zh"><b class="mono">zlib tui</b> 把所有功能放进一个全屏界面。每一步也都是单独的命令，<b class="mono">search</b>、<b class="mono">favorites</b>、<b class="mono">recommended</b>、<b class="mono">most-popular</b>、<b class="mono">history</b>、<b class="mono">profile</b>、<b class="mono">doctor</b>、<b class="mono">config</b> 都支持 <b class="mono">--json</b>。点一条看它输出什么。</span>
+    <span data-i18n="en"><b class="mono">zlib tui</b> puts everything in one full-screen app. Each step is also a command, and <b class="mono">search</b>, <b class="mono">favorites</b>, <b class="mono">recommended</b>, <b class="mono">most-popular</b>, <b class="mono">history</b>, <b class="mono">profile</b>, <b class="mono">doctor</b>, <b class="mono">config</b>, and <b class="mono">download</b> take <b class="mono">--json</b>. Pick one to see what it prints.</span>
+    <span data-i18n="zh"><b class="mono">zlib tui</b> 把所有功能放进一个全屏界面。每一步也都是单独的命令，<b class="mono">search</b>、<b class="mono">favorites</b>、<b class="mono">recommended</b>、<b class="mono">most-popular</b>、<b class="mono">history</b>、<b class="mono">profile</b>、<b class="mono">doctor</b>、<b class="mono">config</b>、<b class="mono">download</b> 都支持 <b class="mono">--json</b>。点一条看它输出什么。</span>
   </p>
   <a class="pill-link" href="/send-to-kindle/" style="margin-bottom:2.6rem">
     <span data-i18n="en">Setting up Send to Kindle</span><span data-i18n="zh">发送到 Kindle 怎么配</span>
@@ -554,7 +554,7 @@
         '<span class="muted">  ' + (total * pct / 100).toFixed(1) + " MB / " + total.toFixed(1) + " MB</span></div>" +
         "<div>&nbsp;</div>" +
         (pct >= 100
-          ? '<div>  <span class="green">✓</span> Saved to: <span class="title">~/' + esc(fileName(b)) + "</span>" +
+          ? '<div>  <span class="green">✓</span> Saved to: <span class="title">/home/you/' + esc(fileName(b)) + "</span>" +
             ' <span class="muted">(' + Math.round(total * 1048576) + " bytes)</span></div>"
           : '<div>  <span class="muted">esc cancel</span></div>');
     };
@@ -674,7 +674,7 @@
     download: P("zlib download 115066162:e9f13b --dir ~/books") + BLANK +
       '<div>  Downloading: <span class="title">Dune</span></div>' +
       '<div>  <span class="bar">' + "█".repeat(34) + '</span><span class="muted">  2.8 MB / 2.8 MB</span></div>' + BLANK +
-      OK('Saved to: <span class="title">~/books/Dune.epub</span> <span class="muted">(2936013 bytes)</span>') + BLANK +
+      OK('Saved to: <span class="title">/home/you/books/Dune.epub</span> <span class="muted">(2936013 bytes)</span>') + BLANK +
       L("muted", "Ctrl+C removes the partial file, and a failed download") +
       L("muted", "never replaces a file that is already there.") +
       L("muted", "--send-to-kindle mails the book once it lands."),

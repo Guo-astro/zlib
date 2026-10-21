@@ -132,7 +132,7 @@ defaults, run `zlib <command> --help`.
 | 1 | Other error |
 | 2 | Usage error: unknown command or flag, wrong number of arguments |
 | 3 | Not logged in, or the saved session expired; run `zlib login` |
-| 4 | Network: the mirror is unreachable or behind DiamWall, or `doctor` found no usable domain |
+| 4 | Network: a host (a mirror, or GitHub for `update`) is unreachable, the mirror is behind DiamWall, or `doctor` found no usable domain |
 | 5 | The book was saved, but Send to Kindle failed |
 | 130 | You cancelled the download or its folder prompt |
 
