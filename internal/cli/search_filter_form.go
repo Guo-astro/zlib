@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"charm.land/bubbles/v2/help"
 	keys "charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -540,7 +539,11 @@ func (m searchFilterForm) pickerOverlayView(title string, options []string) tea.
 	inner := min(58, m.width-2) - 4
 	visible := max(1, min(len(options), min(17, m.height-2)-8))
 	start := min(max(0, m.choice-visible+1), max(0, len(options)-visible))
-	rows := []string{lipgloss.NewStyle().Foreground(currentTheme.Accent).Bold(true).Render(title), ""}
+	// Everything inside the panel paints the Surface background itself: an
+	// unstyled run after an inner reset shows the terminal's background as a
+	// dark band.
+	onSurface := lipgloss.NewStyle().Background(currentTheme.Surface)
+	rows := []string{onSurface.Foreground(currentTheme.Accent).Bold(true).Render(title), ""}
 	for i := start; i < min(len(options), start+visible); i++ {
 		mark := "[ ] "
 		if m.picker == 3 && slices.Contains(m.languages, searchLanguages[i]) ||
@@ -557,15 +560,13 @@ func (m searchFilterForm) pickerOverlayView(title string, options []string) tea.
 	for len(rows) < visible+2 {
 		rows = append(rows, "")
 	}
-	h := help.New()
-	h.SetWidth(inner)
-	h.Styles.ShortKey = lipgloss.NewStyle().Foreground(currentTheme.Accent)
-	h.Styles.ShortDesc = lipgloss.NewStyle().Foreground(currentTheme.Muted)
-	bindings := []keys.Binding{uiKey("↑/↓", "choose"), uiKey("space", "toggle"), uiKey("esc", "done")}
+	// Plain text like the other dialogs' hints: help.ShortHelpView leaves the
+	// space after each key unstyled, which showed as a dark gap on the panel.
+	hints := "↑/↓ choose · space toggle · esc done"
 	if m.picker == 6 {
-		bindings = []keys.Binding{uiKey("↑/↓", "choose"), uiKey("enter", "select"), uiKey("esc", "back")}
+		hints = "↑/↓ choose · enter select · esc back"
 	}
-	rows = append(rows, "", h.ShortHelpView(bindings))
+	rows = append(rows, "", onSurface.Foreground(currentTheme.Muted).Render(ansi.Truncate(hints, inner, "…")))
 	panel := lipgloss.NewStyle().Background(currentTheme.Surface).Width(inner).Padding(1, 1).
 		Border(lipgloss.RoundedBorder()).BorderForeground(currentTheme.Accent).Render(strings.Join(rows, "\n"))
 	background := m

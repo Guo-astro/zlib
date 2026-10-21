@@ -103,6 +103,14 @@ func renderActionButton(label string, focused, danger bool) string {
 }
 
 func actionButtonRows(actions []string, focused, width int) []string {
+	return actionButtonRowsOn(actions, focused, width, lipgloss.NewStyle())
+}
+
+// actionButtonRowsOn is actionButtonRows for a panel with its own
+// background: the gap between buttons is drawn in surface, or the terminal's
+// default background shows through as a dark block after each button.
+func actionButtonRowsOn(actions []string, focused, width int, surface lipgloss.Style) []string {
+	gap := surface.Render("  ")
 	var rows []string
 	row := ""
 	for i, label := range actions {
@@ -116,7 +124,7 @@ func actionButtonRows(actions []string, focused, width int) []string {
 			row = ""
 		}
 		if row != "" {
-			row += "  "
+			row += gap
 		}
 		row += button
 	}

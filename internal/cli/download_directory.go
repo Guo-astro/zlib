@@ -174,7 +174,7 @@ func (m downloadDirectoryModel) dialogView(background string) tea.View {
 		if m.change {
 			focused = 2
 		}
-		lines = append(lines, actionButtonRows([]string{"Download here", "Choose another folder"}, focused, inner)...)
+		lines = append(lines, actionButtonRowsOn([]string{"Download here", "Choose another folder"}, focused, inner, base)...)
 	}
 	if m.picker.message != "" {
 		lines = append(lines, "", muted.Render(ansi.Truncate(m.picker.message, inner, "…")))
