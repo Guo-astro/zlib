@@ -232,7 +232,32 @@ func (c *Client) eapiRequest(ctx context.Context, method, path string, values ur
 	if err := validateStatus(resp); err != nil && !isEAPIEnvelope(responseBody) {
 		return nil, err
 	}
+	// A revoked or expired remix_userkey is answered with HTTP 400 and
+	// {"success":0,"error":"Invalid credentials"} (or "Please login") on every
+	// authenticated endpoint. Classify it once here so callers can tell it
+	// apart from other failures. Login is exempt: there the same envelope
+	// describes the credentials being submitted, not a saved session.
+	if path != eapiLoginPath && cookies["remix_userkey"] != "" && isEAPISessionRejection(responseBody) {
+		return nil, ErrSessionExpired
+	}
 	return responseBody, nil
+}
+
+// isEAPISessionRejection reports whether body is the envelope EAPI returns
+// when it does not accept the session sent with the request.
+func isEAPISessionRejection(body []byte) bool {
+	var envelope struct {
+		Success *int   `json:"success"`
+		Error   string `json:"error"`
+	}
+	if err := decodeEAPIJSON(body, &envelope); err != nil || envelope.Success == nil || *envelope.Success != 0 {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(envelope.Error)) {
+	case "invalid credentials", "please login":
+		return true
+	}
+	return false
 }
 
 // isEAPIEnvelope reports whether body is a JSON object carrying EAPI's

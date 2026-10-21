@@ -233,3 +233,52 @@ func TestLoginEAPIRejectionDoesNotCallHTMLFallback(t *testing.T) {
 		t.Fatalf("Login() error = %v", err)
 	}
 }
+
+func TestEAPIRequestReportsRejectedSessionAsExpired(t *testing.T) {
+	for _, message := range []string{"Invalid credentials", "Please login"} {
+		t.Run(message, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprintf(w, `{"success":0,"error":%q}`, message)
+			}))
+			defer server.Close()
+			client := NewClient(WithDomain(server.URL))
+			client.SetCookies(map[string]string{"remix_userid": "123", "remix_userkey": "stale"})
+
+			calls := map[string]func() error{
+				"profile":   func() error { _, err := client.GetProfile(); return err },
+				"history":   func() error { _, err := client.DownloadHistory(1); return err },
+				"favorites": func() error { _, err := client.SavedBooks(1); return err },
+				"search":    func() error { _, err := client.Search("dune", 1, 10, nil); return err },
+			}
+			for name, call := range calls {
+				if err := call(); !errors.Is(err, ErrSessionExpired) {
+					t.Errorf("%s error = %v, want ErrSessionExpired", name, err)
+				}
+			}
+		})
+	}
+}
+
+func TestEAPIRequestKeepsOtherRejectionsAndLoginFailures(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		if r.URL.Path == eapiLoginPath {
+			fmt.Fprint(w, `{"success":0,"error":"Invalid credentials"}`)
+			return
+		}
+		fmt.Fprint(w, `{"success":0,"error":"Daily limit reached"}`)
+	}))
+	defer server.Close()
+	client := NewClient(WithDomain(server.URL))
+	client.SetCookies(map[string]string{"remix_userid": "123", "remix_userkey": "key"})
+
+	if _, err := client.SavedBooks(1); errors.Is(err, ErrSessionExpired) || err == nil || !strings.Contains(err.Error(), "Daily limit reached") {
+		t.Fatalf("SavedBooks error = %v, want the server message", err)
+	}
+	// A wrong password must read as a failed login, even with a stale session
+	// still loaded in the client.
+	if err := client.Login("reader@example.com", "wrong"); !errors.Is(err, ErrLoginFailed) || errors.Is(err, ErrSessionExpired) {
+		t.Fatalf("Login error = %v, want ErrLoginFailed only", err)
+	}
+}
