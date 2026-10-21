@@ -15,7 +15,7 @@ func (m *shellModel) openKindle(arg string) tea.Cmd {
 	if arg == "config" {
 		cfg, err := config.LoadKindleConfig()
 		if err != nil && !os.IsNotExist(err) {
-			m.setNotice(err.Error())
+			m.setError(err.Error())
 			return nil
 		}
 		if cfg.SMTPHost == "" {
@@ -38,24 +38,24 @@ func (m *shellModel) openKindle(arg string) tea.Cmd {
 		path = strings.TrimSpace(path)
 		if strings.HasPrefix(path, "\"") {
 			if !strings.HasSuffix(path, "\"") || len(path) < 2 {
-				m.setNotice("Close the quoted file path")
+				m.setError("Close the quoted file path")
 				return nil
 			}
 			path = path[1 : len(path)-1]
 		}
 		if path == "" {
-			m.setNotice("Use /kindle send <file>")
+			m.setError("Use /kindle send <file>")
 			return nil
 		}
 		if info, err := os.Stat(path); err != nil || info.IsDir() {
-			m.setNotice("File not found: " + path)
+			m.setError("File not found: " + path)
 			return nil
 		}
 		m.kindlePath = path
 		return m.open("kindle-confirm", shellConfirm{title: "Send to Kindle?", detail: filepath.Base(path), action: "Send"})
 	}
 	if arg != "" && arg != "send" {
-		m.setNotice("Use /kindle send <file> or /kindle config")
+		m.setError("Use /kindle send <file> or /kindle config")
 		return nil
 	}
 	dir, _ := os.Getwd()

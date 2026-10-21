@@ -20,22 +20,24 @@ func shellStep(m shellModel, msg tea.Msg) (shellModel, tea.Cmd) {
 	return next.(shellModel), cmd
 }
 
-func TestShellNoticeExpiresWithoutReplacingInputOrHelp(t *testing.T) {
+// Errors stay until the next key press: a timer could clear one before it is
+// read. The input and key hints keep their rows either way.
+func TestShellErrorNoticeStaysUntilKeyPressWithoutReplacingInputOrHelp(t *testing.T) {
 	m := newShellModel()
 	m.signedIn = true
 	for _, size := range []tea.WindowSizeMsg{{Width: 80, Height: 24}, {Width: 32, Height: 12}, {Width: 20, Height: 5}} {
 		m, _ = shellStep(m, size)
 		m.input.SetValue("/missing arg")
 		m, cmd := shellStep(m, key("enter"))
-		if cmd == nil {
-			t.Fatal("command feedback has no expiry timer")
+		if cmd != nil {
+			t.Fatal("an error notice must not schedule expiry")
 		}
 		lines := strings.Split(ansi.Strip(m.View().Content), "\n")
 		if len(lines) != size.Height {
 			t.Fatalf("%dx%d: got %d rows", size.Width, size.Height, len(lines))
 		}
-		if !strings.Contains(strings.Join(lines[:len(lines)-2], "\n"), "Unknown") {
-			t.Fatalf("%dx%d: notice missing above input: %q", size.Width, size.Height, lines)
+		if !strings.Contains(strings.Join(lines[:len(lines)-2], "\n"), symbolError+" Unknown") {
+			t.Fatalf("%dx%d: error notice missing above input: %q", size.Width, size.Height, lines)
 		}
 		if strings.Contains(strings.Join(lines[len(lines)-2:], "\n"), "Unknown command") || !strings.Contains(lines[len(lines)-2], "/missing") {
 			t.Fatalf("%dx%d: notice replaced input or help: %q", size.Width, size.Height, lines[len(lines)-2:])
@@ -45,15 +47,61 @@ func TestShellNoticeExpiresWithoutReplacingInputOrHelp(t *testing.T) {
 				t.Fatalf("%dx%d: row exceeds terminal width", size.Width, size.Height)
 			}
 		}
-		oldVersion := m.noticeVersion
-		m.setNotice("New feedback")
-		m, _ = shellStep(m, shellNoticeExpired{version: oldVersion})
-		if m.status != "New feedback" {
-			t.Fatal("old timer cleared newer feedback")
-		}
 		m, _ = shellStep(m, shellNoticeExpired{version: m.noticeVersion})
-		if m.status != "" || strings.Contains(ansi.Strip(m.View().Content), "New feedback") {
-			t.Fatal("notice did not expire")
+		if m.status == "" {
+			t.Fatal("a timer cleared the error notice")
+		}
+		m, _ = shellStep(m, key("x"))
+		if m.status != "" || strings.Contains(ansi.Strip(m.View().Content), "Unknown command") {
+			t.Fatal("the next key press did not dismiss the error notice")
+		}
+		m.input.SetValue("")
+	}
+}
+
+func TestShellInfoAndSuccessNoticesExpire(t *testing.T) {
+	m := newShellModel()
+	m.signedIn = true
+	m, _ = shellStep(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m.setSuccess("Logged out")
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, symbolSuccess+" Logged out") {
+		t.Fatalf("success notice lacks its mark: %q", view)
+	}
+	oldVersion := m.noticeVersion
+	m.setNotice("New feedback")
+	m, _ = shellStep(m, shellNoticeExpired{version: oldVersion})
+	if m.status != "New feedback" {
+		t.Fatal("old timer cleared newer feedback")
+	}
+	m, _ = shellStep(m, shellNoticeExpired{version: m.noticeVersion})
+	if m.status != "" || strings.Contains(ansi.Strip(m.View().Content), "New feedback") {
+		t.Fatal("notice did not expire")
+	}
+}
+
+// Feedback sits on the title row: row 1 of a list carries the page and the
+// selected position, which a notice used to cover.
+func TestShellNoticeKeepsListStatusVisible(t *testing.T) {
+	for _, width := range []int{80, 32} {
+		m := newShellModel()
+		m.signedIn = true
+		m, _ = shellStep(m, tea.WindowSizeMsg{Width: width, Height: 24})
+		list := newBookFeedSelectModel("Recommended", nil)
+		list.state = searchStateResults
+		list.books = []zlib.Book{{ID: "1", Hash: "abc", Name: "First"}, {ID: "2", Hash: "def", Name: "Second"}}
+		m.open("list", list)
+		m, _ = shellStep(m, tea.WindowSizeMsg{Width: width, Height: 24})
+		before := strings.Split(ansi.Strip(m.View().Content), "\n")
+		m.setError("Session expired. Use /login to sign in again.")
+		after := strings.Split(ansi.Strip(m.View().Content), "\n")
+		if strings.TrimSpace(before[1]) == "" || after[1] != before[1] {
+			t.Fatalf("width %d: status row changed from %q to %q", width, before[1], after[1])
+		}
+		if !strings.Contains(after[0], symbolError) {
+			t.Fatalf("width %d: notice not on the title row: %q", width, after[0])
+		}
+		if title := strings.TrimRight(before[0], " "); width >= 80 && (title == "" || !strings.HasPrefix(after[0], title)) {
+			t.Fatalf("width %d: notice covered the title: %q", width, after[0])
 		}
 	}
 }
@@ -78,9 +126,9 @@ func TestShellThemeSavedNoticeLeavesFooterAvailable(t *testing.T) {
 func TestShellNoticeAppearsOverCommandDialog(t *testing.T) {
 	m := newShellModel()
 	m.input.SetValue("/missing")
-	m, cmd := shellStep(m, key("enter"))
-	if cmd == nil || !m.paletteOpen() {
-		t.Fatal("unknown command did not retain the command dialog and schedule expiry")
+	m, _ = shellStep(m, key("enter"))
+	if !m.paletteOpen() {
+		t.Fatal("unknown command did not retain the command dialog")
 	}
 	view := ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "Unknown command") || !strings.Contains(view, "No matching commands") {

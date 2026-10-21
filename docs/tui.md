@@ -42,10 +42,13 @@ including from last to first; the list scrolls when selection leaves its visible
 rows. Type to filter, Tab to complete into the command input, or Enter to run.
 On book lists, Ctrl+K also opens the dialog. Esc closes it and restores the page.
 
-Shell command feedback appears near the top of the screen for five seconds.
-New feedback restarts the timer; an older timer cannot clear a newer message.
-The input and bottom key hints stay in place. Errors that need a response stay
-on their form or result page.
+Shell command feedback appears at the right end of the title row, so the list
+status line below it stays visible. Errors start with ✗ in the error color and
+stay until the next key press. Confirmations start with ✓ in the success color;
+they and neutral hints disappear after five seconds. New feedback restarts the
+timer; an older timer cannot clear a newer message. The input and bottom key
+hints stay in place. Errors that need a response stay on their form or result
+page.
 
 Direct commands such as `zlib search` and `zlib history --json` still work.
 The Search form shows query, year range, languages, formats, exact match, and sort
