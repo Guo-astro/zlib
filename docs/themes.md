@@ -24,6 +24,13 @@ theme's own while zlib runs, so a light theme stays readable on a dark terminal
 and the reverse. zlib restores the terminal's colors on exit. Terminals that do
 not support changing their default colors keep their own background.
 
+Built-in themes adapt their source palettes for reading. Every text color,
+including secondary text, reaches at least 4.5:1 contrast (WCAG AA) on the
+theme background. Colors that miss it are moved toward black or white. The four
+format colors (EPUB, PDF, MOBI, FB2) stay visibly different, and warnings use
+amber or orange rather than a palette color. Custom themes keep the exact
+colors you enter.
+
 Run `zlib theme <name>` to set a built-in or saved custom theme directly.
 `ZLIB_THEME=<name>` overrides
 the saved choice for one process. With redirected output, `zlib theme` prints

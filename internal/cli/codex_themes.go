@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"image/color"
 
 	"charm.land/lipgloss/v2"
 )
@@ -36,31 +37,48 @@ func codexPalette(fg, keyword, function, str, comment, number, background string
 		Title:   lipgloss.Color(fg),
 		Success: lipgloss.Color("#a6e3a1"),
 		Error:   lipgloss.Color("#f38ba8"),
-		Warning: lipgloss.Color(number),
 		Info:    lipgloss.Color(function),
 		Muted:   lipgloss.Color(comment),
-		ExtEPUB: lipgloss.Color(str),
-		ExtPDF:  lipgloss.Color(function),
-		ExtMOBI: lipgloss.Color(number),
-		ExtFB2:  lipgloss.Color(keyword),
 	}
+	// Status colors are fixed rather than taken from the palette: a palette's
+	// "number" color made Warning blue in github.
+	warnings := []string{"#f9e2af", "#fab387"}
 	if background == "" {
 		palette.Surface = lipgloss.Color("8")
-		return palette
-	}
-	palette.Background = lipgloss.Color(background)
-	var r, g, b uint8
-	if _, err := fmt.Sscanf(background, "#%02x%02x%02x", &r, &g, &b); err != nil {
-		palette.Surface = palette.Background
-		return palette
-	}
-	light := int(r)*299+int(g)*587+int(b)*114 > 160000
-	if light {
-		palette.Success = lipgloss.Color("#247a36")
-		palette.Error = lipgloss.Color("#c43440")
-		palette.Surface = lipgloss.Color(fmt.Sprintf("#%02x%02x%02x", r-r/10, g-g/10, b-b/10))
 	} else {
-		palette.Surface = lipgloss.Color(fmt.Sprintf("#%02x%02x%02x", r+(255-r)/8, g+(255-g)/8, b+(255-b)/8))
+		palette.Background = lipgloss.Color(background)
+		var r, g, b uint8
+		if _, err := fmt.Sscanf(background, "#%02x%02x%02x", &r, &g, &b); err != nil {
+			palette.Surface = palette.Background
+		} else if int(r)*299+int(g)*587+int(b)*114 > 160000 {
+			palette.Success = lipgloss.Color("#247a36")
+			palette.Error = lipgloss.Color("#c43440")
+			warnings = []string{"#8a5a00", "#b03500"}
+			palette.Surface = lipgloss.Color(fmt.Sprintf("#%02x%02x%02x", r-r/10, g-g/10, b-b/10))
+		} else {
+			palette.Surface = lipgloss.Color(fmt.Sprintf("#%02x%02x%02x", r+(255-r)/8, g+(255-g)/8, b+(255-b)/8))
+		}
 	}
+	palette = readableTheme(palette)
+
+	// Pick distinct colors only after readableTheme has darkened or lightened
+	// them: on a light background pastel syntax colors converge toward black.
+	readable := func(hexes ...string) []color.Color {
+		colors := make([]color.Color, len(hexes))
+		for i, hex := range hexes {
+			colors[i] = lipgloss.Color(hex)
+			if palette.Background != nil {
+				colors[i] = readableOn(colors[i], palette.Background, minTextContrast)
+			}
+		}
+		return colors
+	}
+	// Warning must not read as a link or an error; amber first, then orange.
+	palette.Warning = distinctFrom(readable(warnings...), palette.Info, palette.Link, palette.Error)
+	// Several palettes reuse one color for two token kinds (gruvbox strings
+	// and functions), so formats fall back to the status colors.
+	ext := distinctColors(4, append(readable(str, function, number, keyword),
+		palette.Warning, palette.Success, palette.Error, palette.Title)...)
+	palette.ExtEPUB, palette.ExtPDF, palette.ExtMOBI, palette.ExtFB2 = ext[0], ext[1], ext[2], ext[3]
 	return palette
 }

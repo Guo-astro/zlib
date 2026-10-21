@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"image/color"
 	"reflect"
 	"slices"
 	"strings"
@@ -130,5 +131,45 @@ func TestLegacyAutoThemeIsUnset(t *testing.T) {
 	}
 	if err := themeCmd.RunE(themeCmd, []string{"auto"}); err == nil {
 		t.Fatal("theme auto must be rejected")
+	}
+}
+
+// Every built-in theme must keep text readable and roles distinguishable on
+// its own background; see minTextContrast and minRoleDistance.
+func TestBuiltInThemesMeetContrastAndKeepRolesApart(t *testing.T) {
+	for _, name := range themeOrder {
+		theme := themes[name]
+		if theme.Background == nil {
+			t.Errorf("%s: no background", name)
+			continue
+		}
+		roles := map[string]color.Color{
+			"Accent": theme.Accent, "Link": theme.Link, "Title": theme.Title,
+			"Success": theme.Success, "Error": theme.Error, "Warning": theme.Warning,
+			"Info": theme.Info, "Muted": theme.Muted, "EPUB": theme.ExtEPUB,
+			"PDF": theme.ExtPDF, "MOBI": theme.ExtMOBI, "FB2": theme.ExtFB2,
+		}
+		for role, c := range roles {
+			if ratio := contrastRatio(c, theme.Background); ratio < minTextContrast {
+				t.Errorf("%s: %s contrast %.2f:1, want >= %.1f:1", name, role, ratio, minTextContrast)
+			}
+		}
+		// Selected rows draw Title on Surface.
+		if ratio := contrastRatio(theme.Title, theme.Surface); ratio < minTextContrast {
+			t.Errorf("%s: Title on Surface %.2f:1", name, ratio)
+		}
+		formats := []color.Color{theme.ExtEPUB, theme.ExtPDF, theme.ExtMOBI, theme.ExtFB2}
+		for i := range formats {
+			for j := i + 1; j < len(formats); j++ {
+				if d := colorDistance(formats[i], formats[j]); d < minRoleDistance {
+					t.Errorf("%s: format colors %d and %d only %.0f apart", name, i, j, d)
+				}
+			}
+		}
+		for role, other := range map[string]color.Color{"Info": theme.Info, "Link": theme.Link, "Error": theme.Error} {
+			if d := colorDistance(theme.Warning, other); d < minRoleDistance {
+				t.Errorf("%s: Warning only %.0f from %s", name, d, role)
+			}
+		}
 	}
 }

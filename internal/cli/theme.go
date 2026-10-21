@@ -59,11 +59,14 @@ var themes = func() map[string]Theme {
 			ExtEPUB:    lipgloss.Color("#9ece6a"),
 			ExtPDF:     lipgloss.Color("#7dcfff"),
 			ExtMOBI:    lipgloss.Color("#e0af68"),
-			ExtFB2:     lipgloss.Color("#7aa2f7"),
+			ExtFB2:     lipgloss.Color("#bb9af7"), // Magenta: Blue sat too close to PDF's Cyan
 		},
 	}
 	for name, palette := range codexThemes {
 		all[name] = palette
+	}
+	for name, palette := range all {
+		all[name] = readableTheme(palette)
 	}
 	return all
 }()
