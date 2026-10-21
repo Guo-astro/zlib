@@ -45,20 +45,10 @@ func resolveClientDomain(envDomain, sessionDomain string) string {
 	return strings.TrimSpace(sessionDomain)
 }
 
-// newClient loads session and returns an authenticated client.
-func newClient() *zlib.Client {
-	c, err := loadClient()
-	if err != nil {
-		lipgloss.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	return c
-}
-
 func loadClient() (*zlib.Client, error) {
 	session, err := config.LoadSession()
 	if err != nil || len(session.Cookies) == 0 {
-		return nil, fmt.Errorf("not logged in; use /login or zlib login")
+		return nil, errNotLoggedIn
 	}
 	c := zlib.NewClient()
 	// SetDomain before SetCookies: SetCookies seats the jar against c.domain.
@@ -81,9 +71,13 @@ func Execute() {
 		os.Exit(1)
 	}
 	resolveTheme()
+	markUsageErrors(rootCmd)
 	if err := rootCmd.Execute(); err != nil {
+		if isUnknownCommandError(err) {
+			err = &usageError{err}
+		}
 		lipgloss.Fprintln(os.Stderr, formatCLIError(err))
-		os.Exit(1)
+		os.Exit(exitCode(err))
 	}
 }
 
@@ -93,10 +87,21 @@ func formatCLIError(err error) string {
 	}
 
 	prefix := colorRed(symbolError + " Error:")
+	if errors.Is(err, errCancelled) {
+		return colorRed(symbolError) + " Cancelled"
+	}
+	var delivery *kindleDeliveryError
+	switch {
 	// SMTP errors already name the server, port and TLS mode; a generic
 	// network message would hide whether TLS, auth or the port is wrong.
-	if errors.Is(err, zlib.ErrSMTPSend) {
+	case errors.As(err, &delivery), errors.Is(err, zlib.ErrSMTPSend):
 		return prefix + " " + err.Error()
+	case errors.Is(err, errNotLoggedIn), errors.Is(err, zlib.ErrNotLoggedIn):
+		return prefix + " not logged in. Run `zlib login` first."
+	case errors.Is(err, zlib.ErrSessionExpired):
+		return prefix + " the saved session expired or was revoked. Run `zlib login` to sign in again."
+	case errors.Is(err, zlib.ErrBotProtection):
+		return prefix + " " + err.Error() + ". This mirror is behind DiamWall; run `zlib doctor` and set ZLIB_DOMAIN to a reachable domain."
 	}
 	if msg, ok := classifyNetworkError(err); ok {
 		return prefix + " " + msg
@@ -105,17 +110,46 @@ func formatCLIError(err error) string {
 	return prefix + " " + err.Error()
 }
 
+// networkFailure words a network error, naming the host that failed. For a
+// Z-Library mirror it points to `zlib doctor`, since switching domains is the
+// usual fix; other hosts (GitHub for `zlib update`, a CDN) get no such hint.
+func networkFailure(err error, problem string) string {
+	host := failedHost(err)
+	if host == "" {
+		return problem + ". Please check your connection and try again."
+	}
+	if _, allowErr := zlib.ParseAllowedDomain("https://" + host); allowErr == nil {
+		return fmt.Sprintf("%s (%s). Check your connection, or run `zlib doctor` to find a reachable domain.", problem, host)
+	}
+	return fmt.Sprintf("%s (%s). Please check your connection and try again.", problem, host)
+}
+
+// failedHost returns the host of the request that failed, when known.
+func failedHost(err error) string {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		if u, parseErr := url.Parse(urlErr.URL); parseErr == nil {
+			return u.Hostname()
+		}
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return dnsErr.Name
+	}
+	return ""
+}
+
 func classifyNetworkError(err error) (string, bool) {
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) {
 		if timeoutErr, ok := urlErr.Err.(interface{ Timeout() bool }); ok && timeoutErr.Timeout() {
-			return "network request timed out. Please check your connection and try again.", true
+			return networkFailure(err, "network request timed out"), true
 		}
 	}
 
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
-		return "network request timed out. Please check your connection and try again.", true
+		return networkFailure(err, "network request timed out"), true
 	}
 
 	switch {
@@ -125,12 +159,12 @@ func classifyNetworkError(err error) (string, bool) {
 		errors.Is(err, syscall.ECONNREFUSED),
 		errors.Is(err, syscall.ENETUNREACH),
 		errors.Is(err, syscall.EHOSTUNREACH):
-		return "network request failed. Please check your connection and try again.", true
+		return networkFailure(err, "network request failed"), true
 	}
 
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) {
-		return "could not resolve the server address. Please check your network or DNS settings and try again.", true
+		return networkFailure(err, "could not resolve the server address"), true
 	}
 
 	msg := strings.ToLower(err.Error())
@@ -142,7 +176,7 @@ func classifyNetworkError(err error) (string, bool) {
 		strings.Contains(msg, "server misbehaving"),
 		strings.Contains(msg, "unexpected eof"),
 		strings.Contains(msg, " eof"):
-		return "network request failed. Please check your connection and try again.", true
+		return networkFailure(err, "network request failed"), true
 	}
 
 	return "", false

@@ -71,7 +71,8 @@ var kindleSendCmd = &cobra.Command{
 			}
 			filePath = selected
 		}
-		return sendDownloadedFileToKindle(filePath)
+		_, err := sendDownloadedFileToKindle(filePath, true)
+		return err
 	},
 }
 
@@ -79,41 +80,47 @@ func init() {
 	kindleCmd.AddCommand(kindleConfigCmd, kindleSendCmd)
 }
 
-func sendDownloadedFileToKindle(filePath string) error {
+// sendDownloadedFileToKindle emails filePath to the configured Kindle address
+// and returns that address. With report it shows the spinner on a terminal
+// and prints the outcome on stdout; without it (--json) stdout stays free for
+// the caller's document and only the "Sending" status reaches stderr.
+func sendDownloadedFileToKindle(filePath string, report bool) (string, error) {
 	cfg, err := config.LoadKindleConfig()
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("kindle config not found; run: zlib kindle config")
+			return "", fmt.Errorf("kindle config not found; run: zlib kindle config")
 		}
-		return fmt.Errorf("failed to load kindle config: %w", err)
+		return "", fmt.Errorf("failed to load kindle config: %w", err)
 	}
 
 	password := os.Getenv(kindleSMTPPasswordEnv)
 	if strings.TrimSpace(password) == "" {
-		return fmt.Errorf("kindle smtp password not set; export %s", kindleSMTPPasswordEnv)
+		return "", fmt.Errorf("kindle smtp password not set; export %s", kindleSMTPPasswordEnv)
 	}
 
 	// Run the spinner UI on a terminal; send directly otherwise so the
 	// command still works (and exits) when driven by a script or pipe.
-	if isInteractive() {
+	if report && isInteractive() {
 		result, err := tea.NewProgram(newKindleSendModel(filePath, cfg, password)).Run()
 		if err != nil {
-			return err
+			return "", err
 		}
 		if sm := result.(kindleSendModel); sm.err != nil {
-			return sm.err
+			return "", sm.err
 		}
 	} else {
-		lipgloss.Fprintln(os.Stdout, "  Sending to Kindle...")
+		lipgloss.Fprintln(os.Stderr, "Sending to Kindle...")
 		if err := zlib.SendToKindle(filePath, cfg, password); err != nil {
-			return err
+			return "", err
 		}
 	}
 
-	lipgloss.Fprintln(os.Stdout)
-	lipgloss.Fprintf(os.Stdout, "%s Email sent to Kindle address: %s\n", colorGreen(symbolSuccess), colorCyan(cfg.To))
-	lipgloss.Fprintf(os.Stdout, "%s Final delivery depends on Amazon approval and file compatibility.\n", colorFaint(symbolInfo))
-	return nil
+	if report {
+		lipgloss.Fprintln(os.Stdout)
+		lipgloss.Fprintf(os.Stdout, "%s Email sent to Kindle address: %s\n", colorGreen(symbolSuccess), colorCyan(cfg.To))
+		lipgloss.Fprintf(os.Stdout, "%s Final delivery depends on Amazon approval and file compatibility.\n", colorFaint(symbolInfo))
+	}
+	return cfg.To, nil
 }
 
 // — kindle send model (spinner during SMTP send) —

@@ -71,8 +71,12 @@ both parts exactly; do not invent a reference or replace it with a short legacy 
 Replace the placeholder below with the actual result:
 
 ```sh
-zlib download "id:hash"
+zlib download "id:hash" --json
 ```
+
+`--json` prints one document on stdout, `{"id","name","path","size"}`, where
+`path` is the saved file's absolute path. Progress lines go to stderr; read only
+stdout.
 
 Omit `--dir` to use the CLI's configured destination (`ZLIB_DOWNLOAD_DIR`, then
 the current directory). This does not require reading `.env` or asking for a
@@ -83,9 +87,12 @@ If `quota_known` is true and `daily_remaining` is zero, report the exhausted
 quota instead of attempting downloads. If quota is unknown, report it as unknown;
 zero placeholder fields do not establish exhaustion.
 
-Success requires a successful command exit and the reported saved file. Report
-the actual `Saved to:` path. If the command times out or fails, inspect that
-specific path before retrying; a partial file or matching displayed size alone
+Success requires exit code 0 and the JSON `path`. Report that path. Other exit
+codes: `3` means the user must run `zlib login` in their own terminal; `4` is a
+network or mirror problem (suggest `zlib doctor`); `5` means the book was saved
+but Kindle delivery failed (the JSON `kindle.error` says why; do not download
+again); `130` means it was cancelled. If the command times out or fails, inspect
+the destination before retrying; a partial file or matching displayed size alone
 does not prove completion. Avoid repeating downloads after an uncertain outcome.
 
 For history re-downloads, use `zlib history --download "id:hash"`. For delivery

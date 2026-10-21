@@ -30,7 +30,13 @@ var searchCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			selectedID, err := interactiveSearch(nil, opts, fullTitle)
+			// Check the session before the filter form opens, so a signed-out
+			// user is not asked to fill it in first.
+			c, err := loadClient()
+			if err != nil {
+				return err
+			}
+			selectedID, err := interactiveSearch(c, opts, fullTitle)
 			if err != nil {
 				return err
 			}
@@ -43,7 +49,7 @@ var searchCmd = &cobra.Command{
 			}
 			sendToKindle, _ := cmd.Flags().GetBool("send-to-kindle")
 
-			return runDownload(newDownloadModel(selectedID, dir, newClient()), sendToKindle, cmd)
+			return runDownload(newDownloadModel(selectedID, dir, c), sendToKindle, cmd)
 		}
 
 		query := strings.Join(args, " ")
@@ -55,7 +61,11 @@ var searchCmd = &cobra.Command{
 			return err
 		}
 
-		result, err := newClient().Search(query, page, count, opts)
+		c, err := loadClient()
+		if err != nil {
+			return err
+		}
+		result, err := c.Search(query, page, count, opts)
 		if err != nil {
 			return err
 		}

@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -30,55 +31,100 @@ var downloadCmd = &cobra.Command{
 			return err
 		}
 		sendToKindle, _ := cmd.Flags().GetBool("send-to-kindle")
-		c := newClient()
+		c, err := loadClient()
+		if err != nil {
+			return err
+		}
 		return runDownload(newDownloadModel(args[0], dir, c), sendToKindle, cmd)
 	},
 }
 
+// downloadResult is the --json document a finished download prints.
+type downloadResult struct {
+	ID     string        `json:"id,omitempty"`
+	Name   string        `json:"name,omitempty"`
+	Path   string        `json:"path"`
+	Size   int64         `json:"size"`
+	Kindle *kindleResult `json:"kindle,omitempty"`
+}
+
+// kindleResult reports the Send to Kindle step of a download.
+type kindleResult struct {
+	Sent  bool   `json:"sent"`
+	To    string `json:"to,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+
 // runDownload executes the download described by m — through the bubbletea
-// progress UI on an interactive terminal, or a plain text path otherwise (see
-// isInteractive) — then prints the saved path and optionally delivers to
-// Kindle. Shared by the download, search, and history commands.
+// progress UI on an interactive terminal, or a plain path otherwise (see
+// isInteractive) — then reports the saved file and optionally delivers it to
+// Kindle. Shared by the download, search, history, favorites and feed
+// commands. With --json the plain path always runs, progress goes to stderr,
+// and stdout carries only the downloadResult document.
 func runDownload(m downloadModel, sendToKindle bool, cmd *cobra.Command) error {
-	dir, proceed, err := chooseDownloadDirectory(cmd, m.dir)
-	if err != nil {
-		return err
+	jsonOut := false
+	if cmd.Flags().Lookup("json") != nil {
+		jsonOut, _ = cmd.Flags().GetBool("json")
 	}
-	if !proceed {
-		return nil
+	if !jsonOut {
+		dir, proceed, err := chooseDownloadDirectory(cmd, m.dir)
+		if err != nil {
+			return err
+		}
+		if !proceed {
+			return errCancelled
+		}
+		m.dir = dir
 	}
-	m.dir = dir
-	dm, err := runDownloadModel(m)
+	var dm downloadModel
+	var err error
+	if jsonOut || !isInteractive() {
+		dm, err = m.runPlain(os.Stderr)
+	} else {
+		dm, err = runDownloadProgram(m)
+	}
 	if err != nil {
 		return err
 	}
 	if dm.state == stateCancelled {
-		return nil
+		return errCancelled
 	}
 	if dm.err != nil {
 		return dm.err
 	}
 
-	lipgloss.Fprintln(os.Stdout)
-	lipgloss.Fprintf(os.Stdout, "%s Saved to: %s (%d bytes)\n",
-		colorGreen(symbolSuccess),
-		colorGreen(tildePath(dm.savedPath)),
-		dm.savedSize,
-	)
+	path := dm.savedPath
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	result := downloadResult{ID: dm.id, Name: dm.bookName, Path: path, Size: dm.savedSize}
+	if !jsonOut {
+		lipgloss.Fprintln(os.Stdout)
+		lipgloss.Fprintf(os.Stdout, "%s Saved to: %s (%d bytes)\n",
+			colorGreen(symbolSuccess),
+			colorGreen(path),
+			dm.savedSize,
+		)
+	}
+	var deliveryErr error
 	if sendToKindle {
-		if err := sendDownloadedFileToKindle(dm.savedPath); err != nil {
-			return fmt.Errorf("send to kindle failed: %w", err)
+		to, err := sendDownloadedFileToKindle(path, !jsonOut)
+		result.Kindle = &kindleResult{Sent: err == nil, To: to}
+		if err != nil {
+			result.Kindle.Error = err.Error()
+			deliveryErr = &kindleDeliveryError{path: path, err: err}
 		}
 	}
-	return nil
+	if jsonOut {
+		if err := printJSON(result); err != nil {
+			return err
+		}
+	}
+	return deliveryErr
 }
 
-// runDownloadModel runs the download, choosing the bubbletea UI or the plain
-// path based on whether the process is attached to a terminal.
-func runDownloadModel(m downloadModel) (downloadModel, error) {
-	if !isInteractive() {
-		return m.runPlain()
-	}
+// runDownloadProgram runs the download through the bubbletea progress UI.
+func runDownloadProgram(m downloadModel) (downloadModel, error) {
 	result, err := tea.NewProgram(m).Run()
 	if err != nil {
 		return downloadModel{}, err
@@ -87,10 +133,12 @@ func runDownloadModel(m downloadModel) (downloadModel, error) {
 }
 
 // runPlain performs the download without the bubbletea UI, for non-terminal
-// output. It mirrors the fetch-then-download flow of the UI model and records
-// the result on the returned model. Ctrl+C cancels the transfer, so the
-// library can clean up its partial file before the command exits.
-func (m downloadModel) runPlain() (downloadModel, error) {
+// output and --json. It mirrors the fetch-then-download flow of the UI model
+// and records the result on the returned model. Status and progress lines go
+// to status (stderr), keeping stdout for the result. Ctrl+C cancels the
+// transfer, so the library can clean up its partial file before the command
+// exits.
+func (m downloadModel) runPlain(status io.Writer) (downloadModel, error) {
 	downloadURL, name := m.directURL, m.bookName
 	if downloadURL == "" {
 		book, err := m.client.FetchBook(m.id)
@@ -102,15 +150,21 @@ func (m downloadModel) runPlain() (downloadModel, error) {
 		}
 		downloadURL, name = book.DownloadURL, book.Name
 	}
+	m.bookName = name
 
 	// Trap Ctrl+C only for the transfer; during the fetch it still exits
 	// immediately, since nothing has been written yet.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	lipgloss.Fprintf(os.Stdout, "  Downloading: %s\n", name)
-	result, err := m.client.DownloadWithContext(ctx, downloadURL, m.dir, nil)
+	fmt.Fprintf(status, "Downloading: %s\n", name)
+	progress := plainProgress{w: status}
+	result, err := m.client.DownloadWithContext(ctx, downloadURL, m.dir, progress.report)
 	if err != nil {
+		if ctx.Err() != nil {
+			m.state = stateCancelled
+			return m, nil
+		}
 		return m, err
 	}
 	m.savedPath = result.FilePath
@@ -119,9 +173,36 @@ func (m downloadModel) runPlain() (downloadModel, error) {
 	return m, nil
 }
 
+// plainProgress prints download progress as plain lines a log or an agent can
+// follow: one line per 10% when the size is known, otherwise one per
+// plainProgressChunk bytes.
+type plainProgress struct {
+	w        io.Writer
+	reported int64 // last percent step, or bytes when the total is unknown
+}
+
+const plainProgressChunk = 5 << 20
+
+func (p *plainProgress) report(written, total int64) {
+	const mb = 1 << 20
+	if total > 0 {
+		step := written * 100 / total / 10 * 10
+		if step > p.reported {
+			p.reported = step
+			fmt.Fprintf(p.w, "  %d%% (%.1f MB / %.1f MB)\n", step, float64(written)/mb, float64(total)/mb)
+		}
+		return
+	}
+	if written-p.reported >= plainProgressChunk {
+		p.reported = written
+		fmt.Fprintf(p.w, "  %.1f MB\n", float64(written)/mb)
+	}
+}
+
 func init() {
 	addDestDirFlag(downloadCmd)
 	downloadCmd.Flags().Bool("send-to-kindle", false, "Send the downloaded book to Kindle")
+	downloadCmd.Flags().Bool("json", false, "Print the saved file as JSON; progress goes to stderr")
 }
 
 // — bubbletea model —

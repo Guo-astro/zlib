@@ -29,7 +29,10 @@ var historyCmd = &cobra.Command{
 		jsonOut, _ := cmd.Flags().GetBool("json")
 		deleteID, _ := cmd.Flags().GetString("delete")
 
-		c := newClient()
+		c, err := loadClient()
+		if err != nil {
+			return err
+		}
 		if deleteID != "" {
 			if err := c.DeleteDownloadHistory(deleteID); err != nil {
 				return err

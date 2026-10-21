@@ -49,6 +49,18 @@ the flag, zlib uses `ZLIB_DOWNLOAD_DIR`, then the current directory. See
 Press `Ctrl+C` to cancel a download; the CLI removes the incomplete file.
 After [Kindle setup](kindle.md), add `--send-to-kindle` to send the downloaded file.
 
+Without a terminal, `download` prints `Downloading:` and a progress line per 10%
+to stderr, then `Saved to:` with the absolute path on stdout. `--json` replaces
+that last line with one JSON document and skips the folder prompt:
+
+```json
+{"id":"id:hash","name":"Dune","path":"/home/me/books/Dune.epub","size":1048576}
+```
+
+With `--send-to-kindle`, the document also has `kindle`: `{"sent":true,"to":"..."}`,
+or `{"sent":false,"error":"..."}` when the book was saved but delivery failed.
+`history --download` accepts `--json` the same way.
+
 ## Saved books, recommendations and history
 
 In the history browser, press `d` to delete the selected entry, then `y` to
@@ -111,3 +123,18 @@ names and preview controls.
 
 See [Terminal interface](tui.md) for interactive controls. For exact flags and
 defaults, run `zlib <command> --help`.
+
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Success, or you left a list without choosing a book |
+| 1 | Other error |
+| 2 | Usage error: unknown command or flag, wrong number of arguments |
+| 3 | Not logged in, or the saved session expired; run `zlib login` |
+| 4 | Network: the mirror is unreachable or behind DiamWall, or `doctor` found no usable domain |
+| 5 | The book was saved, but Send to Kindle failed |
+| 130 | You cancelled the download or its folder prompt |
+
+Errors go to stderr. A network error names the host; for a Z-Library mirror it
+suggests `zlib doctor`.

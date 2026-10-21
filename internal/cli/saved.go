@@ -24,7 +24,10 @@ func newSavedBooksCommand(name string) *cobra.Command {
 }
 
 func runSavedBooks(cmd *cobra.Command, args []string) error {
-	c := newClient()
+	c, err := loadClient()
+	if err != nil {
+		return err
+	}
 	jsonOut, _ := cmd.Flags().GetBool("json")
 	if !jsonOut && !cmd.Flags().Changed("page") && isInteractive() {
 		p := tea.NewProgram(newSavedBooksSelectModel(c.SavedBooks).withBookDetails(c))

@@ -86,8 +86,18 @@ Copy the selected book's `id` without dropping its hash. Replace `id:hash` below
 with that value and use an existing destination directory:
 
 ```sh
-zlib download "id:hash" --dir ./books
+zlib download "id:hash" --dir ./books --json
 ```
+
+`download --json` prints one document, `{"id","name","path","size"}`, with the
+absolute `path` of the saved file; add `--send-to-kindle` and it gains a
+`kindle` object (`sent`, `to` or `error`). Progress lines go to stderr, so
+read stdout only.
+
+Branch on the [exit code](usage.md#exit-codes) rather than on message text: `3`
+means the session needs `zlib login`, `4` a network or mirror problem
+(`zlib doctor`), `5` a saved book whose Kindle delivery failed, `130` a
+cancellation.
 
 `zlib tui`, `zlib search` without a query, bare `history`, and `kindle send`
 without a file open interactive prompts. Bare `zlib` prints help. Use the JSON

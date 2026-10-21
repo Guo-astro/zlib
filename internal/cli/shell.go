@@ -621,7 +621,7 @@ func (m *shellModel) dispatch(value string) tea.Cmd {
 		m.pending = value
 		m.home()
 		if m.signedIn {
-			m.setNotice(err.Error())
+			m.setNotice(shellErrorText(err))
 		} else {
 			m.setNotice("Sign in to continue. Press Enter to sign in.")
 		}
@@ -665,7 +665,7 @@ func (m *shellModel) completed() tea.Cmd {
 		if err != nil {
 			m.pending = "/search " + page.query
 			m.home()
-			m.setNotice(err.Error())
+			m.setNotice(shellErrorText(err))
 			return nil
 		}
 		return m.open("list", newSearchSelectModel(page.query, c, page.searchOptions(), false))
@@ -680,7 +680,7 @@ func (m *shellModel) completed() tea.Cmd {
 				var err error
 				client, err = loadClient()
 				if err != nil {
-					m.setNotice(err.Error())
+					m.setNotice(shellErrorText(err))
 					m.restore()
 					return nil
 				}

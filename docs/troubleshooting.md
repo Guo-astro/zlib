@@ -68,7 +68,9 @@ a saved login does not guarantee that a domain remains reachable.
 
 ## Not logged in or session expired
 
-Run `zlib login --domain URL` in your terminal, choosing a domain from `doctor`.
+Commands exit with code 3 and say whether there is no session or the server
+rejected the saved one (`session expired or was revoked`). Run
+`zlib login --domain URL` in your terminal, choosing a domain from `doctor`.
 If password login is refused, use the [Cookie import procedure](#login-returns-authorization-failed).
 
 Agents need access to the same user environment and session. See

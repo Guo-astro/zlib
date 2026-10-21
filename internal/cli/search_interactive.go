@@ -390,6 +390,8 @@ func (m searchSelectModel) listView() tea.View {
 	return fullScreenView(m.width, m.height, m.feedViewWith("Author", "No favorites on this page.", status, "←/→ page · "))
 }
 
+// interactiveSearch runs the filter form and then the result list. The caller
+// loads c first, so a signed-out user never fills in the form for nothing.
 func interactiveSearch(c *zlib.Client, opts *zlib.SearchOptions, fullTitle bool) (string, error) {
 	form, err := runSearchFilterForm(newSearchFilterForm("", opts))
 	if err != nil {
@@ -401,9 +403,6 @@ func interactiveSearch(c *zlib.Client, opts *zlib.SearchOptions, fullTitle bool)
 	query := form.query
 	opts = form.searchOptions()
 
-	if c == nil {
-		c = newClient()
-	}
 	p := tea.NewProgram(newSearchSelectModel(query, c, opts, fullTitle))
 	result, err := p.Run()
 	if err != nil {
