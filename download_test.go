@@ -30,6 +30,8 @@ func TestSanitizeFilename(t *testing.T) {
 		{"terminal escapes", "Dune\x1b]52;c;ZXZpbA==\x07\x1b[2J.epub", "Dune]52;c;ZXZpbA==[2J.epub"},
 		{"control only", "\x1b\x07", "download"},
 		{"colon kept off windows", "Dune: Messiah.epub", "Dune: Messiah.epub"},
+		{"bidi override", "book\u202Ebupe.exe", "bookbupe.exe"},
+		{"raw C1 byte", "Dune\x9b2J.epub", "Dune\uFFFD2J.epub"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

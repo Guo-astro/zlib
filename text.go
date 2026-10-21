@@ -38,12 +38,23 @@ func cleanText(v reflect.Value) {
 			cleanText(v.Index(i))
 		}
 	case reflect.Map:
+		// Keys are server text too. Rebuild the map so a cleaned key
+		// replaces the old one. Interface values arrive here as settable
+		// copies, so v can always be replaced.
+		if v.IsNil() || !v.CanSet() {
+			return
+		}
+		cleaned := reflect.MakeMapWithSize(v.Type(), v.Len())
 		for _, key := range v.MapKeys() {
+			k := reflect.New(key.Type()).Elem()
+			k.Set(key)
+			cleanText(k)
 			value := reflect.New(v.Type().Elem()).Elem()
 			value.Set(v.MapIndex(key))
 			cleanText(value)
-			v.SetMapIndex(key, value)
+			cleaned.SetMapIndex(k, value)
 		}
+		v.Set(cleaned)
 	case reflect.String:
 		if v.CanSet() {
 			v.SetString(stripControl(v.String(), "\n\t"))
@@ -52,16 +63,22 @@ func cleanText(v reflect.Value) {
 }
 
 // stripControl drops every Unicode control character from s except those in
-// keep.
+// keep. strings.Map also rewrites invalid UTF-8 as U+FFFD: a lone 0x9b byte is
+// not a control rune to the decoder, but an 8-bit terminal reads it as CSI.
+// Do not add a fast path that returns s unchanged; it would keep those bytes.
 func stripControl(s, keep string) string {
-	unsafe := func(r rune) bool { return unicode.IsControl(r) && !strings.ContainsRune(keep, r) }
-	if !strings.ContainsFunc(s, unsafe) {
-		return s
-	}
 	return strings.Map(func(r rune) rune {
-		if unsafe(r) {
+		if unicode.IsControl(r) && !strings.ContainsRune(keep, r) {
 			return -1
 		}
 		return r
 	}, s)
+}
+
+// isBidiControl reports the Unicode bidirectional formatting characters,
+// which can make a file name such as "book\u202Ebupe.exe" display as
+// "bookexe.epub".
+func isBidiControl(r rune) bool {
+	return r == '\u200E' || r == '\u200F' || r == '\u061C' ||
+		(r >= '\u202A' && r <= '\u202E') || (r >= '\u2066' && r <= '\u2069')
 }

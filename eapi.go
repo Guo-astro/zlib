@@ -453,7 +453,11 @@ func eapiString(value any) string {
 		return value.String()
 	case float64:
 		return strconv.FormatFloat(value, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(value)
 	default:
-		return fmt.Sprint(value)
+		// Objects and arrays are not scalar text; printing them with
+		// fmt.Sprint would show server-chosen keys verbatim.
+		return ""
 	}
 }

@@ -1,6 +1,7 @@
 package zlib
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -55,5 +56,31 @@ func TestEAPIResponsesLoseTerminalControlCharacters(t *testing.T) {
 	}
 	if book.Description != "line one\nline two\ttabbed]52;c;ZXZpbA==[2J31m" {
 		t.Errorf("description lost its newline or tab: %q", book.Description)
+	}
+}
+
+func TestCleanTextCoversMapKeysAndInvalidUTF8(t *testing.T) {
+	var decoded struct {
+		Year       any `json:"year"`
+		Categories any `json:"categories"`
+	}
+	body := `{"year":{"\u001b[2J":1},"categories":[{"\u001b]52;c;eA==\u0007name":"x"}]}`
+	if err := decodeEAPIJSON([]byte(body), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(decoded.Year, decoded.Categories); strings.ContainsAny(got, "\x1b\x07") {
+		t.Fatalf("map keys kept control characters: %q", got)
+	}
+	// A non-scalar field is not text; it must not be printed via fmt.Sprint.
+	if got := eapiString(decoded.Year); got != "" {
+		t.Fatalf("eapiString(map) = %q", got)
+	}
+	if got := eapiString(json.Number("1965")); got != "1965" {
+		t.Fatalf("eapiString(number) = %q", got)
+	}
+	// A lone 0x9b is CSI on an 8-bit terminal but not a control rune until
+	// the invalid byte is repaired.
+	if got := stripControl("a\x9b31mb", ""); strings.Contains(got, "\x9b") || got != "a\uFFFD31mb" {
+		t.Fatalf("stripControl kept a raw C1 byte: %q", got)
 	}
 }

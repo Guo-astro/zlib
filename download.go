@@ -326,7 +326,12 @@ func sanitizeFilenameFor(name, goos string) string {
 	// Normalize Windows separators so path.Base splits on them too, regardless
 	// of the host OS.
 	name = strings.ReplaceAll(name, `\`, "/")
-	name = stripControl(path.Base(name), "")
+	name = strings.Map(func(r rune) rune {
+		if isBidiControl(r) {
+			return -1
+		}
+		return r
+	}, stripControl(path.Base(name), ""))
 	if goos == "windows" {
 		name = windowsFilename(name)
 	}
