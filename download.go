@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -312,17 +313,46 @@ func filenameFromResponse(resp *http.Response, fallbackURL string) string {
 	return "download"
 }
 
-// sanitizeFilename strips any directory components from a download filename.
+// sanitizeFilename makes a download filename safe to write and to print.
 // The name can originate from a server-controlled Content-Disposition header,
 // so without this a malicious mirror could use ../ (or a leading slash) to
-// escape destDir and overwrite arbitrary files via filepath.Join.
+// escape destDir and overwrite arbitrary files via filepath.Join, or embed
+// terminal escape sequences that reach the screen in "Saved to:".
 func sanitizeFilename(name string) string {
+	return sanitizeFilenameFor(name, runtime.GOOS)
+}
+
+func sanitizeFilenameFor(name, goos string) string {
 	// Normalize Windows separators so path.Base splits on them too, regardless
 	// of the host OS.
 	name = strings.ReplaceAll(name, `\`, "/")
-	name = path.Base(name)
+	name = stripControl(path.Base(name), "")
+	if goos == "windows" {
+		name = windowsFilename(name)
+	}
 	if name == "" || name == "." || name == ".." || name == "/" {
 		return "download"
+	}
+	return name
+}
+
+// windowsFilename replaces what Windows rejects in a file name. Titles such
+// as "Dune: Messiah" are common, and the final rename failed on them after
+// the whole book had been downloaded.
+func windowsFilename(name string) string {
+	name = strings.Map(func(r rune) rune {
+		if strings.ContainsRune(`<>:"|?*`, r) {
+			return '_'
+		}
+		return r
+	}, name)
+	name = strings.TrimRight(name, ". ")
+	stem, _, _ := strings.Cut(name, ".")
+	switch strings.ToUpper(strings.TrimSpace(stem)) {
+	case "CON", "PRN", "AUX", "NUL",
+		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		name = "_" + name
 	}
 	return name
 }

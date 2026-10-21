@@ -27,13 +27,32 @@ func TestSanitizeFilename(t *testing.T) {
 		{"dotdot only", "..", "download"},
 		{"empty", "", "download"},
 		{"dot", ".", "download"},
+		{"terminal escapes", "Dune\x1b]52;c;ZXZpbA==\x07\x1b[2J.epub", "Dune]52;c;ZXZpbA==[2J.epub"},
+		{"control only", "\x1b\x07", "download"},
+		{"colon kept off windows", "Dune: Messiah.epub", "Dune: Messiah.epub"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := sanitizeFilename(tt.in); got != tt.want {
-				t.Errorf("sanitizeFilename(%q) = %q, want %q", tt.in, got, tt.want)
+			if got := sanitizeFilenameFor(tt.in, "linux"); got != tt.want {
+				t.Errorf("sanitizeFilenameFor(%q, linux) = %q, want %q", tt.in, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSanitizeFilenameForWindows(t *testing.T) {
+	for in, want := range map[string]string{
+		"Dune: Messiah.epub": "Dune_ Messiah.epub",
+		`a<b>c"d|e?f*g.pdf`:  "a_b_c_d_e_f_g.pdf",
+		"CON.epub":           "_CON.epub",
+		"lpt1":               "_lpt1",
+		"Console.epub":       "Console.epub",
+		"trailing dot.":      "trailing dot",
+		`C:\books\Dune.epub`: "Dune.epub",
+	} {
+		if got := sanitizeFilenameFor(in, "windows"); got != want {
+			t.Errorf("sanitizeFilenameFor(%q, windows) = %q, want %q", in, got, want)
+		}
 	}
 }
 

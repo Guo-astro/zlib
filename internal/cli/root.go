@@ -95,19 +95,19 @@ func formatCLIError(err error) string {
 	// SMTP errors already name the server, port and TLS mode; a generic
 	// network message would hide whether TLS, auth or the port is wrong.
 	case errors.As(err, &delivery), errors.Is(err, zlib.ErrSMTPSend):
-		return prefix + " " + err.Error()
+		return prefix + " " + safeText(err.Error())
 	case errors.Is(err, errNotLoggedIn), errors.Is(err, zlib.ErrNotLoggedIn):
 		return prefix + " not logged in. Run `zlib login` first."
 	case errors.Is(err, zlib.ErrSessionExpired):
 		return prefix + " the saved session expired or was revoked. Run `zlib login` to sign in again."
 	case errors.Is(err, zlib.ErrBotProtection):
-		return prefix + " " + err.Error() + ". This mirror is behind DiamWall; run `zlib doctor` and set ZLIB_DOMAIN to a reachable domain."
+		return prefix + " " + safeText(err.Error()) + ". This mirror is behind DiamWall; run `zlib doctor` and set ZLIB_DOMAIN to a reachable domain."
 	}
 	if msg, ok := classifyNetworkError(err); ok {
 		return prefix + " " + msg
 	}
 
-	return prefix + " " + err.Error()
+	return prefix + " " + safeText(err.Error())
 }
 
 // networkFailure words a network error, naming the host that failed. For a

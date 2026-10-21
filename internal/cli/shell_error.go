@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"strings"
+	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -74,4 +75,17 @@ func shellErrorText(err error) string {
 		return "Session expired. Use /login to sign in again."
 	}
 	return err.Error()
+}
+
+// safeText drops control characters other than newline and tab, so an error
+// message carrying server text cannot reach the terminal as an escape
+// sequence. The library already cleans EAPI responses; this guards the
+// outputs that print error text.
+func safeText(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) && r != '\n' && r != '\t' {
+			return -1
+		}
+		return r
+	}, s)
 }

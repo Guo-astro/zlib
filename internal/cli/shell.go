@@ -923,7 +923,7 @@ func (m shellModel) View() tea.View {
 		}
 	}
 	if m.kind == "info" && !m.typing {
-		lines := strings.Split(m.status, "\n")
+		lines := strings.Split(safeText(m.status), "\n")
 		visible := max(1, m.height-6)
 		start := min(max(0, m.infoOffset), max(0, len(lines)-visible))
 		end := min(len(lines), start+visible)
@@ -977,7 +977,7 @@ func (m shellModel) View() tea.View {
 
 func (m shellModel) noticeView(base tea.View) tea.View {
 	width := max(1, m.width)
-	message := strings.ReplaceAll(m.status, "\n", " ")
+	message := strings.ReplaceAll(safeText(m.status), "\n", " ")
 	message = strings.ReplaceAll(message, "\r", " ")
 	style := lipgloss.NewStyle().Foreground(currentTheme.Title).Background(currentTheme.Surface).Padding(0, 1)
 	switch m.noticeTone {

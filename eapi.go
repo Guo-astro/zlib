@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -429,10 +430,17 @@ func eapiCategoryText(value any) string {
 	return ""
 }
 
+// decodeEAPIJSON decodes an EAPI response into target and strips control
+// characters from every string in it (see cleanText), so no caller can print
+// a terminal escape sequence the server sent.
 func decodeEAPIJSON(body []byte, target any) error {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
-	return decoder.Decode(target)
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	cleanText(reflect.ValueOf(target))
+	return nil
 }
 
 func eapiString(value any) string {

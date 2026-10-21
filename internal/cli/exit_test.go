@@ -1,6 +1,7 @@
 package cli
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -137,5 +138,20 @@ func TestShellErrorTextPointsToSlashLogin(t *testing.T) {
 	}
 	if got := shellErrorText(fmt.Errorf("history: %w", zlib.ErrSessionExpired)); !strings.Contains(got, "/login") {
 		t.Fatalf("session expired = %q", got)
+	}
+}
+
+// Error text can quote a server; it must not reach the terminal as an escape
+// sequence, in the CLI error line or in shell feedback.
+func TestErrorOutputsDropControlCharacters(t *testing.T) {
+	hostile := errors.New("zlibrary: EAPI search failed: limit\x1b]52;c;ZXZpbA==\x07\x1b[2J")
+	if got := formatCLIError(hostile); strings.Contains(ansi.Strip(got), "\x1b") || strings.Contains(got, "\x07") || strings.Contains(got, "]52;c;ZXZpbA==\x07") {
+		t.Fatalf("formatCLIError kept control characters: %q", got)
+	}
+	m := newShellModel()
+	m, _ = shellStep(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+	m.setError(hostile.Error())
+	if view := m.View().Content; strings.Contains(view, "\x07") || strings.Contains(view, "\x1b]52") || strings.Contains(view, "\x1b[2J") {
+		t.Fatalf("shell notice kept control characters: %q", view)
 	}
 }
