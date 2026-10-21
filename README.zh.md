@@ -4,7 +4,8 @@
 
 # zlib
 
-Z-Library 命令行工具，搜索、下载图书并发送到 Kindle，你和 Claude Code、Codex 等 AI Agent 都能用。
+Z-Library 命令行工具，搜索、下载图书并发送到 Kindle，<br>
+你和 Claude Code、Codex 等 AI Agent 都能用。
 
 <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/heartleo/zlib" alt="Go version" height="20"/></a> <a href="https://github.com/heartleo/zlib/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/heartleo/zlib/ci.yml" alt="CI" height="20"/></a> <a href="https://github.com/heartleo/zlib/releases/latest"><img src="https://img.shields.io/github/v/release/heartleo/zlib" alt="Release" height="20"/></a> <a href="https://github.com/heartleo/zlib/releases"><img src="https://img.shields.io/github/downloads/heartleo/zlib/total" alt="Downloads" height="20"/></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" height="20"/></a>
 
@@ -16,7 +17,11 @@ Z-Library 命令行工具，搜索、下载图书并发送到 Kindle，你和 Cl
 
 </div>
 
-![终端搜书演示](docs/demo-search.gif)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/demo-search.gif">
+  <source media="(prefers-color-scheme: light)" srcset="docs/demo-search-light.gif">
+  <img src="docs/demo-search.gif" width="100%" alt="终端搜书演示">
+</picture>
 
 ## 功能
 

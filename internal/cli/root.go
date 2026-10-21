@@ -45,7 +45,11 @@ func resolveClientDomain(envDomain, sessionDomain string) string {
 	return strings.TrimSpace(sessionDomain)
 }
 
-func loadClient() (*zlib.Client, error) {
+// loadClient builds the authenticated client for a command. It is a variable
+// only so the demo recorder (demo_test.go) can serve fixture data instead.
+var loadClient = loadSessionClient
+
+func loadSessionClient() (*zlib.Client, error) {
 	session, err := config.LoadSession()
 	if err != nil || len(session.Cookies) == 0 {
 		return nil, errNotLoggedIn

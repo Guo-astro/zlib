@@ -4,7 +4,8 @@
 
 # zlib
 
-A Z-Library CLI to search, download, and send books to Kindle, for you and AI agents like Claude Code and Codex.
+A Z-Library CLI to search, download, and send books to Kindle,<br>
+for you and AI agents like Claude Code and Codex.
 
 <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/heartleo/zlib" alt="Go version" height="20"/></a> <a href="https://github.com/heartleo/zlib/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/heartleo/zlib/ci.yml" alt="CI" height="20"/></a> <a href="https://github.com/heartleo/zlib/releases/latest"><img src="https://img.shields.io/github/v/release/heartleo/zlib" alt="Release" height="20"/></a> <a href="https://github.com/heartleo/zlib/releases"><img src="https://img.shields.io/github/downloads/heartleo/zlib/total" alt="Downloads" height="20"/></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" height="20"/></a>
 
@@ -16,7 +17,11 @@ English | [简体中文](README.zh.md)
 
 </div>
 
-![Book search in the terminal](docs/demo-search.gif)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/demo-search.gif">
+  <source media="(prefers-color-scheme: light)" srcset="docs/demo-search-light.gif">
+  <img src="docs/demo-search.gif" width="100%" alt="Book search in the terminal">
+</picture>
 
 ## Features
 
