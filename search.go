@@ -1,11 +1,17 @@
 package zlib
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
 
 func (c *Client) Search(query string, page, count int, opts *SearchOptions) (SearchResult, error) {
+	return c.SearchContext(context.Background(), query, page, count, opts)
+}
+
+// SearchContext is Search with cancellation support.
+func (c *Client) SearchContext(ctx context.Context, query string, page, count int, opts *SearchOptions) (SearchResult, error) {
 	if !c.loggedIn {
 		return SearchResult{}, ErrNotLoggedIn
 	}
@@ -21,7 +27,7 @@ func (c *Client) Search(query string, page, count int, opts *SearchOptions) (Sea
 	if page <= 0 {
 		page = 1
 	}
-	return c.searchEAPI(query, page, count, opts)
+	return c.searchEAPIContext(ctx, query, page, count, opts)
 }
 
 // FullTextSearch is unavailable because the mobile EAPI has no verified

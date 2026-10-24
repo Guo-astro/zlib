@@ -1,6 +1,10 @@
 package zlib
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"net/http"
+)
 
 const (
 	recommendedBooksPath = "/eapi/user/book/recommended"
@@ -9,19 +13,33 @@ const (
 
 // RecommendedBooks returns the account's recommended books.
 func (c *Client) RecommendedBooks() ([]Book, error) {
-	return c.bookFeed(recommendedBooksPath)
+	return c.RecommendedBooksContext(context.Background())
+}
+
+// RecommendedBooksContext is RecommendedBooks with cancellation support.
+func (c *Client) RecommendedBooksContext(ctx context.Context) ([]Book, error) {
+	return c.bookFeedContext(ctx, recommendedBooksPath)
 }
 
 // MostPopularBooks returns the EAPI most-popular list.
 func (c *Client) MostPopularBooks() ([]Book, error) {
-	return c.bookFeed(mostPopularBooksPath)
+	return c.MostPopularBooksContext(context.Background())
+}
+
+// MostPopularBooksContext is MostPopularBooks with cancellation support.
+func (c *Client) MostPopularBooksContext(ctx context.Context) ([]Book, error) {
+	return c.bookFeedContext(ctx, mostPopularBooksPath)
 }
 
 func (c *Client) bookFeed(path string) ([]Book, error) {
+	return c.bookFeedContext(context.Background(), path)
+}
+
+func (c *Client) bookFeedContext(ctx context.Context, path string) ([]Book, error) {
 	if !c.loggedIn {
 		return nil, ErrNotLoggedIn
 	}
-	body, err := c.eapiGet(path, nil)
+	body, err := c.eapiRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}

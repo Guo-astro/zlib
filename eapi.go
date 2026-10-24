@@ -104,6 +104,10 @@ func (c *Client) LoginEAPIContext(ctx context.Context, email, password string) e
 }
 
 func (c *Client) searchEAPI(query string, page, count int, opts *SearchOptions) (SearchResult, error) {
+	return c.searchEAPIContext(context.Background(), query, page, count, opts)
+}
+
+func (c *Client) searchEAPIContext(ctx context.Context, query string, page, count int, opts *SearchOptions) (SearchResult, error) {
 	values := url.Values{
 		"message": {query},
 		"page":    {strconv.Itoa(page)},
@@ -130,7 +134,7 @@ func (c *Client) searchEAPI(query string, page, count int, opts *SearchOptions) 
 		}
 	}
 
-	body, err := c.eapiPost(eapiSearchPath, values)
+	body, err := c.eapiRequest(ctx, http.MethodPost, eapiSearchPath, values)
 	if err != nil {
 		return SearchResult{}, err
 	}

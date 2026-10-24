@@ -2,6 +2,7 @@ package zlib
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -81,6 +82,15 @@ func (c KindleConfig) Validate() error {
 }
 
 func SendToKindle(filePath string, cfg KindleConfig, smtpPassword string) error {
+	return SendToKindleContext(context.Background(), filePath, cfg, smtpPassword)
+}
+
+// SendToKindleContext sends an attachment and stops local work when ctx is
+// cancelled. Cancellation cannot retract a message already accepted by SMTP.
+func SendToKindleContext(ctx context.Context, filePath string, cfg KindleConfig, smtpPassword string) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("%w: %w", ErrSMTPSend, err)
+	}
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -91,6 +101,9 @@ func SendToKindle(filePath string, cfg KindleConfig, smtpPassword string) error 
 		return err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("%w: %w", ErrSMTPSend, err)
+	}
 	msg, err := buildKindleMessage(filePath, cfg)
 	if err != nil {
 		return err
@@ -98,7 +111,7 @@ func SendToKindle(filePath string, cfg KindleConfig, smtpPassword string) error 
 
 	security := cfg.Security()
 	auth := smtp.PlainAuth("", cfg.From, smtpPassword, cfg.SMTPHost)
-	if err := sendMail(cfg.SMTPHost, cfg.SMTPPort, security == SMTPSecurityTLS, auth, cfg.From, cfg.To, msg); err != nil {
+	if err := sendMailContext(ctx, cfg.SMTPHost, cfg.SMTPPort, security == SMTPSecurityTLS, auth, cfg.From, cfg.To, msg); err != nil {
 		addr := net.JoinHostPort(cfg.SMTPHost, strconv.Itoa(cfg.SMTPPort))
 		return fmt.Errorf("%w: %s (smtp_security %s): %w%s", ErrSMTPSend, addr, security, err, smtpModeHint(security, err))
 	}
@@ -110,6 +123,9 @@ func SendToKindle(filePath string, cfg KindleConfig, smtpPassword string) error 
 // timeout or EOF, and a TLS client talking to a plain server reads a record
 // that is not a TLS handshake.
 func smtpModeHint(security string, err error) string {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return ""
+	}
 	var netErr net.Error
 	var recordErr tls.RecordHeaderError
 	switch {
@@ -142,19 +158,48 @@ var (
 // plain text when the server does not offer it, and has no timeouts, so an
 // implicit-TLS server left it waiting for a greeting that never comes.
 func sendMail(host string, port int, implicitTLS bool, auth smtp.Auth, from, to string, msg []byte) error {
+	return sendMailContext(context.Background(), host, port, implicitTLS, auth, from, to, msg)
+}
+
+func sendMailContext(ctx context.Context, host string, port int, implicitTLS bool, auth smtp.Auth, from, to string, msg []byte) (err error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// Closing the connection interrupts net/smtp operations, including its
+	// STARTTLS handshake. Keep both the context and transport errors inspectable.
+	defer func() {
+		if err != nil && ctx.Err() != nil && !errors.Is(err, ctx.Err()) {
+			err = fmt.Errorf("%w: %w", ctx.Err(), err)
+		}
+	}()
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
-	raw, err := (&net.Dialer{Timeout: smtpDialTimeout}).Dial("tcp", addr)
+	raw, err := (&net.Dialer{Timeout: smtpDialTimeout}).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return err
 	}
+	defer raw.Close()
+	cancelled := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		_ = raw.Close()
+		close(cancelled)
+	})
+	defer func() {
+		if !stop() {
+			<-cancelled
+		}
+	}()
+
 	tlsConfig := &tls.Config{ServerName: host, RootCAs: smtpRootCAs, MinVersion: tls.VersionTLS12}
 	conn := net.Conn(&idleTimeoutConn{Conn: raw, timeout: smtpIdleTimeout})
 	if implicitTLS {
-		conn = tls.Client(conn, tlsConfig)
+		tlsConn := tls.Client(conn, tlsConfig)
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			return err
+		}
+		conn = tlsConn
 	}
 	c, err := smtp.NewClient(conn, host)
 	if err != nil {
-		conn.Close()
 		return err
 	}
 	defer c.Close()
@@ -168,6 +213,9 @@ func sendMail(host string, port int, implicitTLS bool, auth smtp.Auth, from, to 
 		}
 	}
 	if err := c.Auth(auth); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if err := c.Mail(from); err != nil {

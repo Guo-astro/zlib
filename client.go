@@ -68,6 +68,21 @@ func NewClient(opts ...ClientOption) *Client {
 
 type ClientOption func(*Client)
 
+// WithTransportFrom shares source's HTTP connection pool without sharing its
+// cookie jar or account state. Both clients must use the same proxy settings.
+// Configure source before sharing it; do not change its transport concurrently.
+func WithTransportFrom(source *Client) ClientOption {
+	return func(c *Client) {
+		c.httpClient.Transport = source.httpClient.Transport
+	}
+}
+
+// CloseIdleConnections releases idle connections owned by the client's transport.
+// Active requests are not interrupted.
+func (c *Client) CloseIdleConnections() {
+	c.httpClient.CloseIdleConnections()
+}
+
 func WithDomain(domain string) ClientOption {
 	return func(c *Client) {
 		c.SetDomain(domain)

@@ -128,12 +128,11 @@ zlib download "id:hash"
 
 ## Agent 接入
 
-安装插件即可。没有 `zlib` 时，Agent 首次使用会自行安装。
-登录请自己运行 `zlib login`，密码不要发到对话里。
+可安装 Agent 插件，或直接注册 MCP 服务（`zlib mcp`）。没有 `zlib` 时，插件首次使用会自行安装。登录请自己运行 `zlib login`，密码不要发到对话里。
 
 ### Claude Code
 
-在 Claude Code 中执行：
+安装插件：
 
 ```text
 /plugin marketplace add heartleo/zlib
@@ -142,16 +141,33 @@ zlib download "id:hash"
 
 ### Codex
 
-在终端执行：
+安装插件：
 
 ```sh
 codex plugin marketplace add heartleo/zlib
 codex plugin add zlib@zlib
 ```
 
+### MCP 快速开始
+
+通过 stdio 注册 `zlib mcp`（需已安装 `zlib` 并在本地完成登录）：
+
+```sh
+# Claude Code
+claude mcp add zlib -- zlib mcp
+claude mcp get zlib
+
+# Codex
+codex mcp add zlib -- zlib mcp
+codex mcp get zlib
+```
+
+在末尾加上 `--read-only`（`zlib mcp --read-only`）可只开放搜索、图书详情、书单、历史查询、账号配额和域名检测，禁用下载、删除历史和发送到 Kindle。
+也可用 `--disable-kindle`、`--disable-history-delete` 或 `--disable-download` 单独关闭写操作。禁用 Kindle 也会阻止下载后发送。加上 `--allowed-dir ~/Books` 可把下载和 Kindle 附件限制在一个目录内。下载可能覆盖同名文件，请在客户端要求确认写操作；只读模式仍会返回账号资料。
+
 然后告诉 Agent：
 
-> 用 zlib 搜索 The Pragmatic Programmer 的 EPUB 版本，先列出结果，再决定下载。
+> 用 zlib MCP 搜索 The Pragmatic Programmer 的 EPUB 版本，先列出结果和今日剩余下载次数，再决定下载。
 
 ## 文档
 

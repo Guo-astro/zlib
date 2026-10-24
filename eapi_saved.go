@@ -1,20 +1,27 @@
 package zlib
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 )
 
 // SavedBooks returns one page of the account's saved books.
 func (c *Client) SavedBooks(page int) (SearchResult, error) {
+	return c.SavedBooksContext(context.Background(), page)
+}
+
+// SavedBooksContext is SavedBooks with cancellation support.
+func (c *Client) SavedBooksContext(ctx context.Context, page int) (SearchResult, error) {
 	if !c.loggedIn {
 		return SearchResult{}, ErrNotLoggedIn
 	}
 	if page < 1 {
 		page = 1
 	}
-	body, err := c.eapiGet("/eapi/user/book/saved", url.Values{
+	body, err := c.eapiRequest(ctx, http.MethodGet, "/eapi/user/book/saved", url.Values{
 		"page":  {strconv.Itoa(page)},
 		"limit": {"50"},
 	})

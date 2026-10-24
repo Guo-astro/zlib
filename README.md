@@ -132,12 +132,13 @@ pagination, and download options.
 
 ## Agent setup
 
-Install the plugin. If `zlib` is missing, the agent installs it on first use.
-Log in yourself with `zlib login` so your password stays out of chat.
+Install the plugin, or register the MCP server (`zlib mcp`). If `zlib` is
+missing, the plugin installs it on first use. Log in yourself with `zlib login`
+so your password stays out of chat.
 
 ### Claude Code
 
-Run inside Claude Code:
+Plugin:
 
 ```text
 /plugin marketplace add heartleo/zlib
@@ -146,16 +147,39 @@ Run inside Claude Code:
 
 ### Codex
 
-Run in your terminal:
+Plugin:
 
 ```sh
 codex plugin marketplace add heartleo/zlib
 codex plugin add zlib@zlib
 ```
 
+### MCP quick start
+
+Register `zlib mcp` over stdio (`zlib` must be on `PATH` and signed in):
+
+```sh
+# Claude Code
+claude mcp add zlib -- zlib mcp
+claude mcp get zlib
+
+# Codex
+codex mcp add zlib -- zlib mcp
+codex mcp get zlib
+```
+
+Append `--read-only` (`zlib mcp --read-only`) to expose only search, book
+details, feeds, history, profile, and domain checks, omitting download, history
+deletion, and Kindle delivery. Use `--disable-kindle`, `--disable-history-delete`,
+or `--disable-download` to disable individual write capabilities. Disabling Kindle
+also prevents delivery after a download. Add `--allowed-dir ~/Books` to keep
+downloads and Kindle attachments inside one folder. Downloads may overwrite
+same-named files; require client approval for writes. Read-only mode still
+exposes account data.
+
 Then ask your agent:
 
-> Use zlib to find The Pragmatic Programmer in EPUB. Show the results before downloading.
+> Use the zlib MCP server to find The Pragmatic Programmer in EPUB. Show the results and my remaining daily quota before downloading.
 
 ## Documentation
 

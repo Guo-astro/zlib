@@ -1,13 +1,23 @@
 package zlib
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"strings"
 )
 
 // DeleteDownloadHistory removes a remote history entry, leaving local files intact.
 // ref accepts a numeric book ID or id:hash.
 func (c *Client) DeleteDownloadHistory(ref string) error {
+	return c.DeleteDownloadHistoryContext(context.Background(), ref)
+}
+
+// DeleteDownloadHistoryContext is DeleteDownloadHistory with cancellation support.
+func (c *Client) DeleteDownloadHistoryContext(ctx context.Context, ref string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if !c.loggedIn {
 		return ErrNotLoggedIn
 	}
@@ -15,7 +25,7 @@ func (c *Client) DeleteDownloadHistory(ref string) error {
 	if id == "" || strings.Trim(id, "0123456789") != "" {
 		return fmt.Errorf("zlibrary: history deletion requires a numeric book ID")
 	}
-	body, err := c.eapiGet("/eapi/user/book/"+id+"/delete", nil)
+	body, err := c.eapiRequest(ctx, http.MethodGet, "/eapi/user/book/"+id+"/delete", nil)
 	if err != nil {
 		return err
 	}

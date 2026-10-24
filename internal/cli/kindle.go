@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -85,17 +86,9 @@ func init() {
 // and prints the outcome on stdout; without it (--json) stdout stays free for
 // the caller's document and only the "Sending" status reaches stderr.
 func sendDownloadedFileToKindle(filePath string, report bool) (string, error) {
-	cfg, err := config.LoadKindleConfig()
+	cfg, password, err := kindleDeliverySettings()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return "", fmt.Errorf("kindle config not found; run: zlib kindle config")
-		}
-		return "", fmt.Errorf("failed to load kindle config: %w", err)
-	}
-
-	password := os.Getenv(kindleSMTPPasswordEnv)
-	if strings.TrimSpace(password) == "" {
-		return "", fmt.Errorf("kindle smtp password not set; export %s", kindleSMTPPasswordEnv)
+		return "", err
 	}
 
 	// Run the spinner UI on a terminal; send directly otherwise so the
@@ -121,6 +114,34 @@ func sendDownloadedFileToKindle(filePath string, report bool) (string, error) {
 		lipgloss.Fprintf(os.Stdout, "%s Final delivery depends on Amazon approval and file compatibility.\n", colorFaint(symbolInfo))
 	}
 	return cfg.To, nil
+}
+
+func kindleDeliverySettings() (zlib.KindleConfig, string, error) {
+	cfg, err := config.LoadKindleConfig()
+	if err != nil {
+		if os.IsNotExist(err) {
+			return cfg, "", fmt.Errorf("kindle config not found; run: zlib kindle config")
+		}
+		return cfg, "", fmt.Errorf("failed to load kindle config: %w", err)
+	}
+	password := os.Getenv(kindleSMTPPasswordEnv)
+	if strings.TrimSpace(password) == "" {
+		return cfg, "", fmt.Errorf("kindle smtp password not set; export %s", kindleSMTPPasswordEnv)
+	}
+	return cfg, password, nil
+}
+
+// sendFileToKindlePlain sends filePath via SMTP without writing to stdout or
+// stderr, keeping stdio clean for MCP JSON-RPC frames.
+func sendFileToKindlePlain(ctx context.Context, filePath string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	cfg, password, err := kindleDeliverySettings()
+	if err != nil {
+		return "", err
+	}
+	return cfg.To, zlib.SendToKindleContext(ctx, filePath, cfg, password)
 }
 
 // — kindle send model (spinner during SMTP send) —

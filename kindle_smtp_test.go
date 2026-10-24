@@ -1,6 +1,7 @@
 package zlib
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -29,6 +30,15 @@ type smtpSession struct {
 type fakeSMTP struct {
 	port     int
 	sessions chan smtpSession
+	accepted chan struct{}
+	stallAt  string
+	stalled  chan struct{}
+	resume   chan struct{}
+}
+
+func (f *fakeSMTP) stall() {
+	close(f.stalled)
+	<-f.resume
 }
 
 // smtpTestTLS returns a server config for 127.0.0.1 and points the client's
@@ -50,20 +60,57 @@ func smtpTestTLS(t *testing.T) *tls.Config {
 
 func startFakeSMTP(t *testing.T, tlsConfig *tls.Config, implicitTLS, offerSTARTTLS bool) *fakeSMTP {
 	t.Helper()
+	return startFakeSMTPWithStall(t, tlsConfig, implicitTLS, offerSTARTTLS, "")
+}
+
+func startFakeSMTPWithStall(t *testing.T, tlsConfig *tls.Config, implicitTLS, offerSTARTTLS bool, stallAt string) *fakeSMTP {
+	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { ln.Close() })
-	f := &fakeSMTP{port: ln.Addr().(*net.TCPAddr).Port, sessions: make(chan smtpSession, 1)}
+	f := &fakeSMTP{
+		port:     ln.Addr().(*net.TCPAddr).Port,
+		sessions: make(chan smtpSession, 1),
+		accepted: make(chan struct{}),
+		stallAt:  stallAt,
+		stalled:  make(chan struct{}),
+		resume:   make(chan struct{}),
+	}
+	done := make(chan struct{})
+	connections := make(chan net.Conn, 1)
+	t.Cleanup(func() {
+		ln.Close()
+		close(f.resume)
+		select {
+		case conn := <-connections:
+			conn.Close()
+		case <-done:
+		}
+		<-done
+	})
 	go func() {
+		defer close(done)
 		conn, err := ln.Accept()
 		if err != nil {
 			return
 		}
+		connections <- conn
+		close(f.accepted)
 		defer conn.Close()
+		if implicitTLS && stallAt == "tls" {
+			var hello [1]byte
+			if _, err := conn.Read(hello[:]); err == nil {
+				f.stall()
+			}
+			return
+		}
 		if implicitTLS {
 			conn = tls.Server(conn, tlsConfig)
+		}
+		if stallAt == "greeting" {
+			f.stall()
+			return
 		}
 		f.serve(conn, tlsConfig, implicitTLS, offerSTARTTLS)
 	}()
@@ -91,6 +138,13 @@ func (f *fakeSMTP) serve(conn net.Conn, tlsConfig *tls.Config, overTLS, offerSTA
 			_ = tp.PrintfLine("250 AUTH PLAIN")
 		case "STARTTLS":
 			_ = tp.PrintfLine("220 ready")
+			if f.stallAt == "tls" {
+				var hello [1]byte
+				if _, err := conn.Read(hello[:]); err == nil {
+					f.stall()
+				}
+				return
+			}
 			conn = tls.Server(conn, tlsConfig)
 			tp = textproto.NewConn(conn)
 			overTLS = true
@@ -105,6 +159,12 @@ func (f *fakeSMTP) serve(conn net.Conn, tlsConfig *tls.Config, overTLS, offerSTA
 			_ = tp.PrintfLine("250 ok")
 		case "DATA":
 			_ = tp.PrintfLine("354 go")
+			if f.stallAt == "upload" {
+				if _, err := tp.R.ReadByte(); err == nil {
+					f.stall()
+				}
+				return
+			}
 			data, err := tp.ReadDotBytes()
 			if err != nil {
 				return
@@ -258,5 +318,114 @@ func TestSendToKindleRejectsPlainServerInTLSMode(t *testing.T) {
 		if verb == "EHLO" || verb == "AUTH" || verb == "MAIL" {
 			t.Fatalf("client sent %s in plain text to a TLS-mode port", verb)
 		}
+	}
+}
+
+func TestSendToKindleContextPreCancelledNeverDials(t *testing.T) {
+	f := startFakeSMTP(t, nil, false, false)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// A nonexistent attachment also proves cancellation precedes file loading.
+	err := SendToKindleContext(ctx, filepath.Join(t.TempDir(), "missing.epub"), kindleTestConfig(f.port, ""), "test-password")
+	if !errors.Is(err, context.Canceled) || !errors.Is(err, ErrSMTPSend) {
+		t.Fatalf("SendToKindleContext() error = %v, want context.Canceled and ErrSMTPSend", err)
+	}
+	if err := sendMailContext(ctx, "127.0.0.1", f.port, false, nil, "", "", nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("sendMailContext() error = %v, want context.Canceled", err)
+	}
+	select {
+	case <-f.accepted:
+		t.Fatal("cancelled send opened an SMTP connection")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestSendToKindleContextCancelsBlockedHandshake(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		security string
+		stallAt  string
+	}{
+		{"greeting", SMTPSecuritySTARTTLS, "greeting"},
+		{"implicit TLS", SMTPSecurityTLS, "tls"},
+		{"STARTTLS", SMTPSecuritySTARTTLS, "tls"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tlsConfig := smtpTestTLS(t)
+			f := startFakeSMTPWithStall(t, tlsConfig, tt.security == SMTPSecurityTLS, true, tt.stallAt)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			result := make(chan error, 1)
+			path := kindleTestFile(t)
+			go func() {
+				result <- SendToKindleContext(ctx, path, kindleTestConfig(f.port, tt.security), "test-password")
+			}()
+			waitForSMTPStall(t, f, result)
+			cancel()
+			assertSMTPContextError(t, result, context.Canceled)
+		})
+	}
+}
+
+func TestSendToKindleContextDeadlineDuringGreeting(t *testing.T) {
+	f := startFakeSMTPWithStall(t, nil, false, true, "greeting")
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+	path := kindleTestFile(t)
+	result := make(chan error, 1)
+	go func() {
+		result <- SendToKindleContext(ctx, path, kindleTestConfig(f.port, SMTPSecuritySTARTTLS), "test-password")
+	}()
+	waitForSMTPStall(t, f, result)
+	assertSMTPContextError(t, result, context.DeadlineExceeded)
+}
+
+func TestSendToKindleContextCancelsBlockedUpload(t *testing.T) {
+	for _, security := range []string{SMTPSecurityTLS, SMTPSecuritySTARTTLS} {
+		t.Run(security, func(t *testing.T) {
+			tlsConfig := smtpTestTLS(t)
+			f := startFakeSMTPWithStall(t, tlsConfig, security == SMTPSecurityTLS, true, "upload")
+			path := kindleTestFile(t)
+			// Exceed socket buffers so DATA cannot finish while the server stalls.
+			if err := os.Truncate(path, 8*1024*1024); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			result := make(chan error, 1)
+			go func() {
+				result <- SendToKindleContext(ctx, path, kindleTestConfig(f.port, security), "test-password")
+			}()
+			waitForSMTPStall(t, f, result)
+			cancel()
+			assertSMTPContextError(t, result, context.Canceled)
+		})
+	}
+}
+
+func waitForSMTPStall(t *testing.T, f *fakeSMTP, result <-chan error) {
+	t.Helper()
+	select {
+	case <-f.stalled:
+	case err := <-result:
+		t.Fatalf("send returned before SMTP stalled: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("SMTP did not reach the blocked phase")
+	}
+}
+
+func assertSMTPContextError(t *testing.T, result <-chan error, want error) {
+	t.Helper()
+	select {
+	case err := <-result:
+		if !errors.Is(err, want) || !errors.Is(err, ErrSMTPSend) {
+			t.Fatalf("SendToKindleContext() error = %v, want %v and ErrSMTPSend", err, want)
+		}
+		if strings.Contains(err.Error(), "set smtp_security") {
+			t.Fatalf("cancellation suggested changing TLS mode: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("SMTP did not stop promptly after context cancellation")
 	}
 }

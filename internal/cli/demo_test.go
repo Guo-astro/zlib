@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -85,6 +86,24 @@ func demoFind(id string) (demoBook, bool) {
 	return demoBook{}, false
 }
 
+// demoHistoryBookJSON renders a history entry. It is a variable so tests can
+// drop the extension and size fields the EAPI history sometimes omits.
+var demoHistoryBookJSON = func(b demoBook) map[string]any { return b.json() }
+
+// demoBookList renders books for a saved/history response; history uses the
+// replaceable renderer.
+func demoBookList(books []demoBook, path string) []map[string]any {
+	render := demoHistoryBookJSON
+	if path != "/eapi/user/book/downloaded" {
+		render = func(b demoBook) map[string]any { return b.json() }
+	}
+	out := make([]map[string]any, 0, len(books))
+	for _, b := range books {
+		out = append(out, render(b))
+	}
+	return out
+}
+
 // newDemoServer answers the EAPI calls the CLI makes with fixture data. It
 // holds no real account, session or book, and never contacts Z-Library.
 func newDemoServer() *httptest.Server {
@@ -100,12 +119,15 @@ func newDemoServer() *httptest.Server {
 		}
 		return out
 	}
+	fast := os.Getenv("ZLIB_DEMO_FAST") == "1"
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		switch {
 		case path == "/eapi/book/search":
-			// Make the request visibly take a moment, as a real mirror does.
-			time.Sleep(700 * time.Millisecond)
+			if !fast {
+				// Make the request visibly take a moment, as a real mirror does.
+				time.Sleep(700 * time.Millisecond)
+			}
 			r.ParseForm()
 			page, _ := strconv.Atoi(r.FormValue("page"))
 			page = max(page, 1)
@@ -117,8 +139,10 @@ func newDemoServer() *httptest.Server {
 				"id": 1, "name": "Reader", "email": "reader@example.com",
 				"downloads_today": 3, "downloads_limit": 10}})
 		case path == "/eapi/user/book/downloaded", path == "/eapi/user/book/saved":
-			reply(w, map[string]any{"success": 1, "books": list(demoCatalogue[:4]),
+			reply(w, map[string]any{"success": 1, "books": demoBookList(demoCatalogue[:4], path),
 				"pagination": map[string]any{"current": 1, "total_pages": 1}})
+		case strings.HasPrefix(path, "/eapi/user/book/") && strings.HasSuffix(path, "/delete"):
+			reply(w, map[string]any{"success": 1})
 		case path == "/eapi/user/book/recommended", path == "/eapi/book/most-popular":
 			reply(w, map[string]any{"success": 1, "books": list(demoCatalogue[8:16])})
 		case strings.HasPrefix(path, "/eapi/book/") && strings.HasSuffix(path, "/file"):
@@ -156,6 +180,7 @@ func serveDemoFile(w http.ResponseWriter, b demoBook) {
 	name := strings.ReplaceAll(b.title, ":", "") + " (" + b.author + ")." + b.ext
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name))
 	w.Header().Set("Content-Length", strconv.Itoa(size))
+	fast := os.Getenv("ZLIB_DEMO_FAST") == "1"
 	const steps = 40
 	chunk := make([]byte, size/steps+1)
 	for written := 0; written < size; written += len(chunk) {
@@ -164,7 +189,9 @@ func serveDemoFile(w http.ResponseWriter, b demoBook) {
 			return
 		}
 		w.(http.Flusher).Flush()
-		time.Sleep(50 * time.Millisecond)
+		if !fast {
+			time.Sleep(50 * time.Millisecond)
+		}
 	}
 }
 
@@ -194,6 +221,7 @@ func TestDemo(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	t.Setenv(downloadDirEnvVar, books)
 	t.Setenv(zlib.EnvDomain, "")
+	t.Setenv(zlib.EnvProxy, "")
 	cookies := map[string]string{"remix_userid": "1", "remix_userkey": "demo"}
 	if err := config.SaveSession(config.Session{Cookies: cookies, Domain: "https://z-lib.gd", Mode: string(zlib.ClientModeEAPI)}); err != nil {
 		t.Fatal(err)
@@ -208,6 +236,16 @@ func TestDemo(t *testing.T) {
 		return c, nil
 	}
 	defer func() { loadClient = previous }()
+	prevProbe := probeAvailableDomains
+	probeAvailableDomains = func(_ context.Context, _ []string, _ string) []zlib.DomainCheck {
+		return []zlib.DomainCheck{{
+			Domain:     "https://z-lib.gd",
+			Status:     zlib.DomainStatusHealthy,
+			HTTPStatus: http.StatusOK,
+			FinalURL:   "https://z-lib.gd/eapi/info/domains",
+		}}
+	}
+	defer func() { probeAvailableDomains = prevProbe }()
 
 	resolveTheme()
 	markUsageErrors(rootCmd)

@@ -1,13 +1,19 @@
 package zlib
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 )
 
 func (c *Client) getProfileEAPI() (UserProfile, error) {
-	body, err := c.eapiGet("/eapi/user/profile", nil)
+	return c.getProfileEAPIContext(context.Background())
+}
+
+func (c *Client) getProfileEAPIContext(ctx context.Context) (UserProfile, error) {
+	body, err := c.eapiRequest(ctx, http.MethodGet, "/eapi/user/profile", nil)
 	if err != nil {
 		return UserProfile{}, err
 	}
@@ -92,7 +98,11 @@ func eapiFlag(value any) *bool {
 }
 
 func (c *Client) downloadHistoryEAPI(page int) (DownloadHistoryResult, error) {
-	body, err := c.eapiGet("/eapi/user/book/downloaded", url.Values{
+	return c.downloadHistoryEAPIContext(context.Background(), page)
+}
+
+func (c *Client) downloadHistoryEAPIContext(ctx context.Context, page int) (DownloadHistoryResult, error) {
+	body, err := c.eapiRequest(ctx, http.MethodGet, "/eapi/user/book/downloaded", url.Values{
 		"page":  {strconv.Itoa(page)},
 		"limit": {"50"},
 	})

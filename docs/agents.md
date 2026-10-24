@@ -110,6 +110,118 @@ zlib kindle send ./books/book.epub
 `profile --json` contains personal account information, though it omits
 authentication keys. Handle that output as private account data.
 
+## Model Context Protocol (MCP) server
+
+`zlib mcp` runs a stdio MCP server exposing Z-Library tools with structured
+inputs and outputs. It uses the same local session (`~/.config/zlib/session.json`)
+and `.env` settings as the CLI.
+
+### MCP quick start
+
+1. Confirm `zlib` is installed and signed in:
+
+   ```sh
+   zlib version
+   zlib mcp --help
+   zlib profile --json
+   ```
+
+2. Register and verify the server in Claude Code or Codex:
+
+   ```sh
+   # Claude Code
+   claude mcp add zlib -- zlib mcp
+   claude mcp get zlib
+
+   # Codex
+   codex mcp add zlib -- zlib mcp
+   codex mcp get zlib
+   ```
+
+   For read-only access (disables `download_book`, `delete_download_history`, and
+   `send_to_kindle`), pass `--read-only`:
+
+   ```sh
+   claude mcp add zlib -- zlib mcp --read-only
+   codex mcp add zlib -- zlib mcp --read-only
+   ```
+
+   To allow downloads without email or history deletion, register with
+   `zlib mcp --disable-kindle --disable-history-delete` instead. The separate
+   `--disable-download` flag hides only the download tool. `--disable-kindle`
+   also blocks `download_book.send_to_kindle`; `--read-only` overrides all write
+   capabilities.
+
+   To keep downloads and Kindle attachments inside one folder, add
+   `--allowed-dir ~/Books`. Paths outside it, including through symlinks or
+   Windows junctions, are rejected. Downloads without a `dir` go to
+   `ZLIB_DOWNLOAD_DIR` when it lies inside that folder, otherwise to the folder
+   itself. `--log-level` (`off`, `error`, `warn`
+   by default, `info`, `debug`) writes tool names, durations and failures to
+   stderr, never arguments.
+
+   You can also configure Codex in `~/.codex/config.toml`:
+
+   ```toml
+   [mcp_servers.zlib]
+   command = "zlib"
+   args = ["mcp"]
+   ```
+
+3. Use it in an interactive session or headless run:
+
+   > Use the zlib MCP tools to check my remaining daily downloads, search for
+   > "Dune" in EPUB, and show the first 5 matches with IDs and sizes.
+
+   Non-interactive runs:
+
+   ```sh
+   codex exec "Use zlib MCP to search for 'Dune' in EPUB and list the top 3 IDs."
+   claude -p "Use mcp__zlib__search_books to find 'Dune' in EPUB and list the top 3 IDs." --allowedTools "mcp__zlib__search_books"
+   ```
+
+### Permissions and results
+
+Downloads can replace same-named files. Kindle delivery reads a local file and
+emails it to the configured recipient. Require client approval for these actions
+and for history deletion; tool annotations are hints, not authorization.
+Read-only mode still exposes account details and history. Without
+`--allowed-dir`, the server can write and read wherever the local user can.
+`check_domains` takes no proxy argument; it uses `ZLIB_PROXY` when set.
+
+MCP search accepts `count` from 1 to 50 (default 10) and pages starting at 1.
+Year filters accept 1000 through 9999, or 0 to leave a bound unset. Invalid
+arguments are tool errors that name the argument and its allowed values.
+History metadata failures return an error instead of an incomplete filtered
+list. Restart the server after changing environment or proxy settings; account
+sessions are reread on each call.
+
+Book lists return `id`, `name`, `authors`, `publisher`, `year`, `language`,
+`extension`, `size` and `rating`; `get_book` adds ISBNs, edition, pages,
+categories and description. Error messages show only the scheme and host of any
+URL, so signed download links and proxy credentials stay out of transcripts.
+
+Cancelling a tool stops its HTTP and SMTP work. A completed file remains saved,
+and mail already accepted by the SMTP server cannot be recalled. A failed Kindle
+step after a download retains the file path in the result; do not download again
+just to retry delivery.
+
+### Available tools
+
+| Tool | Mode | Description |
+| --- | --- | --- |
+| `search_books` | Read | Search books with format, language, year, and order filters |
+| `get_book` | Read | Fetch book metadata and description by `id:hash` |
+| `get_recommended_books` | Read | Personalized recommendations for the signed-in account |
+| `get_most_popular_books` | Read | Most popular books on Z-Library |
+| `get_saved_books` | Read | Paged favorite books |
+| `get_download_history` | Read | Paged download history with optional format filter |
+| `get_profile` | Read | Account profile and daily quota |
+| `check_domains` | Read | Probe known mirrors to find reachable domains |
+| `download_book` | Write | Download a book by `id:hash` with MCP progress notifications |
+| `delete_download_history` | Write | Remove an entry from remote history by ID or `id:hash` |
+| `send_to_kindle` | Write | Send a local ebook file to Kindle via SMTP |
+
 ## Maintain the skills
 
 Edit `.agents/skills/<name>/SKILL.md` and its `references/` files. Run

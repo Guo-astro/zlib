@@ -209,39 +209,14 @@ func searchOptsFromFlags(cmd *cobra.Command) (*zlib.SearchOptions, error) {
 	langs, _ := cmd.Flags().GetStringArray("language")
 	exact, _ := cmd.Flags().GetBool("exact")
 	orderRaw, _ := cmd.Flags().GetString("order")
-	if from < 0 || to < 0 || from > 0 && from < 1000 || to > 0 && to < 1000 || from > 9999 || to > 9999 || from > 0 && to > 0 && from > to {
-		return nil, fmt.Errorf("invalid year range")
-	}
-	order := zlib.OrderOption(orderRaw)
-	if order != "" {
-		valid := false
-		for _, choice := range searchSorts {
-			if choice.value == order {
-				valid = true
-				break
-			}
-		}
-		if !valid {
-			return nil, fmt.Errorf("invalid search order %q", orderRaw)
-		}
-	}
-	seen := make(map[zlib.Extension]bool)
-	opts := &zlib.SearchOptions{FromYear: from, ToYear: to, Exact: exact, Order: order}
-	for _, e := range exts {
-		ext := zlib.Extension(strings.ToUpper(e))
-		if seen[ext] {
-			continue
-		}
-		seen[ext] = true
-		opts.Extensions = append(opts.Extensions, ext)
-	}
-	for _, language := range langs {
-		opts.Languages = append(opts.Languages, zlib.Language(strings.ToLower(language)))
-	}
-	if len(opts.Extensions) == 0 && len(opts.Languages) == 0 && from == 0 && to == 0 && !exact && order == "" {
-		return nil, nil
-	}
-	return opts, nil
+	return searchOptions(searchFilterValues{
+		Extensions: exts,
+		Languages:  langs,
+		FromYear:   from,
+		ToYear:     to,
+		Exact:      exact,
+		Order:      orderRaw,
+	})
 }
 
 func init() {
