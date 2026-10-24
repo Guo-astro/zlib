@@ -148,6 +148,7 @@ html[data-theme="mocha"] .i-moon{display:none}
 }
 .ghlink:hover{color:var(--strong);border-color:var(--faint)}
 .ghlink svg{width:15px;height:15px;fill:currentColor}
+.ghlink .star{color:var(--accent)}
 
 /* ── hero ─────────────────────────────────────────────── */
 .hero{padding-block:clamp(48px,7vw,86px) clamp(56px,8vw,96px)}
@@ -300,6 +301,10 @@ h1 .z{color:var(--accent);font-style:italic;font-weight:500}
   padding:.8rem .9rem;overflow-x:auto;font-family:var(--mono);font-size:.78rem;line-height:1.75;
 }
 .card pre .p{color:var(--t-mauve)}
+/* mcp: bottom-align the two code blocks, and give the caveat its own line */
+#mcp .card{display:flex;flex-direction:column}
+#mcp .card pre{margin-top:auto}
+#mcp .note{color:var(--faint);font-size:.85rem;margin-top:1.6rem;font-family:var(--mono);line-height:1.6}
 .card .after{color:var(--faint);font-size:.85rem;margin:1rem 0 0}
 .card .after code{font-family:var(--mono);font-size:.92em;color:var(--accent)}
 
@@ -334,6 +339,7 @@ h1 .z{color:var(--accent);font-style:italic;font-weight:500}
 .cta{text-align:center;padding-block:clamp(52px,6vw,84px) clamp(80px,10vw,128px)}
 .cta h2{font-size:clamp(1.9rem,4.2vw,3rem);margin-bottom:.7rem}
 .cta p{color:var(--subtext);margin-bottom:2.1rem}
+.cta p.star-ask{font-size:.9rem;color:var(--faint);margin-top:-1.3rem}
 .btns{display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap}
 .btn{
   display:inline-flex;align-items:center;gap:.5rem;text-decoration:none;

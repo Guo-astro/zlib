@@ -77,6 +77,7 @@
       <a href="#install" data-i18n="en">Install</a><a href="#install" data-i18n="zh">安装</a>
       <a href="#commands" data-i18n="en">Commands</a><a href="#commands" data-i18n="zh">命令</a>
       <a href="#agents" data-i18n="en">Agents</a><a href="#agents" data-i18n="zh">插件</a>
+      <a href="#mcp">MCP</a>
       <a href="#access" data-i18n="en">Access</a><a href="#access" data-i18n="zh">访问</a>
       <a href="#themes" data-i18n="en">Themes</a><a href="#themes" data-i18n="zh">主题</a>
     </nav>
@@ -89,9 +90,9 @@
         <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.05 4.05l1.56 1.56M18.39 18.39l1.56 1.56M2.6 12h2.2M19.2 12h2.2M4.05 19.95l1.56-1.56M18.39 5.61l1.56-1.56"/></svg>
         <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.4 13.6A8.4 8.4 0 1 1 10.4 3.6a6.6 6.6 0 0 0 10 10Z"/></svg>
       </button>
-      <a class="ghlink" href="https://github.com/heartleo/zlib" target="_blank" rel="noopener" aria-label="zlib on GitHub">
+      <a class="ghlink" href="https://github.com/heartleo/zlib" target="_blank" rel="noopener" aria-label="Star zlib on GitHub">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-        <span class="cnt">GitHub</span>
+        <span class="cnt"><span class="star" aria-hidden="true">&#9734;</span> Star</span>
       </a>
     </div>
   </div>
@@ -277,12 +278,46 @@
     </div>
     <div class="card">
       <h3>Codex</h3>
-      <p><span data-i18n="en">A skills-only plugin, so there is no MCP server to keep running.</span><span data-i18n="zh">纯 skills 插件，不需要常驻 MCP server。</span></p>
+      <p><span data-i18n="en">A skills-only plugin with no server to keep running.</span><span data-i18n="zh">纯 skills 插件，不需要常驻服务。</span></p>
       <pre><span class="p">$</span> codex plugin marketplace add heartleo/zlib
 <span class="p">$</span> codex plugin add zlib@zlib</pre>
       <p class="after"><span data-i18n="en">Ask Codex to find a title, or point the bundled Kindle skill at a local file.</span><span data-i18n="zh">让 Codex 找书，或者把自带的 Kindle skill 指向本地文件。</span></p>
     </div>
   </div>
+</section>
+
+<!-- ── mcp ─────────────────────────────────────────────────── -->
+<section class="wrap band" id="mcp">
+  <div class="eyebrow">$ zlib mcp</div>
+  <h2 class="sec">
+    <span data-i18n="en">Or connect over MCP.</span>
+    <span data-i18n="zh">也可以接入 MCP。</span>
+  </h2>
+  <p class="lede" style="margin-bottom:2.4rem">
+    <span data-i18n="en"><b class="mono">zlib mcp</b> is a stdio MCP server built into the same binary. Agents get typed tools with structured results: search, book details, favorites, history, quota, domain checks, downloads with progress, and Kindle delivery. It reuses your local login, so there is nothing else to install.</span>
+    <span data-i18n="zh"><b class="mono">zlib mcp</b> 是内置在同一个二进制里的 stdio MCP 服务。Agent 拿到的是带类型的工具和结构化结果：搜书、图书详情、收藏、下载历史、额度、域名检测、带进度的下载，以及发送到 Kindle。它沿用你本地的登录，不用再装别的东西。</span>
+  </p>
+  <div class="two">
+    <div class="card">
+      <h3>Claude Code</h3>
+      <p><span data-i18n="en">Register it once. The tools show up as <code>mcp__zlib__*</code>.</span><span data-i18n="zh">注册一次，工具以 <code>mcp__zlib__*</code> 的名字出现。</span></p>
+      <pre><span class="p">$</span> claude mcp add zlib -- zlib mcp
+<span class="p">$</span> claude mcp get zlib</pre>
+    </div>
+    <div class="card">
+      <h3>Codex</h3>
+      <p><span data-i18n="en">Add it from the terminal, or as <code>[mcp_servers.zlib]</code> in <code>~/.codex/config.toml</code>.</span><span data-i18n="zh">在终端添加，或写进 <code>~/.codex/config.toml</code> 的 <code>[mcp_servers.zlib]</code>。</span></p>
+      <pre><span class="p">$</span> codex mcp add zlib -- zlib mcp
+<span class="p">$</span> codex mcp get zlib</pre>
+    </div>
+  </div>
+  <div class="status-key">
+    <div><b>--read-only</b><span data-i18n="en">search, details, feeds, history, profile, and domain checks only</span><span data-i18n="zh">只开放搜索、详情、书单、历史、账号和域名检测</span></div>
+    <div><b>--disable-kindle</b><span data-i18n="en">no email, including after a download</span><span data-i18n="zh">不发邮件，下载后也不发</span></div>
+    <div><b>--allowed-dir</b><span data-i18n="en">keep downloads and Kindle attachments inside one folder</span><span data-i18n="zh">把下载和 Kindle 附件限制在一个目录内</span></div>
+    <div><b>--log-level</b><span data-i18n="en">tool names and timings on stderr, never arguments</span><span data-i18n="zh">把工具名和耗时写到 stderr，不记录参数</span></div>
+  </div>
+  <p class="note"><span data-i18n="en">Downloads can replace a file with the same name. Keep your client's approval prompt on for downloads, history deletion, and Kindle delivery.</span><span data-i18n="zh">下载可能覆盖同名文件。下载、删除历史和发送到 Kindle 时，请保留客户端的确认提示。</span></p>
 </section>
 
 <!-- ── access ──────────────────────────────────────────────── -->
@@ -343,6 +378,10 @@
   <p>
     <span data-i18n="en">Free and MIT licensed. It talks to Z-Library, the SMTP server you configure, and GitHub when you run <b>zlib update</b>.</span>
     <span data-i18n="zh">免费，MIT 协议。只连 Z-Library、你自己配的 SMTP 服务器，以及运行 <b>zlib update</b> 时的 GitHub。</span>
+  </p>
+  <p class="star-ask">
+    <span data-i18n="en">If zlib saves you time, a star on GitHub helps other readers find it.</span>
+    <span data-i18n="zh">如果 zlib 帮你省了时间，在 GitHub 点个 Star，能让更多人找到它。</span>
   </p>
   <div class="btns">
     <a class="btn pri" href="https://github.com/heartleo/zlib/releases/latest" target="_blank" rel="noopener">
