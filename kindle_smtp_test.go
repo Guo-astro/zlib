@@ -127,7 +127,12 @@ func (f *fakeSMTP) serve(conn net.Conn, tlsConfig *tls.Config, overTLS, offerSTA
 		if err != nil {
 			return
 		}
-		verb := strings.ToUpper(strings.Fields(line + " ")[0])
+		// A TLS ClientHello sent to a plain server is random bytes, so the
+		// "line" can be empty; that must not panic the whole test binary.
+		verb := ""
+		if fields := strings.Fields(line); len(fields) > 0 {
+			verb = strings.ToUpper(fields[0])
+		}
 		s.verbs = append(s.verbs, verb)
 		switch verb {
 		case "EHLO":
