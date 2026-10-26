@@ -10,6 +10,9 @@ import (
 type Config struct {
 	Theme          string `json:"theme,omitempty"`
 	LastLoginEmail string `json:"last_login_email,omitempty"`
+	// UserMirrors are HTTPS origins the user trusts with their login in
+	// addition to the built-in Z-Library domains.
+	UserMirrors []string `json:"user_mirrors,omitempty"`
 }
 
 func ConfigPath() string {

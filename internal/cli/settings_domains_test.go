@@ -1,0 +1,257 @@
+package cli
+
+import (
+	"errors"
+	"slices"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+	zlib "github.com/heartleo/zlib"
+)
+
+func domainPage(t *testing.T, mirrors ...string) settingsModel {
+	t.Helper()
+	isolateMirrors(t, mirrors...)
+	m, err := newSettingsModel(t.Context(), testSettingsStore(t), "domain")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.width, m.height = 100, 40
+	return m
+}
+
+func settingsStep(t *testing.T, m settingsModel, msg tea.Msg) (settingsModel, tea.Cmd) {
+	t.Helper()
+	next, cmd := m.Update(msg)
+	return next.(settingsModel), cmd
+}
+
+func typeText(t *testing.T, m settingsModel, text string) settingsModel {
+	t.Helper()
+	for _, r := range text {
+		m, _ = settingsStep(t, m, tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	return m
+}
+
+func healthy(origin string) zlib.DomainCheck {
+	return zlib.DomainCheck{Domain: origin, Status: zlib.DomainStatusHealthy, FinalURL: origin + "/eapi/info/domains"}
+}
+
+func TestDomainPageListsMirrorsFirstWhileChecking(t *testing.T) {
+	m := domainPage(t, "https://mirror.example")
+
+	if m.domains[0] != "https://mirror.example" || !slices.Contains(m.domains, "https://z-lib.gd") {
+		t.Fatalf("domains = %v, want the mirror first, then built-ins", m.domains)
+	}
+	view := ansi.Strip(m.View().Content)
+	for _, want := range []string{"YOUR MIRRORS", "BUILT-IN", "mirror.example", "Checking…"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view lacks %q:\n%s", want, view)
+		}
+	}
+	if strings.Index(view, "mirror.example") > strings.Index(view, "BUILT-IN") {
+		t.Error("mirror is not listed above the built-in section")
+	}
+	if _, ok := m.Init()().(settingsStartProbeMsg); !ok {
+		t.Error("domain page does not start its check on open")
+	}
+}
+
+func TestDomainPageWithoutMirrorsInvitesAdding(t *testing.T) {
+	m := domainPage(t)
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "None yet · press a") {
+		t.Errorf("view lacks the empty-mirrors hint:\n%s", view)
+	}
+}
+
+func TestDomainPageShowsEveryResultAndUsesOnlyAvailableRows(t *testing.T) {
+	m := domainPage(t, "https://mirror.example", "https://hop.example")
+	t.Setenv(zlib.EnvDomain, "")
+	checks := map[string]zlib.DomainCheck{}
+	for _, d := range m.domains {
+		checks[d] = zlib.DomainCheck{Domain: d, Status: zlib.DomainStatusDiamWallBlocked}
+	}
+	checks["https://mirror.example"] = healthy("https://mirror.example")
+	checks["https://hop.example"] = zlib.DomainCheck{Domain: "https://hop.example", Status: zlib.DomainStatusHealthy, FinalURL: "https://zlib.bz/eapi/info/domains"}
+	m, _ = settingsStep(t, m, settingsProbeMsg{generation: m.generation, checks: checks})
+
+	view := ansi.Strip(m.View().Content)
+	for _, want := range []string{"Available", "Unavailable", "Available via zlib.bz", "2 of "} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view lacks %q:\n%s", want, view)
+		}
+	}
+
+	m.cursor = slices.Index(m.domains, "https://z-lib.gd")
+	m, _ = settingsStep(t, m, key("enter"))
+	if m.page != "domain" || !strings.Contains(m.message, "is unavailable") {
+		t.Fatalf("enter on a blocked row: page %q, message %q", m.page, m.message)
+	}
+
+	m.cursor = slices.Index(m.domains, "https://hop.example")
+	m, _ = settingsStep(t, m, key("enter"))
+	if got := m.value(zlib.EnvDomain).Value; got != "https://zlib.bz" {
+		t.Errorf("saved domain = %q, want the redirect target https://zlib.bz", got)
+	}
+}
+
+func TestDomainPageEnterWhileUncheckedExplains(t *testing.T) {
+	m := domainPage(t)
+	m, _ = settingsStep(t, m, key("enter"))
+	if m.page != "domain" || !strings.Contains(m.message, "Still checking") {
+		t.Errorf("page %q, message %q", m.page, m.message)
+	}
+}
+
+func TestDomainPageAddMirrorChecksThenAsksForTrust(t *testing.T) {
+	m := domainPage(t)
+	calls := stubVerifyMirror(t, nil)
+
+	m.busy = true // a domain check is still running
+	m, _ = settingsStep(t, m, key("a"))
+	if m.page != "mirror" || m.busy {
+		t.Fatalf("a opened %q (busy %v), want an idle mirror form", m.page, m.busy)
+	}
+	m = typeText(t, m, "Mirror.Example")
+	m, cmd := settingsStep(t, m, key("enter"))
+	if !m.busy || cmd == nil {
+		t.Fatal("enter did not start the check")
+	}
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "Checking Mirror.Example") {
+		t.Errorf("view lacks the checking status:\n%s", view)
+	}
+	m, _ = settingsStep(t, m, cmd().(tea.BatchMsg)[1]())
+	if want := []string{"https://mirror.example"}; !slices.Equal(*calls, want) {
+		t.Fatalf("verified %v, want %v", *calls, want)
+	}
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "Trust this mirror?") || !strings.Contains(view, "login") {
+		t.Fatalf("no trust confirmation:\n%s", view)
+	}
+	if len(savedMirrors(t)) != 0 {
+		t.Fatal("mirror saved before confirmation")
+	}
+
+	m, _ = settingsStep(t, m, key("y"))
+	if want := []string{"https://mirror.example"}; !slices.Equal(savedMirrors(t), want) {
+		t.Fatalf("saved %v, want %v", savedMirrors(t), want)
+	}
+	if m.page != "domain" || m.domains[m.cursor] != "https://mirror.example" {
+		t.Errorf("page %q, cursor on %q; want the new mirror selected", m.page, m.domains[m.cursor])
+	}
+	if label, ok := domainStatus(m.domains[m.cursor], m.checks[m.domains[m.cursor]], true); !ok {
+		t.Errorf("new mirror reads %q, want available from its check", label)
+	}
+}
+
+func TestDomainPageAddMirrorCancelAndRejections(t *testing.T) {
+	m := domainPage(t, "https://mirror.example")
+	calls := stubVerifyMirror(t, nil)
+	m, _ = settingsStep(t, m, key("a"))
+
+	for input, want := range map[string]string{"z-lib.gd": "built in", "mirror.example": "already one of your mirrors", "http://x.example": "HTTPS"} {
+		m.input.SetValue("")
+		m = typeText(t, m, input)
+		m, _ = settingsStep(t, m, key("enter"))
+		if !strings.Contains(m.message, want) {
+			t.Errorf("%q: message %q, want %q", input, m.message, want)
+		}
+	}
+	if len(*calls) != 0 {
+		t.Errorf("checked %v for rejected input", *calls)
+	}
+
+	m.input.SetValue("")
+	m = typeText(t, m, "new.example")
+	m, cmd := settingsStep(t, m, key("enter"))
+	m, _ = settingsStep(t, m, cmd().(tea.BatchMsg)[1]())
+	m, _ = settingsStep(t, m, key("esc"))
+	if m.mirrorConfirm != "" || m.page != "mirror" {
+		t.Fatalf("esc in the dialog: confirm %q, page %q", m.mirrorConfirm, m.page)
+	}
+	if slices.Contains(savedMirrors(t), "https://new.example") {
+		t.Fatal("declined mirror saved")
+	}
+	m, _ = settingsStep(t, m, key("esc"))
+	if m.page != "domain" {
+		t.Errorf("esc on the form returned to %q, want domain", m.page)
+	}
+}
+
+func TestDomainPageAddMirrorShowsFailedCheck(t *testing.T) {
+	m := domainPage(t)
+	stubVerifyMirror(t, errors.New("https://new.example answered, but not with the Z-Library EAPI"))
+	m, _ = settingsStep(t, m, key("a"))
+	m = typeText(t, m, "new.example")
+	m, cmd := settingsStep(t, m, key("enter"))
+	m, _ = settingsStep(t, m, cmd().(tea.BatchMsg)[1]())
+	if m.busy || m.mirrorConfirm != "" || !strings.Contains(m.message, "not with the Z-Library EAPI") {
+		t.Errorf("busy %v, confirm %q, message %q", m.busy, m.mirrorConfirm, m.message)
+	}
+}
+
+func TestDomainPageRemoveMirror(t *testing.T) {
+	m := domainPage(t, "https://mirror.example")
+
+	m.cursor = slices.Index(m.domains, "https://z-lib.gd")
+	m, _ = settingsStep(t, m, key("d"))
+	if m.mirrorConfirm != "" || !strings.Contains(m.message, "cannot be removed") {
+		t.Fatalf("d on a built-in: confirm %q, message %q", m.mirrorConfirm, m.message)
+	}
+
+	m.cursor = 0
+	m, _ = settingsStep(t, m, key("d"))
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "Remove this mirror?") {
+		t.Fatalf("no remove confirmation:\n%s", view)
+	}
+	m, _ = settingsStep(t, m, key("enter")) // Cancel has the focus.
+	if len(savedMirrors(t)) != 1 {
+		t.Fatal("enter on Cancel removed the mirror")
+	}
+
+	m, _ = settingsStep(t, m, key("d"))
+	m, _ = settingsStep(t, m, key("y"))
+	if len(savedMirrors(t)) != 0 || slices.Contains(m.domains, "https://mirror.example") {
+		t.Errorf("saved %v, listed %v after removal", savedMirrors(t), m.domains)
+	}
+	if !strings.Contains(m.message, "Removed mirror.example") {
+		t.Errorf("message %q", m.message)
+	}
+}
+
+func TestDomainPageFitsSmallTerminals(t *testing.T) {
+	m := domainPage(t, "https://a-rather-long-personal-mirror-name.example")
+	for _, size := range [][2]int{{40, 12}, {60, 16}, {100, 9}} {
+		m.width, m.height = size[0], size[1]
+		for _, line := range strings.Split(m.View().Content, "\n") {
+			if ansi.StringWidth(line) > size[0] {
+				t.Fatalf("line exceeds width %d at %dx%d: %q", ansi.StringWidth(line), size[0], size[1], ansi.Strip(line))
+			}
+		}
+	}
+}
+
+func TestDomainPageSortsAvailableFirstWithinEachSection(t *testing.T) {
+	m := domainPage(t, "https://down.example", "https://up.example")
+	m.cursor = slices.Index(m.domains, "https://z-lib.gd")
+	checks := map[string]zlib.DomainCheck{}
+	for _, d := range m.domains {
+		checks[d] = zlib.DomainCheck{Domain: d, Status: zlib.DomainStatusNetworkError}
+	}
+	checks["https://up.example"] = healthy("https://up.example")
+	checks["https://zlib.bz"] = healthy("https://zlib.bz")
+	m, _ = settingsStep(t, m, settingsProbeMsg{generation: m.generation, checks: checks})
+
+	if want := []string{"https://up.example", "https://down.example", "https://zlib.bz"}; !slices.Equal(m.domains[:3], want) {
+		t.Errorf("first rows = %v, want %v", m.domains[:3], want)
+	}
+	if m.domains[m.cursor] != "https://z-lib.gd" {
+		t.Errorf("cursor moved to %q, want it to stay on z-lib.gd", m.domains[m.cursor])
+	}
+	view := ansi.Strip(m.View().Content)
+	if strings.Index(view, "down.example") > strings.Index(view, "BUILT-IN") {
+		t.Error("an unavailable mirror dropped below the built-in section")
+	}
+}

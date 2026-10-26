@@ -40,6 +40,12 @@ Run `zlib doctor --json` once. If the user has supplied a proxy, test it with
 command or chat. Do not replace the configured domain merely because another
 candidate is available.
 
+A domain outside the built-in list (a self-hosted or personal mirror) must be
+trusted first, because zlib sends the login to it. Never run
+`zlib mirrors add` or pass `--yes` on the user's behalf: ask the user to run
+`zlib mirrors add <domain>` in their own terminal and confirm it there.
+`zlib mirrors list --json` shows the trusted mirrors; `doctor` probes them too.
+
 Domain configuration precedence is process environment, working-directory `.env`,
 then `~/.config/zlib/.env`. Authenticated commands use the saved session domain
 when `ZLIB_DOMAIN` is absent or blank. Login's `--domain` overrides the domain for

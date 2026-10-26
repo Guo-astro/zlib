@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -34,7 +32,7 @@ var kindleSettingKeys = []string{kindleToKey, kindleFromKey, kindleHostKey, kind
 
 type settingsProbeMsg struct {
 	generation int
-	domains    []string
+	checks     map[string]zlib.DomainCheck
 }
 type settingsModel struct {
 	store          settingsStore
@@ -61,6 +59,12 @@ type settingsModel struct {
 	original       string
 	returnPage     string
 	returnCursor   int
+	// Domain page state (settings_domains.go).
+	checks        map[string]zlib.DomainCheck
+	pendingCheck  zlib.DomainCheck
+	mirrorConfirm string
+	mirrorTarget  string
+	mirrorFocused bool
 }
 
 func newSettingsModel(ctx context.Context, store settingsStore, page string) (settingsModel, error) {
@@ -85,7 +89,12 @@ func newSettingsModel(ctx context.Context, store settingsStore, page string) (se
 	styles.Blurred.Text = lipgloss.NewStyle().Foreground(currentTheme.Muted)
 	styles.Cursor.Color = currentTheme.Accent
 	input.SetStyles(styles)
-	return settingsModel{store: store, values: values, kindle: kindle, page: page, input: input, ctx: ctx, width: 80, height: 24}, nil
+	m := settingsModel{store: store, values: values, kindle: kindle, page: page, input: input, ctx: ctx, width: 80, height: 24}
+	if page == "domain" {
+		m.domains = m.domainCandidates()
+		m.cursor = m.currentDomainIndex()
+	}
+	return m, nil
 }
 
 func kindleSettingValues(cfg zlib.KindleConfig) []settingValue {
@@ -124,7 +133,14 @@ func isKindleSetting(key string) bool {
 	return false
 }
 
-func (m settingsModel) Init() tea.Cmd { return nil }
+// Init starts the domain check when the model opens on the domain page. The
+// check runs from Update, because Init cannot keep changes to the model.
+func (m settingsModel) Init() tea.Cmd {
+	if m.page == "domain" {
+		return func() tea.Msg { return settingsStartProbeMsg{} }
+	}
+	return nil
+}
 func (m settingsModel) value(key string) settingValue {
 	for _, v := range m.values {
 		if v.Key == key {
@@ -201,6 +217,10 @@ func (m *settingsModel) back() {
 		m.page = "edit"
 		m.editAction = 0
 		m.input.Focus()
+	case "mirror":
+		m.page = "domain"
+		m.cursor = m.returnCursor
+		m.input.Blur()
 	default:
 		m.page = "home"
 	}
@@ -218,27 +238,19 @@ func (m *settingsModel) probe(proxy string, page string) tea.Cmd {
 	m.message = ""
 	m.spinner = newLoadingSpinner()
 	m.probeReturn = page
-	candidates := zlib.KnownDomains()
-	if d, err := zlib.ParseAllowedDomain(m.value(zlib.EnvDomain).Value); err == nil {
-		candidates = append(candidates, d)
+	candidates := m.domainCandidates()
+	if page == "domain" {
+		m.domains = candidates
 	}
 	return tea.Batch(m.spinner.Tick, func() tea.Msg {
-		results := checkAvailableDomains(ctx, candidates, proxy)
-		seen := map[string]bool{}
-		var domains []string
-		for _, result := range results {
-			u, err := url.Parse(result.FinalURL)
-			if err != nil {
-				continue
-			}
-			d := u.Scheme + "://" + u.Host
-			if !seen[d] {
-				seen[d] = true
-				domains = append(domains, d)
+		results := zlib.ProbeDomainsWithOptions(ctx, candidates, zlib.DomainProbeOptions{ProxyURL: proxy, Path: "/eapi/info/domains"})
+		checks := make(map[string]zlib.DomainCheck, len(results))
+		if ctx.Err() == nil {
+			for i, result := range results {
+				checks[candidates[i]] = result
 			}
 		}
-		sort.Strings(domains)
-		return settingsProbeMsg{generation, domains}
+		return settingsProbeMsg{generation, checks}
 	})
 }
 
@@ -377,18 +389,28 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.busy = false
 		m.cancel = nil
-		if m.probeReturn == "edit" {
-			m.message = fmt.Sprintf("Proxy test: %d available domains", len(msg.domains))
-			return m, nil
-		}
-		m.domains = msg.domains
-		m.cursor = 0
-		for i, d := range m.domains {
-			if d == m.value(zlib.EnvDomain).Value {
-				m.cursor = i
+		available := 0
+		for _, check := range msg.checks {
+			if _, ok := usableOrigin(check); ok {
+				available++
 			}
 		}
-		m.message = fmt.Sprintf("%d available domains · r refresh", len(m.domains))
+		if m.probeReturn == "edit" {
+			m.message = fmt.Sprintf("Proxy test: %d available domains", available)
+			return m, nil
+		}
+		m.checks = msg.checks
+		m.sortDomains()
+		if m.page == "domain" {
+			m.message = fmt.Sprintf("%d of %d domains available", available, len(m.domains))
+		}
+		return m, nil
+	case settingsMirrorCheckMsg:
+		return m.handleMirrorCheck(msg)
+	case settingsStartProbeMsg:
+		if m.page == "domain" {
+			return m, m.probe(m.effectiveProxy(), "domain")
+		}
 		return m, nil
 	case tea.KeyPressMsg:
 		k := msg.String()
@@ -410,6 +432,12 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.discard = false
 			}
 			return m, nil
+		}
+		if m.mirrorConfirm != "" || m.page == "mirror" || m.page == "domain" {
+			next, cmd, handled := m.updateDomainKeys(msg)
+			if handled {
+				return next, cmd
+			}
 		}
 		if k == "esc" {
 			if m.page == "home" {
@@ -515,9 +543,6 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.Quit
 		}
-		if m.page == "domain" && k == "r" {
-			return m, m.probe(m.effectiveProxy(), "domain")
-		}
 		rows := m.rows()
 		count := len(rows)
 		switch k {
@@ -550,9 +575,7 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case 0:
 					m.returnPage = "home"
 					m.returnCursor = m.cursor
-					m.page = "domain"
-					m.cursor = 0
-					return m, m.probe(m.effectiveProxy(), "domain")
+					return m, m.openDomains()
 				case 1:
 					return m, m.edit(zlib.EnvProxy)
 				case 2:
@@ -566,9 +589,7 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.cursor == 0 {
 					m.returnPage = "network"
 					m.returnCursor = m.cursor
-					m.page = "domain"
-					m.cursor = 0
-					return m, m.probe(m.effectiveProxy(), "domain")
+					return m, m.openDomains()
 				}
 				return m, m.edit(zlib.EnvProxy)
 			case "download":
@@ -578,11 +599,6 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.edit(zlib.EnvRetries)
 			case "kindle":
 				return m, m.edit(kindleSettingKeys[m.cursor])
-			case "domain":
-				if count > 0 {
-					m.key = zlib.EnvDomain
-					m.save(rows[m.cursor])
-				}
 			case "browse":
 				if count > 0 {
 					m.browse(filepath.Join(m.directory, rows[m.cursor]))
@@ -706,7 +722,10 @@ func settingsCompactView(width, height int, title, subtitle string, lines []stri
 
 func (m settingsModel) View() tea.View {
 	w, h := max(1, m.width), max(1, m.height)
-	titles := map[string]string{"home": "Settings", "network": "Settings / Network", "download": "Settings / Downloads", "kindle": "Settings / Kindle", "domain": "Settings / Domain", "browse": "Settings / Choose directory", "edit": "Settings / Edit"}
+	if m.page == "domain" || m.page == "mirror" {
+		return m.domainView(w, h)
+	}
+	titles := map[string]string{"home": "Settings", "network": "Settings / Network", "download": "Settings / Downloads", "kindle": "Settings / Kindle", "browse": "Settings / Choose directory", "edit": "Settings / Edit"}
 	if m.busy {
 		return screenView(w, h, titles[m.page], "", m.spinner.View(), "", uiKey("esc", "back"))
 	}
@@ -753,11 +772,6 @@ func (m settingsModel) View() tea.View {
 				values[i] = displaySetting(m.values[i].Key, m.values[i].Value)
 			case "download":
 				values[i] = displaySetting(m.values[i+2].Key, m.values[i+2].Value)
-			case "domain":
-				values[i] = "Available"
-				if label == m.value(zlib.EnvDomain).Value {
-					values[i] += " (current)"
-				}
 			}
 			labelNeed = max(labelNeed, ansi.StringWidth(bookCell(label)))
 			valueNeed = max(valueNeed, ansi.StringWidth(bookCell(values[i])))
@@ -781,13 +795,6 @@ func (m settingsModel) View() tea.View {
 		if m.page == "browse" {
 			subtitle = bookCell(m.directory)
 			controls = []keys.Binding{uiKey("esc", "back"), uiKey("space", "use folder"), uiKey("enter", "open")}
-		}
-		if m.page == "domain" {
-			subtitle = "Current: " + m.value(zlib.EnvDomain).Value
-			controls = []keys.Binding{uiKey("esc", "back"), uiKey("enter", "save"), uiKey("r", "refresh")}
-			if !m.busy && len(rows) == 0 {
-				lines = append(lines, "No available domains. Press r to retry.")
-			}
 		}
 		if m.page == "network" || m.page == "download" {
 			i := m.cursor

@@ -132,9 +132,9 @@ defaults, run `zlib <command> --help`.
 | 1 | Other error |
 | 2 | Usage error: unknown command or flag, wrong number of arguments |
 | 3 | Not logged in, or the saved session expired; run `zlib login` |
-| 4 | Network: a host (a mirror, or GitHub for `update`) is unreachable, the mirror is behind DiamWall, or `doctor` found no usable domain |
+| 4 | Network: a host (a mirror, or GitHub for `update`) is unreachable, the mirror is behind DiamWall, `doctor` found no usable domain, or `mirrors add` found no Z-Library at the domain |
 | 5 | The book was saved, but Send to Kindle failed |
-| 130 | You cancelled the download or its folder prompt |
+| 130 | You cancelled the download or its folder prompt, or declined to trust a mirror |
 
 Errors go to stderr. A network error names the host; for a Z-Library mirror it
 suggests `zlib doctor`.

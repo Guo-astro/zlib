@@ -31,7 +31,7 @@ English | [简体中文](README.zh.md)
 📖 **Send to Kindle** — deliver files to your [Kindle address](docs/kindle.md)\
 🕒 **Profile** — check your daily download quota\
 🎨 **Themes** — switch color themes with `/theme`\
-🌐 **Network** — find working mirrors with `zlib doctor`, or use a proxy\
+🌐 **Network** — find working mirrors with `zlib doctor`, trust [your own mirror](docs/configuration.md#your-own-mirrors), or use a proxy\
 🤖 **AI Agent Integration** — integrate with Claude Code and Codex through [Agent plugins](#agent-setup)
 
 ## Install

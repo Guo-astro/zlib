@@ -14,7 +14,7 @@ import (
 )
 
 func TestFormatCLIErrorConvertsEOFToFriendlyMessage(t *testing.T) {
-	got := formatCLIError(errors.New(`Get "https://z-library.sk/s/%E4%B8%89%E4%BD%93?&page=1": EOF`))
+	got := formatCLIError(errors.New(`Get "https://untrusted.example/s/%E4%B8%89%E4%BD%93?&page=1": EOF`))
 	want := "✗ Error: network request failed. Please check your connection and try again."
 	if ansi.Strip(got) != want {
 		t.Fatalf("expected %q, got %q", want, got)

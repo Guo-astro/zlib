@@ -23,7 +23,7 @@ func TestResolveLoginDomain(t *testing.T) {
 		{name: "explicit domain", flagDomain: "https://z-lib.gl/", domainEnv: "https://z-lib.sk", want: "https://z-lib.gl"},
 		{name: "environment domain", domainEnv: "https://z-lib.gd", want: "https://z-lib.gd"},
 		{name: "missing domain", wantErr: zlib.EnvDomain},
-		{name: "invalid domain", domainEnv: "https://z-library.sk", wantErr: "EAPI requires"},
+		{name: "invalid domain", domainEnv: "https://untrusted.example", wantErr: "EAPI requires"},
 	}
 
 	for _, tt := range tests {

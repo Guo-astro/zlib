@@ -74,6 +74,11 @@ func Execute() {
 		lipgloss.Fprintln(os.Stderr, formatCLIError(err))
 		os.Exit(1)
 	}
+	// A bad mirror entry must not lock the user out of every command: the
+	// valid mirrors still apply, and only the warning reaches stderr.
+	if err := loadUserMirrors(); err != nil {
+		lipgloss.Fprintln(os.Stderr, colorFaint(symbolInfo)+" "+safeText(err.Error()))
+	}
 	resolveTheme()
 	markUsageErrors(rootCmd)
 	if err := rootCmd.Execute(); err != nil {

@@ -78,14 +78,23 @@ EAPI 请求使用 `remix_userid`/`remix_userkey`。若登录端点拒绝账号�
 
 ## 域名白名单
 
-CLI 只接受 `1lib.sk`、`article.sk`、`articles.sk`、`z-lib.fm`、`z-lib.gd`、
-`z-lib.gl`、`z-lib.sk`、`z-library.ec`、`zlib.bz` 和 `zliba.ru`。这些域名的子域名
+CLI 内置接受 `1lib.sk`、`article.sk`、`articles.sk`、`z-lib.by`、`z-lib.fm`、
+`z-lib.gd`、`z-lib.gl`、`z-lib.sk`、`z-library.ec`、`z-library.im`、
+`z-library.qa`、`z-library.sk`、`z-library.website` 和 `zlib.bz`。这些域名的子域名
 也可以使用。配置值必须是 HTTPS 源站，不能包含端口、路径、查询或凭据。
 
 2026-09-04 实测：`z-lib.gd`、`z-lib.gl`、`z-library.ec`、`article.sk`、
 `articles.sk`、`zlib.bz` 的 EAPI 可用；`1lib.sk`、`z-lib.fm`、`z-lib.sk` 被
 DiamWall 拦截；`zliba.ru` 已变为跳转到 `zlib.bz` 的纯 redirector，登录会跟随
 并改用最终域名。`z-library.gs` 因 TLS 握手失败已从白名单移除。
+
+2026-10-25 按 r/zlibrary 十月清单实测 `/eapi/info/domains`：`z-lib.by`、
+`z-library.qa`、`z-library.website` 直接返回 EAPI JSON；`z-library.im`、
+`z-library.sk` 与 `z-lib.sk`、`z-lib.fm`、`1lib.sk` 一样 307 重定向回自身
+（DiamWall），但属于官方主域名，同样加入白名单，解封后可直接使用。
+`zliba.ru` 不在清单上，只是跳转到 `zlib.bz` 的 redirector，已从白名单移除，
+请直接使用 `zlib.bz`。不在内置列表的域名可用 `zlib mirrors add`
+自行信任。
 
 意大利、法国或西班牙可尝试 `z-library.ec`。意大利、法国、西班牙、英国、
 德国、印度、丹麦和中国的政府或 ISP 可能屏蔽这些域名。浏览器无法加载时，法国

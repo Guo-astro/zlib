@@ -347,9 +347,9 @@ func TestSettingsKindleSaveAndNavigation(t *testing.T) {
 func TestSettingsStaleProbeAndDirectorySelection(t *testing.T) {
 	m, _ := newSettingsModel(t.Context(), testSettingsStore(t), "domain")
 	m.generation = 2
-	next, _ := m.Update(settingsProbeMsg{generation: 1, domains: []string{"stale"}})
+	next, _ := m.Update(settingsProbeMsg{generation: 1, checks: map[string]zlib.DomainCheck{"stale": {}}})
 	m = next.(settingsModel)
-	if len(m.domains) != 0 {
+	if len(m.checks) != 0 {
 		t.Fatal("stale probe updated page")
 	}
 	m.edit(downloadDirEnvVar)
@@ -441,15 +441,16 @@ func TestSettingsProbeFailureAndCancel(t *testing.T) {
 	msg := batch[1]()
 	next, _ := m.Update(msg)
 	m = next.(settingsModel)
-	if m.busy || len(m.domains) != 0 || !strings.Contains(m.View().Content, "No available domains") {
+	view := m.View().Content
+	if m.busy || len(m.domains) == 0 || !strings.Contains(view, "0 of ") || !strings.Contains(view, "Unavailable") {
 		t.Fatal("failed probe has no recovery state")
 	}
 	m.probe("http://127.0.0.1:1", "domain")
 	old := m.generation
 	m.back()
-	next, _ = m.Update(settingsProbeMsg{generation: old, domains: []string{"stale"}})
+	next, _ = m.Update(settingsProbeMsg{generation: old, checks: map[string]zlib.DomainCheck{"stale": {}}})
 	m = next.(settingsModel)
-	if m.page != "network" || len(m.domains) != 0 {
+	if _, stale := m.checks["stale"]; m.page != "network" || stale {
 		t.Fatal("cancelled probe updated page")
 	}
 }

@@ -31,7 +31,7 @@ Z-Library 命令行工具，搜索、下载图书并发送到 Kindle，<br>
 📖 **发送到 Kindle** — 把文件投递到你的 [Kindle 邮箱](docs/kindle.md)\
 🕒 **用量查看** — 查看每日下载配额\
 🎨 **主题** — 用 `/theme` 切换配色\
-🌐 **网络** — 用 `zlib doctor` 找到可用镜像，也支持代理\
+🌐 **网络** — 用 `zlib doctor` 找到可用镜像，可[添加自己信任的镜像](docs/configuration.md#your-own-mirrors)，也支持代理\
 🤖 **AI Agent 集成** — 通过 [Agent 插件](#agent-接入)集成 Claude Code 和 Codex
 
 ## 安装

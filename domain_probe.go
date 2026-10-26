@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -40,7 +41,13 @@ type DomainCheck struct {
 	HTTPStatus int          `json:"http_status,omitempty"`
 	FinalURL   string       `json:"final_url,omitempty"`
 	Detail     string       `json:"detail,omitempty"`
+	// zlibEAPI records that a /eapi/info/domains probe got Z-Library's own
+	// {"success":1,"domains":[...]} answer, not just any JSON.
+	zlibEAPI bool
 }
+
+// eapiDomainsInfoPath answers without a login on every Z-Library EAPI host.
+const eapiDomainsInfoPath = "/eapi/info/domains"
 
 // DomainProbeOptions controls how doctor probes reach candidate domains.
 type DomainProbeOptions struct {
@@ -50,12 +57,18 @@ type DomainProbeOptions struct {
 	Path string
 }
 
-// KnownDomains returns the domains checked by the CLI doctor command.
+// KnownDomains returns the domains checked by the CLI doctor command: the
+// built-in ones, then the user's trusted mirrors.
 func KnownDomains() []string {
 	suffixes := AllowedDomainSuffixes()
 	domains := make([]string, 0, len(suffixes))
 	for _, suffix := range suffixes {
 		domains = append(domains, "https://"+suffix)
+	}
+	for _, mirror := range UserMirrors() {
+		if !slices.Contains(domains, mirror) {
+			domains = append(domains, mirror)
+		}
 	}
 	return domains
 }
@@ -194,6 +207,13 @@ func ProbeDomainWithOptions(ctx context.Context, domain string, opts DomainProbe
 				result.Status = DomainStatusHTTPError
 				result.Detail = "EAPI returned non-JSON content"
 				return result
+			}
+			if opts.Path == eapiDomainsInfoPath {
+				var info struct {
+					Success int               `json:"success"`
+					Domains []json.RawMessage `json:"domains"`
+				}
+				result.zlibEAPI = json.Unmarshal(body, &info) == nil && info.Success == 1 && info.Domains != nil
 			}
 			result.Status = DomainStatusHealthy
 			return result

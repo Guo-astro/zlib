@@ -25,7 +25,7 @@ func TestAvailableDomains(t *testing.T) {
 		{Domain: "https://z-lib.gd", Status: zlib.DomainStatusHealthy, FinalURL: "https://z-lib.gd/eapi/info/domains"},
 		{Domain: "https://challenge.example", Status: zlib.DomainStatusChallenged},
 		{Domain: "https://blocked.example", Status: zlib.DomainStatusDiamWallBlocked},
-		{Domain: "https://zliba.ru", Status: zlib.DomainStatusHealthy, FinalURL: "https://z-lib.by/eapi/info/domains"},
+		{Domain: "https://hop.example", Status: zlib.DomainStatusHealthy, FinalURL: "https://untrusted.example/eapi/info/domains"},
 	}
 	got := availableDomains(results)
 	if len(got) != 1 || got[0].Domain != "https://z-lib.gd" {

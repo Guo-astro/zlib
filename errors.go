@@ -29,6 +29,9 @@ var (
 	// ErrChallengeFailed is returned when the JS challenge could not be cleared
 	// within the client's attempt budget.
 	ErrChallengeFailed = errors.New("zlibrary: could not clear the browser challenge")
+	// ErrMirrorUnverified is returned when a domain offered as a user mirror
+	// does not itself answer as the Z-Library EAPI.
+	ErrMirrorUnverified = errors.New("zlibrary: mirror did not answer as Z-Library")
 )
 
 // BotProtectionError describes an anti-bot response returned by the upstream.

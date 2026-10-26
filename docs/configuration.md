@@ -47,9 +47,12 @@ subcommands open the same TUI at a specific section or field. Use arrow keys
 or Tab to select, Enter to edit, and Esc to return to the selected setting.
 The settings list keeps its controls and save feedback next to the fields;
 it shows an override notice only when another source supplies the active value.
-The domain page automatically checks candidates using the same EAPI probe as
-`doctor`; `r` refreshes results.
-Enter saves the selected domain. An empty result leaves your configuration intact.
+The domain page lists your mirrors first, then the built-in domains, available
+ones at the top of each group, and marks the current one with `●`. Each row shows the result of the same EAPI probe as
+`doctor`: Available, Available via another host, or Unavailable (`zlib doctor
+--json` gives the reason); `r` checks again.
+Enter saves an available domain. `a` adds a mirror and `d` removes the selected
+one (see [Your own mirrors](#your-own-mirrors)).
 
 Editors have Save, Cancel and Reset actions, reached with Tab. Enter in the
 input saves the value. Reset clears the global value after you save; higher
@@ -131,8 +134,32 @@ An existing process variable or working-directory `.env` can still override that
 value. When `ZLIB_DOMAIN` is unset or blank, authenticated commands use the domain
 stored in the session.
 
-Domains must be HTTPS origins accepted by the CLI's allowlist. Run `zlib doctor`
-to see which supported domains are reachable from your network.
+Domains must be HTTPS origins on the built-in allowlist or on your own mirror
+list. Run `zlib doctor` to see which of them are reachable from your network.
+
+### Your own mirrors
+
+Z-Library invites readers to host their own mirrors, and donors get personal
+domains. zlib sends your login only to domains it trusts, so add such a mirror
+before you use it:
+
+```sh
+zlib mirrors add libb.la         # checks the domain, then asks you to confirm
+zlib mirrors                     # opens the domain page (lists mirrors off a terminal)
+zlib mirrors list --json
+zlib mirrors remove libb.la
+```
+
+`add` first checks that `https://<domain>/eapi/info/domains` answers as Z-Library
+on that same host; a domain that redirects elsewhere is refused, so add its
+target instead. It then shows what is at stake (your `remix_userid` and
+`remix_userkey` go to that host) and asks you to confirm. Off a terminal, pass
+`--yes` after reviewing the domain. A mirror is trusted as that exact host only,
+not its subdomains. Only HTTPS hosts on the default port are accepted.
+
+Mirrors are stored as `user_mirrors` in `config.json`. Removing a mirror does not
+change `ZLIB_DOMAIN`; if it was your current domain, choose another. A failed
+check exits with code 4; an unconfirmed `add` without `--yes` exits with code 2.
 
 To test a proxy for one request:
 

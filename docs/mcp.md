@@ -145,7 +145,9 @@ emails it to the configured recipient. Require client approval for these actions
 and for history deletion; tool annotations are hints, not authorization.
 Read-only mode still exposes account details and history. Without
 `--allowed-dir`, the server can write and read wherever the local user can.
-`check_domains` takes no proxy argument; it uses `ZLIB_PROXY` when set.
+`check_domains` takes no proxy argument; it uses `ZLIB_PROXY` when set. It also
+probes the user's own mirrors. MCP cannot add or remove mirrors: the user runs
+`zlib mirrors add` in a terminal, then restarts the server.
 
 MCP search accepts `count` from 1 to 50 (default 10) and pages starting at 1.
 Year filters accept 1000 through 9999, or 0 to leave a bound unset. Invalid

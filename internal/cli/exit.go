@@ -66,7 +66,7 @@ func exitCode(err error) int {
 		return exitPartial
 	case errors.Is(err, errNotLoggedIn), errors.Is(err, zlib.ErrNotLoggedIn), errors.Is(err, zlib.ErrSessionExpired):
 		return exitAuth
-	case errors.Is(err, zlib.ErrBotProtection), errors.Is(err, zlib.ErrNoDomain), errors.Is(err, zlib.ErrRedirectLoop):
+	case errors.Is(err, zlib.ErrBotProtection), errors.Is(err, zlib.ErrNoDomain), errors.Is(err, zlib.ErrRedirectLoop), errors.Is(err, zlib.ErrMirrorUnverified):
 		return exitNetwork
 	}
 	if _, ok := classifyNetworkError(err); ok && !errors.Is(err, zlib.ErrSMTPSend) {

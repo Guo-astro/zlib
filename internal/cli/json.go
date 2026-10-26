@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 )
 
@@ -9,6 +10,10 @@ import (
 // newline and no decoration, so `--json` output is directly consumable by
 // jq, scripts, and the Claude Code plugin.
 func printJSON(v any) error {
-	enc := json.NewEncoder(os.Stdout)
-	return enc.Encode(v)
+	return printJSONTo(os.Stdout, v)
+}
+
+// printJSONTo is printJSON for a command's own writer.
+func printJSONTo(w io.Writer, v any) error {
+	return json.NewEncoder(w).Encode(v)
 }
