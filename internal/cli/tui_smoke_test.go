@@ -50,6 +50,10 @@ func TestTUIWalkthrough(t *testing.T) {
 	search := newSearchSelectModel("fixture", c, nil, false)
 	settings, _ := newSettingsModel(t.Context(), testSettingsStore(t), "domain")
 	settings.domains = []string{"https://z-lib.gd", "https://z-lib.gl"}
+	settings.checks = map[string]zlib.DomainCheck{
+		"https://z-lib.gd": {Domain: "https://z-lib.gd", Status: zlib.DomainStatusHealthy, FinalURL: "https://z-lib.gd/eapi/info/domains"},
+		"https://z-lib.gl": {Domain: "https://z-lib.gl", Status: zlib.DomainStatusNetworkError},
+	}
 	settings.message = "Fixture domains; no probe performed"
 	dir := t.TempDir()
 	os.WriteFile(dir+"/demo.epub", []byte("fixture"), 0600)
@@ -60,7 +64,7 @@ func TestTUIWalkthrough(t *testing.T) {
 		{"recommended", newBookFeedSelectModel("Recommended", load)},
 		{"most-popular", newBookFeedSelectModel("Most popular", load)},
 		{"saved", saved}, {"search", search}, {"history", newHistorySelectModel(c)},
-		{"domains", settings}, {"download-directory", newDownloadDirectoryModel(dir)},
+		{"domains", settingsStart{settingsModel: settings}}, {"download-directory", newDownloadDirectoryModel(dir)},
 		{"kindle-file", newKindleFileModel(dir)},
 		{"download", newDirectDownloadModel("Fixture book", server.URL+"/demo.epub", dir, c)},
 	}
