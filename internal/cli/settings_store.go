@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	zlib "github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 	"github.com/joho/godotenv"
 )
 

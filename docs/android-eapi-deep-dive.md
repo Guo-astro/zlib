@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | A | 上述 APK 的 `classes.dex`；使用 [JADX 1.5.6](https://github.com/skylot/jadx/releases/tag/v1.5.6) 导出同一 SHA-256 文件中的 Retrofit 注解及模型 | 该 APK **声明**的路径、HTTP 方法、字段、部分调用链。静态代码不证明服务端今天可用，也不证明运行时一定调用。 |
 | L | 2026-10-12 在 `https://z-lib.gd` 以用户明确授权的本地已保存会话发起的只读 EAPI 请求 | 该账户、域名和时间点的响应。未记录或展示凭证、账号内容、书名、下载链接和原始响应；只保留成功码、键名、计数和排序指纹比较。不是 Android 抓包。 |
-| R | 本分支的 [客户端实现](../eapi.go)、[CLI 命令注册](../internal/cli/root.go) 与 [EAPI 文档](eapi.md) | 当前仓库的能力；工作树未提交，后续变化须重新核对。 |
+| R | 本分支的 [客户端实现](../internal/zlib/eapi.go)、[CLI 命令注册](../internal/cli/root.go) 与 [EAPI 文档](eapi.md) | 当前仓库的能力；工作树未提交，后续变化须重新核对。 |
 
 `ZLibApi` 包含 37 个方法，路径和字段以同一 APK 的 JADX 导出为准。复核命令如下，临时导出文件不属于仓库：
 

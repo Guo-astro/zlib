@@ -11,7 +11,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/heartleo/zlib"
+	"github.com/heartleo/zlib/internal/zlib"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )

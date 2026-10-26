@@ -16,8 +16,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	zlib "github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 )
 
 const (

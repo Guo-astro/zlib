@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 const maxCookieFileLineBytes = 1 << 20

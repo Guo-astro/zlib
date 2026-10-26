@@ -22,11 +22,13 @@ report `dev`. Both forms keep the rule.
   `{{.Version}}` is the tag without its `v`.
 - `go install` and source builds take the version from Go build info, which
   already has the `v`.
-- `version.go` (`canonicalVersion`) adds a missing `v` to any numeric version
-  injected by another packager, so `-X github.com/heartleo/zlib.Version=0.0.10`
+- `internal/zlib/version.go` (`canonicalVersion`) adds a missing `v` to any numeric version
+  injected by another packager, so `-X github.com/heartleo/zlib/internal/zlib.Version=0.0.10`
   still reports `v0.0.10`.
 
-`TestCanonicalVersion` covers the normalization. To check a release binary,
+`TestCanonicalVersion` covers the normalization, and
+`TestGoReleaserLdflagsTargetThisPackage` fails when the ldflags package path
+no longer matches the package that declares `Version`. To check a release binary,
 run `zlib version`.
 
 ## Exceptions

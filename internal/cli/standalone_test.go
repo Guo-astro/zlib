@@ -9,8 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	zlib "github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 )
 
 func TestStandaloneKindleSharesShellPages(t *testing.T) {

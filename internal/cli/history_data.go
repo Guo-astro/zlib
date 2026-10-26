@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/heartleo/zlib"
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 func loadHistoryPage(ctx context.Context, c *zlib.Client, page int, formatFilter string) (zlib.DownloadHistoryResult, error) {

@@ -12,7 +12,7 @@ its ID, the affected package or file, whether the code reaches it, and the
 fixed version. Do not drop findings you judge harmless; mark them instead.
 
 Every commit already runs govulncheck and a staged gitleaks scan through the
-mandatory pre-commit hook (`scripts/check.sh`, see `CONTRIBUTING.md`). The
+mandatory pre-commit hook (`scripts/check.sh`, see `.github/CONTRIBUTING.md`). The
 steps below go further: full history, GitHub alerts and the manual review.
 
 ## 1. Go vulnerabilities (govulncheck)

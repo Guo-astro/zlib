@@ -3,8 +3,8 @@ package cli
 import (
 	tea "charm.land/bubbletea/v2"
 	"fmt"
-	zlib "github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 	"os"
 	"path/filepath"
 	"strconv"

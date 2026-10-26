@@ -19,7 +19,7 @@
 - The demo's recording script matches the current flow, or the review notes say it does not.
 - Both languages carry the same badges: Go version, CI (`ci.yml`), release,
   downloads, license, Trendshift. Each points to the intended target.
-- The issues paragraph links `SECURITY.md` for private vulnerability reports.
+- The issues paragraph links `.github/SECURITY.md` for private vulnerability reports.
 - Detailed configuration and installation alternatives remain reachable in `docs/`.
 - Research notes distinguish observations from zlib-specific editorial decisions.
 - Skill references agree with the README structure and avoid maintaining duplicate full drafts.

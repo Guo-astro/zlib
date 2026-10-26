@@ -24,7 +24,7 @@ builds:
       - arm64
     ldflags:
       # {{.Version}} drops the tag's v; zlib reports versions as vX.Y.Z.
-      - -s -w -X github.com/heartleo/zlib.Version=v{{.Version}} -X github.com/heartleo/zlib.Commit={{.Commit}} -X github.com/heartleo/zlib.Date={{.Date}}
+      - -s -w -X github.com/heartleo/zlib/internal/zlib.Version=v{{.Version}} -X github.com/heartleo/zlib/internal/zlib.Commit={{.Commit}} -X github.com/heartleo/zlib/internal/zlib.Date={{.Date}}
 
 archives:
   - id: zlib

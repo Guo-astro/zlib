@@ -60,7 +60,7 @@ func TestUpdateMethodCommands(t *testing.T) {
 
 func TestIsModuleBuild(t *testing.T) {
 	build := func(path, version string) *debug.BuildInfo {
-		return &debug.BuildInfo{Path: path, Main: debug.Module{Path: "github.com/heartleo/zlib", Version: version}}
+		return &debug.BuildInfo{Path: path, Main: debug.Module{Path: "github.com/heartleo/zlib/internal/zlib", Version: version}}
 	}
 	for _, tt := range []struct {
 		name string

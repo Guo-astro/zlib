@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/heartleo/zlib"
+	"github.com/heartleo/zlib/internal/zlib"
 	"github.com/spf13/cobra"
 )
 

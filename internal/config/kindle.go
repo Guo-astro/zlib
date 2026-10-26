@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/heartleo/zlib"
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 func KindleConfigPath() string {

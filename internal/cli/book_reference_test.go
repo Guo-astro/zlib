@@ -3,7 +3,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/heartleo/zlib"
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 func TestBookCommandIDUsesEAPIIDAndHash(t *testing.T) {

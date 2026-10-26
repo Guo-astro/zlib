@@ -11,8 +11,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	"github.com/heartleo/zlib/internal/zlib"
 	"github.com/mattn/go-runewidth"
 	"github.com/spf13/cobra"
 )

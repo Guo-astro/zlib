@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 // demoBook is one fixture result. The first books match the hero picker on

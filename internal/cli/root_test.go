@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
-	"github.com/heartleo/zlib"
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 func TestFormatCLIErrorConvertsEOFToFriendlyMessage(t *testing.T) {

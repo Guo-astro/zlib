@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	zlib "github.com/heartleo/zlib"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 )
 
 func TestRenderProfileCardShowsAccountAndKnownQuota(t *testing.T) {

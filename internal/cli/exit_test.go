@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
-	"github.com/heartleo/zlib"
+	"github.com/heartleo/zlib/internal/zlib"
 	"github.com/spf13/cobra"
 )
 

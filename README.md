@@ -184,7 +184,7 @@ delivery. See [MCP server](docs/mcp.md) for other clients, flags, and tools.
 
 Report bugs in [Issues](https://github.com/heartleo/zlib/issues) with your
 `zlib version`, OS, command, and error. Omit passwords, cookies, and session files.
-Report security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+Report security vulnerabilities privately as described in [SECURITY.md](.github/SECURITY.md).
 
 ## Star History
 

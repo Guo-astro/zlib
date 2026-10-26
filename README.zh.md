@@ -178,7 +178,7 @@ codex mcp add zlib -- zlib mcp
 
 遇到问题请在 [Issues](https://github.com/heartleo/zlib/issues) 附上
 `zlib version`、操作系统、所用命令和报错。请勿附带密码、Cookie 或会话文件。
-安全漏洞请按 [SECURITY.md](SECURITY.md) 私下报告，不要公开提 issue。
+安全漏洞请按 [SECURITY.md](.github/SECURITY.md) 私下报告，不要公开提 issue。
 
 ## Star History
 

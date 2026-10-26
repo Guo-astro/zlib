@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	zlib "github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 )
 
 // isolateMirrors gives a test its own config dir and mirror set, and clears

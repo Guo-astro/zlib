@@ -41,7 +41,7 @@ The Search form in `search_filter_form.go` shows query, year range, language, fo
 
 Book details come from EAPI for the selected `id:hash`. Fetch after selection settles, cache by reference, and keep late results tied to their original book. Show fields the response provides; the Android model does not guarantee categories or separate ISBN fields. See [EAPI notes](../../../docs/eapi.md#当前范围) for the evidence boundary.
 
-Check the shared layout and selection tests in `internal/cli/book_feed_view_test.go` and the EAPI mapping tests in `eapi_book_test.go`. When changing shared layout code, run `go test ./...` and `go vet ./...` after the focused test passes. Update `docs/tui.md` when interaction or spacing rules change.
+Check the shared layout and selection tests in `internal/cli/book_feed_view_test.go` and the EAPI mapping tests in `internal/zlib/eapi_book_test.go`. When changing shared layout code, run `go test ./...` and `go vet ./...` after the focused test passes. Update `docs/tui.md` when interaction or spacing rules change.
 
 Keep recoverable failures on the page that owns the request. Download failure shows the book, a URL-safe reason, and `r` to retry with the same directory; retry must start a new shell generation so late messages are ignored. Kindle send failure shows the file and reason but has no automatic retry because SMTP delivery may have completed. Keep login and setting validation on their forms. Check `TestShellDownloadFailureKeepsContextAndRetries` and `TestShellKindleFailureRequiresExplicitResend` when changing these paths.
 

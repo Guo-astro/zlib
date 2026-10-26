@@ -21,7 +21,7 @@
 - [search_interactive.go](../internal/cli/search_interactive.go)：`searchSelectModel` 共用于搜索、推荐、热门和收藏。`WindowSizeMsg` 只保存 Width；`View` 遍历所有图书。优先在这里统一高度、滚动和响应式行布局。
 - [history_interactive.go](../internal/cli/history_interactive.go)：历史有独立模型，同样逐行渲染且错误直接退出。复用列表呈现和键位逻辑，保留历史自己的数据加载方式。
 - [download.go](../internal/cli/download.go)：已有进度条、取消和非终端输出。交互改进应放在父模型的状态转换，保留脚本/Agent 的直接下载路径。
-- [eapi_book.go](../eapi_book.go)：`FetchBook` 的详情请求读取 `/eapi/book/{id}/{hash}`。映射只构造下载路径，不访问 `/file`；可用于详情预览。
+- [eapi_book.go](../internal/zlib/eapi_book.go)：`FetchBook` 的详情请求读取 `/eapi/book/{id}/{hash}`。映射只构造下载路径，不访问 `/file`；可用于详情预览。
 - [theme.go](../internal/cli/theme.go)：已有语义色和多主题。继续统一使用这些颜色，无需先复制 Crush 的调色板。
 
 详情按选中项加载并缓存。为异步响应携带图书引用或请求序号，忽略已过期的返回，防止快速移动光标时旧详情覆盖新选择。避免一次请求推荐列表中全部 100 本书的详情；预览也不应请求下载链接。

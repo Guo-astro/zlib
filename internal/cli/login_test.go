@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 func TestResolveLoginDomain(t *testing.T) {

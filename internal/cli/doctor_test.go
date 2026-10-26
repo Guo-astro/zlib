@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	zlib "github.com/heartleo/zlib"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 )
 
 // doctor used to exit 0 with "No available EAPI domains found." (or `[]`),

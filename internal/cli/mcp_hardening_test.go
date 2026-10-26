@@ -15,7 +15,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/heartleo/zlib"
+	"github.com/heartleo/zlib/internal/zlib"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

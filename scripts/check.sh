@@ -1,7 +1,7 @@
 #!/bin/sh
 # Mandatory pre-commit checks for zlib. .githooks/pre-commit runs this before
 # every commit; `make check` runs it by hand. Every step must pass. See
-# CONTRIBUTING.md#pre-commit-checks.
+# .github/CONTRIBUTING.md#pre-commit-checks.
 set -eu
 
 cd "$(git rev-parse --show-toplevel)"

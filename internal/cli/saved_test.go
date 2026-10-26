@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	zlib "github.com/heartleo/zlib"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 )
 
 // favorites, recommended and most-popular --json used to print the bare

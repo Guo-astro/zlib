@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	zlib "github.com/heartleo/zlib"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 	"github.com/spf13/cobra"
 )
 

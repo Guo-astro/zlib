@@ -94,7 +94,7 @@ zlib config network proxy --json
 | `ZLIB_THEME` | Override the saved terminal theme | Saved preference |
 | `ZLIB_SMTP_PWD` | SMTP password for Kindle delivery | Unset |
 
-See [.env.example](../.env.example) for sample values.
+See [env.example](env.example) for sample values.
 
 ## Create or edit the global file
 

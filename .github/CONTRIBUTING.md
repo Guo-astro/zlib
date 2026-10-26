@@ -32,7 +32,7 @@ Required tools: Go (the `go.mod` release), Node.js 22+,
 
 Do not bypass the hook with `git commit --no-verify`. If a step fails, fix the
 cause. When govulncheck reports a vulnerability, follow
-[the security-scan skill](.agents/skills/security-scan/SKILL.md). Network
+[the security-scan skill](../.agents/skills/security-scan/SKILL.md). Network
 errors from govulncheck are not a pass: retry.
 
 CI repeats these checks on every push. It also runs the tests natively on
@@ -47,4 +47,4 @@ After changing cookies, EAPI headers, redirects, domain policy, downloads,
 `zlib update`, or files under `~/.config/zlib/`, also run the credential
 boundary review in the security-scan skill. Treat all text from a mirror as
 untrusted: it must not reach the terminal with control characters (see
-`text.go`) or leave the download directory.
+`internal/zlib/text.go`) or leave the download directory.

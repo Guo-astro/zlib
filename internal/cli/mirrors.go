@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	zlib "github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 	"github.com/spf13/cobra"
 )
 
