@@ -26,11 +26,13 @@ code. The full key list stays in `docs/tui.md`.
 
 ## Agent setup
 
-The README's Agent setup covers only the plugin skills users install through
-the Claude Code or Codex marketplace (`zlib`, `kindle`). Do not link
-`.agents/skills/` or `docs/agents.md`, and do not mention repository-level
-skills such as `repo-readme` or `zlib-tui`; those are maintainer tooling, not
-part of what a user installs.
+The README's Agent setup covers the plugin skills users install through the
+Claude Code or Codex marketplace (`zlib`, `kindle`), and a short MCP server
+subsection: the `claude mcp add` and `codex mcp add` commands, `--read-only`,
+and a link to `docs/mcp.md`. Other MCP clients, the flag table and the tool
+list live in `docs/mcp.md`. Do not link `.agents/skills/` or `docs/agents.md`,
+and do not mention repository-level skills such as `repo-readme` or
+`zlib-tui`; those are maintainer tooling, not part of what a user installs.
 
 ## Wording
 

@@ -148,26 +148,20 @@ codex plugin marketplace add heartleo/zlib
 codex plugin add zlib@zlib
 ```
 
-### MCP 快速开始
+### MCP 服务
 
-通过 stdio 注册 `zlib mcp`（需已安装 `zlib` 并在本地完成登录）：
+把 `zlib mcp` 注册为本地 stdio 服务。需已安装 `zlib` 并完成登录：
 
 ```sh
 # Claude Code
-claude mcp add zlib -- zlib mcp
-claude mcp get zlib
+claude mcp add -s user zlib -- zlib mcp
 
 # Codex
 codex mcp add zlib -- zlib mcp
-codex mcp get zlib
 ```
 
-在末尾加上 `--read-only`（`zlib mcp --read-only`）可只开放搜索、图书详情、书单、历史查询、账号配额和域名检测，禁用下载、删除历史和发送到 Kindle。
-也可用 `--disable-kindle`、`--disable-history-delete` 或 `--disable-download` 单独关闭写操作。禁用 Kindle 也会阻止下载后发送。加上 `--allowed-dir ~/Books` 可把下载和 Kindle 附件限制在一个目录内。下载可能覆盖同名文件，请在客户端要求确认写操作；只读模式仍会返回账号资料。
-
-然后告诉 Agent：
-
-> 用 zlib MCP 搜索 The Pragmatic Programmer 的 EPUB 版本，先列出结果和今日剩余下载次数，再决定下载。
+在 `mcp` 后加 `--read-only` 可禁用下载、删除历史和发送到 Kindle。其他客户端、参数和工具列表见
+[MCP 服务](docs/mcp.md)。
 
 ## 文档
 
@@ -179,6 +173,7 @@ codex mcp get zlib
 | [配置指南](docs/configuration.md) | 域名、代理、目录、配置路径 |
 | [主题指南](docs/themes.md) | 配色列表和预览操作 |
 | [Kindle](docs/kindle.md) | SMTP 配置与发送 |
+| [MCP 服务](docs/mcp.md) | `zlib mcp` 的客户端配置、参数和工具 |
 | [排障指南](docs/troubleshooting.md) | 登录和网络问题 |
 
 遇到问题请在 [Issues](https://github.com/heartleo/zlib/issues) 附上

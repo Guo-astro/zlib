@@ -10,7 +10,8 @@
   TUI home has no search input; search starts from `/`.
 - Query search, interactive search, and JSON output are described accurately.
 - Agent setup names only plugin skills; no `.agents/skills/` or `docs/agents.md`
-  link, no repository-level skills.
+  link, no repository-level skills. Its MCP subsection shows only Claude Code and
+  Codex and links `docs/mcp.md` for other clients.
 - Plugin selectors match the marketplace manifests. The CLI/session prerequisite is visible.
 - Commands in corresponding fenced blocks, and keys in the key tables, are
   identical between languages.

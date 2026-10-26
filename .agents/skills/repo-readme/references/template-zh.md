@@ -9,7 +9,7 @@
 | Quick start | 快速开始 | 检测域名、登录、进入 TUI 并完成第一次搜索 |
 | Terminal interface | 终端界面 | 记住第一次使用需要的按键，知道完整列表在哪 |
 | Commands | 常用命令 | 使用表格或 JSON 搜索，找到常用操作 |
-| Agent setup | Agent 接入 | 登录 CLI 后安装 Claude Code 或 Codex 插件 |
+| Agent setup | Agent 接入 | 登录 CLI 后安装 Claude Code 或 Codex 插件，或注册 `zlib mcp` |
 | Documentation | 文档 | 找到配置、排障和详细用法 |
 
 中英文代码块和按键表保持一致。命令名、参数、按键、路径、JSON 字段和插件名称使用原文。

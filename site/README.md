@@ -66,7 +66,7 @@ python3 -m http.server 8000 --directory site
   `data-i18n="en"` / `data-i18n="zh"` elements; CSS shows one based on
   `<html data-lang>`. Add a language by adding a third value.
 - The MCP section copies the install commands and flags from
-  `docs/agents.md` and `zlib mcp --help`. Update it with them.
+  `docs/mcp.md` and `zlib mcp --help`. Update it with them.
 - The nav button and the line above the closing buttons ask for a GitHub
   star. Keep that to those two places so it stays out of the way.
 - Book listings and `doctor` output are illustrative sample data, not live

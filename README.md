@@ -154,32 +154,20 @@ codex plugin marketplace add heartleo/zlib
 codex plugin add zlib@zlib
 ```
 
-### MCP quick start
+### MCP server
 
-Register `zlib mcp` over stdio (`zlib` must be on `PATH` and signed in):
+Register `zlib mcp` as a local stdio server. `zlib` must be on `PATH` and signed in:
 
 ```sh
 # Claude Code
-claude mcp add zlib -- zlib mcp
-claude mcp get zlib
+claude mcp add -s user zlib -- zlib mcp
 
 # Codex
 codex mcp add zlib -- zlib mcp
-codex mcp get zlib
 ```
 
-Append `--read-only` (`zlib mcp --read-only`) to expose only search, book
-details, feeds, history, profile, and domain checks, omitting download, history
-deletion, and Kindle delivery. Use `--disable-kindle`, `--disable-history-delete`,
-or `--disable-download` to disable individual write capabilities. Disabling Kindle
-also prevents delivery after a download. Add `--allowed-dir ~/Books` to keep
-downloads and Kindle attachments inside one folder. Downloads may overwrite
-same-named files; require client approval for writes. Read-only mode still
-exposes account data.
-
-Then ask your agent:
-
-> Use the zlib MCP server to find The Pragmatic Programmer in EPUB. Show the results and my remaining daily quota before downloading.
+Add `--read-only` after `mcp` to hide download, history deletion, and Kindle
+delivery. See [MCP server](docs/mcp.md) for other clients, flags, and tools.
 
 ## Documentation
 
@@ -191,6 +179,7 @@ Then ask your agent:
 | [Configuration](docs/configuration.md) | Domains, proxies, folders, configuration paths |
 | [Themes](docs/themes.md) | Available palettes and preview controls |
 | [Kindle](docs/kindle.md) | SMTP setup and delivery |
+| [MCP server](docs/mcp.md) | Client setup, flags, and tools for `zlib mcp` |
 | [Troubleshooting](docs/troubleshooting.md) | Login and network problems |
 
 Report bugs in [Issues](https://github.com/heartleo/zlib/issues) with your
