@@ -65,6 +65,9 @@ type settingsModel struct {
 	mirrorConfirm string
 	mirrorTarget  string
 	mirrorFocused bool
+	// mirrorCursor is the domain row to restore when the add-mirror form
+	// closes; returnCursor still belongs to the page that opened the list.
+	mirrorCursor int
 }
 
 func newSettingsModel(ctx context.Context, store settingsStore, page string) (settingsModel, error) {
@@ -219,7 +222,7 @@ func (m *settingsModel) back() {
 		m.input.Focus()
 	case "mirror":
 		m.page = "domain"
-		m.cursor = m.returnCursor
+		m.cursor = m.mirrorCursor
 		m.input.Blur()
 	default:
 		m.page = "home"

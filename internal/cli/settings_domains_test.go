@@ -255,3 +255,26 @@ func TestDomainPageSortsAvailableFirstWithinEachSection(t *testing.T) {
 		t.Error("an unavailable mirror dropped below the built-in section")
 	}
 }
+
+func TestDomainPageMirrorFormKeepsParentCursor(t *testing.T) {
+	isolateMirrors(t)
+	m, err := newSettingsModel(t.Context(), testSettingsStore(t), "network")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.width, m.height = 100, 40
+	m, _ = settingsStep(t, m, key("enter")) // Domain row opens the domain page.
+	if m.page != "domain" {
+		t.Fatalf("enter opened %q, want domain", m.page)
+	}
+	m.cursor = 3
+	m, _ = settingsStep(t, m, key("a"))
+	m, _ = settingsStep(t, m, key("esc"))
+	if m.page != "domain" || m.cursor != 3 {
+		t.Fatalf("closing the form: page %q cursor %d, want domain row 3", m.page, m.cursor)
+	}
+	m, _ = settingsStep(t, m, key("esc"))
+	if m.page != "network" || m.cursor != 0 {
+		t.Fatalf("leaving the domain page: page %q cursor %d, want network row 0", m.page, m.cursor)
+	}
+}

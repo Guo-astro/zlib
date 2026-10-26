@@ -260,7 +260,7 @@ func (m settingsModel) updateDomainKeys(msg tea.KeyPressMsg) (settingsModel, tea
 		}
 		m.generation++
 		m.busy = false
-		m.returnCursor = m.cursor
+		m.mirrorCursor = m.cursor
 		m.page = "mirror"
 		m.message = ""
 		m.input.SetValue("")
