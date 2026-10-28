@@ -48,3 +48,17 @@ After changing cookies, EAPI headers, redirects, domain policy, downloads,
 boundary review in the security-scan skill. Treat all text from a mirror as
 untrusted: it must not reach the terminal with control characters (see
 `internal/zlib/text.go`) or leave the download directory.
+
+## Website
+
+`site/` is static and outside `make check`, so check it by hand before
+committing a change to its copy, type, spacing or layout:
+
+- Follow the [text layout rules](../docs/site.md#text-layout): breaks fall
+  between sentences, then between words (Chinese words included), never
+  inside one, and no line is left with one or two words.
+- Run `node scripts/build-zh.mjs`, serve `site/`, and run
+  `scripts/check-site-text.mjs` (it needs `PUPPETEER_CORE` and `CHROME`;
+  see `docs/site.md#verifying-a-change`). It must report nothing.
+- Look at the changed blocks in a browser at 375, 768 and 1440px, in English
+  and Chinese.

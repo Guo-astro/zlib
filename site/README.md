@@ -1,8 +1,13 @@
 # zlib.heartleo.dev
 
-The landing page for [zlib](https://github.com/heartleo/zlib). It is one
-self-contained `index.html` with no build step and no dependencies. The only
-external request it makes is for the Google Fonts stylesheet.
+The website for [zlib](https://github.com/heartleo/zlib): the landing page
+and the Send to Kindle guide. Plain HTML, CSS and JavaScript with no build
+step and no dependencies; the only external request is for the Google Fonts
+stylesheet.
+
+Design decisions, UI and text layout rules, motion standards,
+implementation patterns, past issues and the checks to run are in
+[`docs/site.md`](../docs/site.md). Read it before changing anything here.
 
 ## Deploy
 
@@ -42,40 +47,7 @@ Settings > Pages > Custom domain by itself. Once the DNS check passes, tick
 ## Preview locally
 
 ```bash
+node scripts/build-zh.mjs                     # writes site/zh/
 python3 -m http.server 8000 --directory site
 # http://localhost:8000
 ```
-
-## Notes
-
-- Colors are Catppuccin Latte (light) and Mocha (dark), the same two
-  palettes the CLI ships as `catppuccin-latte` and `catppuccin-mocha`, so the site and the
-  tool match. Terminal blocks follow the page theme through the `--t-*`
-  tokens. The Latte terminal colors copy the CLI palette as is, so a few
-  of them sit below WCAG AA contrast on purpose.
-- The hero is a replica of the `zlib search` picker. Key handling mirrors
-  `internal/cli/search_interactive.go`: `↑/↓` `j/k` select, `←/→` `h/l`
-  page, `enter` asks to download, `q` quit. Columns follow
-  `internal/cli/book_feed_view.go`.
-- Command transcripts copy the strings the CLI prints. Check them against
-  `internal/cli` when output changes.
-- A small script in `<head>` applies the saved theme and language before
-  first paint. `scripts/build-zh.mjs` relies on the `<html>` tag and the
-  `setLang(...)` call keeping their current form.
-- Copy is bilingual. Each string is a sibling pair of
-  `data-i18n="en"` / `data-i18n="zh"` elements; CSS shows one based on
-  `<html data-lang>`. Add a language by adding a third value.
-- The MCP section copies the install commands and flags from
-  `docs/mcp.md` and `zlib mcp --help`. Update it with them.
-- The nav button and the line above the closing buttons ask for a GitHub
-  star. Keep that to those two places so it stays out of the way.
-- Book listings and `doctor` output are illustrative sample data, not live
-  results.
-- `og.png` is the social card (1200x630). It is a screenshot of a small
-  standalone HTML card, not an export from a design tool, so regenerating it
-  means re-rendering that card at 1200x630 and saving the PNG here. The
-  `og:image` and `twitter:image` tags point at it by absolute URL, which is
-  what the scrapers require.
-- The page carries `SoftwareApplication` JSON-LD. Every field in it is
-  checked against the README and `go.mod`; update it when the supported
-  platforms or the Go version change.

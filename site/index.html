@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>zlib — a Z-Library CLI for your terminal and AI agents</title>
-<meta name="description" content="Search, download, and send books to Kindle from the terminal. An open-source Z-Library client with plugins for Claude Code and Codex.">
+<title>zlib: a Z-Library CLI for your terminal and AI agents</title>
+<meta name="description" content="Search, download, and send books to Kindle from the terminal. An open-source Z-Library client with an MCP server and plugins for Claude Code and Codex.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://zlib.heartleo.dev/">
 <link rel="alternate" hreflang="en" href="https://zlib.heartleo.dev/">
@@ -12,7 +12,7 @@
 <link rel="alternate" hreflang="x-default" href="https://zlib.heartleo.dev/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://zlib.heartleo.dev/">
-<meta property="og:title" content="zlib — a Z-Library CLI for your terminal and AI agents">
+<meta property="og:title" content="zlib: a Z-Library CLI for your terminal and AI agents">
 <meta property="og:description" content="Search, download, and send books to Kindle from the terminal, or hand the same binary to Claude Code or Codex.">
 <meta property="og:site_name" content="zlib">
 <meta property="og:locale" content="en_US">
@@ -31,7 +31,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "zlib",
-  "description": "A command-line client for Z-Library. Search the catalogue, download books, and mail them to a Kindle address from the terminal, or drive the same binary from an AI coding agent through the bundled Claude Code and Codex plugins.",
+  "description": "A command-line client for Z-Library. Search the catalogue, download books, and mail them to a Kindle address from the terminal, or drive the same binary from an AI coding agent through its MCP server or the bundled Claude Code and Codex plugins.",
   "url": "https://zlib.heartleo.dev/",
   "applicationCategory": "UtilitiesApplication",
   "applicationSubCategory": "Command Line Utility",
@@ -70,15 +70,14 @@
 <body>
 
 <!-- ── nav ─────────────────────────────────────────────────── -->
-<header class="nav">
+<header class="nav enter-nav">
   <div class="wrap nav-in">
     <a class="brand" href="/">zlib<span class="caret" aria-hidden="true"></span></a>
     <nav class="nav-links" aria-label="Sections">
       <a href="#install" data-i18n="en">Install</a><a href="#install" data-i18n="zh">安装</a>
       <a href="#commands" data-i18n="en">Commands</a><a href="#commands" data-i18n="zh">命令</a>
-      <a href="#agents" data-i18n="en">Agents</a><a href="#agents" data-i18n="zh">插件</a>
-      <a href="#mcp">MCP</a>
-      <a href="#access" data-i18n="en">Access</a><a href="#access" data-i18n="zh">访问</a>
+      <a href="#agents" data-i18n="en">Agents</a><a href="#agents" data-i18n="zh">Agent</a>
+      <a href="#access" data-i18n="en">Access</a><a href="#access" data-i18n="zh">连接</a>
       <a href="#themes" data-i18n="en">Themes</a><a href="#themes" data-i18n="zh">主题</a>
     </nav>
     <div class="nav-right">
@@ -90,9 +89,10 @@
         <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.05 4.05l1.56 1.56M18.39 18.39l1.56 1.56M2.6 12h2.2M19.2 12h2.2M4.05 19.95l1.56-1.56M18.39 5.61l1.56-1.56"/></svg>
         <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.4 13.6A8.4 8.4 0 1 1 10.4 3.6a6.6 6.6 0 0 0 10 10Z"/></svg>
       </button>
-      <a class="ghlink" href="https://github.com/heartleo/zlib" target="_blank" rel="noopener" aria-label="Star zlib on GitHub">
+      <a class="btn nav-star" href="https://github.com/heartleo/zlib" target="_blank" rel="noopener" aria-label="Star zlib on GitHub">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-        <span class="cnt"><span class="star" aria-hidden="true">&#9734;</span> Star</span>
+        <span class="nav-star-text">Star on GitHub</span>
+        <span class="nav-star-count" hidden></span>
       </a>
     </div>
   </div>
@@ -100,343 +100,366 @@
 
 <main>
 
-<!-- ── hero ────────────────────────────────────────────────── -->
+<!-- ── hero: the playable picker beside the install command ─ -->
 <section class="wrap hero">
   <div class="hero-grid">
     <div>
-      <h1>
-        <span data-i18n="en">A CLI for <span class="z">Z&#8209;Library</span>.</span>
-        <span data-i18n="zh">终端里的 <span class="z">Z&#8209;Library</span></span>
+      <h1 class="rise">
+        <span data-i18n="en">A CLI for <span class="nowrap">Z-Library</span>.</span>
+        <span data-i18n="zh"><span class="nowrap">终端里的</span> <span class="nowrap">Z-Library。</span></span>
       </h1>
-      <p class="sub">
-        <span data-i18n="en">Search the catalogue, download the file, and mail it to your Kindle without leaving the terminal.</span>
-        <span data-i18n="zh">搜书、下载、发送到 Kindle，全程不用离开终端。</span>
+      <p class="lead rise d1">
+        <span data-i18n="en"><span class="ln">Search, download, and send books to Kindle.</span> <span class="ln">Or hand it to Claude Code and Codex.</span></span>
+        <span data-i18n="zh"><span class="ln">搜书、下载、发送到 Kindle，</span><span class="ln">也能交给 Claude Code 和 Codex。</span></span>
       </p>
-
-      <div class="cmdline">
+      <div class="cmdline rise d2">
         <span class="p" aria-hidden="true">$</span>
         <code id="heroCmd">brew install heartleo/tap/zlib</code>
         <button class="copy" type="button" data-copy="brew install heartleo/tap/zlib">
-          <span data-i18n="en">copy</span><span data-i18n="zh">复制</span>
+          <span data-i18n="en">Copy</span><span data-i18n="zh">复制</span>
         </button>
       </div>
-
-      <div class="meta">
-        <span><i></i>Go 1.26+</span>
-        <span><i></i>macOS · Linux · Windows</span>
-        <span><i></i>MIT</span>
-      </div>
+      <ul class="platforms rise d3" aria-label="Supported platforms">
+        <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>macOS</li>
+        <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>Linux</li>
+        <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>Windows</li>
+      </ul>
     </div>
 
     <!-- signature: a working replica of `zlib search` -->
-    <div class="term" id="picker" tabindex="0" role="application"
+    <figure class="win-wrap">
+    <div class="win draw" id="picker" tabindex="0" role="application"
          aria-label="Interactive replica of the zlib search picker. Use arrow keys to browse, Enter to download.">
-      <div class="term-bar">
-        <span class="dot" style="background:var(--t-red)"></span>
-        <span class="dot" style="background:var(--t-yellow)"></span>
-        <span class="dot" style="background:var(--t-green)"></span>
-        <span class="term-title">zlib search</span>
-        <span class="term-hint" id="pickerHint">
-          <span data-i18n="en">click to use ↑ ↓ ← → ⏎</span>
-          <span data-i18n="zh">点击后可用 ↑ ↓ ← → ⏎</span>
-        </span>
-      </div>
-      <div class="term-body">
+      <div class="win-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span></div>
+      <div class="win-body">
         <div id="pickerOut"></div>
       </div>
     </div>
+      <figcaption class="win-caption" id="pickerHint">
+        <span data-i18n="en">Click it, then use ↑ ↓ ← → ⏎</span>
+        <span data-i18n="zh">点一下，然后用 ↑ ↓ ← → ⏎ 操作</span>
+      </figcaption>
+    </figure>
   </div>
 </section>
 
-<!-- ── install ─────────────────────────────────────────────── -->
-<section class="wrap band" id="install">
-  <div class="install-grid">
-    <div>
-      <div class="eyebrow">$ brew install</div>
-      <h2 class="sec">
-        <span data-i18n="en">Pick a package manager.</span>
-        <span data-i18n="zh">挑一个包管理器。</span>
+<!-- ── install ────────────────────────────────────────────── -->
+<section class="section ruled" id="install">
+  <div class="wrap install-grid" data-reveal>
+    <div data-r>
+      <h2>
+        <span data-i18n="en">Install in one line.</span>
+        <span data-i18n="zh">一行命令安装。</span>
       </h2>
-      <p class="lede">
-        <span data-i18n="en">Every release ships prebuilt binaries for macOS, Linux, and Windows. Or build it yourself; it is a single Go module. Later, <b class="mono">zlib update</b> upgrades through whichever one you used.</span>
-        <span data-i18n="zh">每个版本都发 macOS、Linux、Windows 的预编译二进制。也可以自己编译，就一个 Go module。之后用 <b class="mono">zlib update</b> 升级，它会沿用你当初的安装方式。</span>
+      <p class="lead intro">
+        <span data-i18n="en"><span class="ln">macOS, Linux, and Windows.</span> <span class="ln"><code>zlib update</code> keeps it current.</span></span>
+        <span data-i18n="zh"><span class="ln">支持 macOS、Linux 和 Windows，</span><span class="ln">之后用 <code>zlib update</code> 更新。</span></span>
       </p>
-      <div class="status-key next" style="margin-top:1.6rem">
-        <div><b data-i18n="en">Then</b><b data-i18n="zh">然后</b><span data-i18n="en">run <span style="color:var(--accent)">zlib doctor</span> to find a working domain</span><span data-i18n="zh">跑 <span style="color:var(--accent)">zlib doctor</span> 找一个可用域名</span></div>
-        <div><b data-i18n="en">And</b><b data-i18n="zh">接着</b><span data-i18n="en"><span style="color:var(--accent)">zlib login --domain</span> it, then <span style="color:var(--accent)">zlib tui</span></span><span data-i18n="zh">用 <span style="color:var(--accent)">zlib login --domain</span> 登录，再开 <span style="color:var(--accent)">zlib tui</span></span></div>
-      </div>
     </div>
 
     <div>
-      <div class="tabs" role="tablist" aria-label="Install method">
+      <div class="tabs" role="tablist" aria-label="Install method" data-r>
         <button type="button" role="tab" aria-selected="true" data-inst="brew">Homebrew</button>
         <button type="button" role="tab" aria-selected="false" data-inst="winget">winget</button>
         <button type="button" role="tab" aria-selected="false" data-inst="curl">curl</button>
         <button type="button" role="tab" aria-selected="false" data-inst="go">go install</button>
-        <button type="button" role="tab" aria-selected="false" data-inst="src"><span data-i18n="en">source</span><span data-i18n="zh">源码</span></button>
+        <button type="button" role="tab" aria-selected="false" data-inst="src"><span data-i18n="en">Source</span><span data-i18n="zh">源码</span></button>
       </div>
 
-      <div class="pane on" data-pane="brew">
-        <div class="cmdline" style="max-width:none">
+      <div class="pane on" data-r data-pane="brew">
+        <div class="cmdline">
           <span class="p">$</span><code>brew install heartleo/tap/zlib</code>
-          <button class="copy" type="button" data-copy="brew install heartleo/tap/zlib"><span data-i18n="en">copy</span><span data-i18n="zh">复制</span></button>
+          <button class="copy" type="button" data-copy="brew install heartleo/tap/zlib"><span data-i18n="en">Copy</span><span data-i18n="zh">复制</span></button>
         </div>
-        <p class="note"><span data-i18n="en">macOS and Linux. Upgrades with <b>brew upgrade zlib</b>.</span><span data-i18n="zh">macOS 和 Linux。用 <b>brew upgrade zlib</b> 升级。</span></p>
+        <p class="note"><span data-i18n="en">macOS and Linux.</span><span data-i18n="zh">macOS 和 Linux。</span></p>
       </div>
-      <div class="pane" data-pane="winget">
-        <div class="cmdline" style="max-width:none">
+      <div class="pane" data-r data-pane="winget">
+        <div class="cmdline">
           <span class="p">&gt;</span><code>winget install --id heartleo.zlib --exact</code>
-          <button class="copy" type="button" data-copy="winget install --id heartleo.zlib --exact"><span data-i18n="en">copy</span><span data-i18n="zh">复制</span></button>
+          <button class="copy" type="button" data-copy="winget install --id heartleo.zlib --exact"><span data-i18n="en">Copy</span><span data-i18n="zh">复制</span></button>
         </div>
-        <p class="note"><span data-i18n="en">Windows 10 and later, PowerShell or Terminal.</span><span data-i18n="zh">Windows 10 及以上，PowerShell 或 Terminal 都行。</span></p>
+        <p class="note"><span data-i18n="en">Windows.</span><span data-i18n="zh">Windows。</span></p>
       </div>
-      <div class="pane" data-pane="curl">
-        <div class="cmdline" style="max-width:none">
+      <div class="pane" data-r data-pane="curl">
+        <div class="cmdline">
           <span class="p">$</span><code>curl -fsSL https://raw.githubusercontent.com/heartleo/zlib/main/install.sh | sh</code>
-          <button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/heartleo/zlib/main/install.sh | sh"><span data-i18n="en">copy</span><span data-i18n="zh">复制</span></button>
+          <button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/heartleo/zlib/main/install.sh | sh"><span data-i18n="en">Copy</span><span data-i18n="zh">复制</span></button>
         </div>
-        <p class="note"><span data-i18n="en">macOS and Linux. Detects your OS and architecture, then installs to <b>/usr/local/bin</b>, which may need sudo.</span><span data-i18n="zh">macOS 和 Linux。自动识别系统和架构，安装到 <b>/usr/local/bin</b>，可能需要 sudo。</span></p>
+        <p class="note"><span data-i18n="en">macOS and Linux. Installs to <code>/usr/local/bin</code>; may ask for sudo.</span><span data-i18n="zh">macOS 和 Linux。安装到 <code>/usr/local/bin</code>，可能需要 sudo。</span></p>
       </div>
-      <div class="pane" data-pane="go">
-        <div class="cmdline" style="max-width:none">
+      <div class="pane" data-r data-pane="go">
+        <div class="cmdline">
           <span class="p">$</span><code>go install github.com/heartleo/zlib/cmd/zlib@latest</code>
-          <button class="copy" type="button" data-copy="go install github.com/heartleo/zlib/cmd/zlib@latest"><span data-i18n="en">copy</span><span data-i18n="zh">复制</span></button>
+          <button class="copy" type="button" data-copy="go install github.com/heartleo/zlib/cmd/zlib@latest"><span data-i18n="en">Copy</span><span data-i18n="zh">复制</span></button>
         </div>
-        <p class="note"><span data-i18n="en">Requires Go 1.26 or later.</span><span data-i18n="zh">需要 Go 1.26 及以上。</span></p>
+        <p class="note"><span data-i18n="en">Any system with Go 1.26 or later.</span><span data-i18n="zh">任意系统，需要 Go 1.26 或更高版本。</span></p>
       </div>
-      <div class="pane" data-pane="src">
-        <div class="card" style="padding:0;box-shadow:none;border:0">
-          <pre><span class="p">$</span> git clone https://github.com/heartleo/zlib
+      <div class="pane" data-r data-pane="src">
+        <pre class="code"><span class="p">$</span> git clone https://github.com/heartleo/zlib
 <span class="p">$</span> cd zlib
 <span class="p">$</span> go build -o zlib ./cmd/zlib</pre>
-        </div>
-        <p class="note"><span data-i18n="en">It builds with the standard Go toolchain. <b>make test</b> runs the suite.</span><span data-i18n="zh">用标准 Go 工具链就能编译。<b>make test</b> 跑测试。</span></p>
+        <p class="note"><span data-i18n="en">Any system with Go 1.26 or later.</span><span data-i18n="zh">任意系统，需要 Go 1.26 或更高版本。</span></p>
       </div>
+
+      <ol class="next">
+        <li data-r><span data-i18n="en">Find a working domain: <code>zlib doctor</code></span><span data-i18n="zh">找出可用域名：<code>zlib doctor</code></span></li>
+        <li data-r><span data-i18n="en">Log in: <code>zlib login --domain &lt;domain&gt;</code></span><span data-i18n="zh">登录：<code>zlib login --domain &lt;domain&gt;</code></span></li>
+        <li data-r><span data-i18n="en">Start: <code>zlib tui</code></span><span data-i18n="zh">开始使用：<code>zlib tui</code></span></li>
+      </ol>
     </div>
   </div>
 </section>
 
-<!-- ── commands ────────────────────────────────────────────── -->
-<section class="wrap band" id="commands">
-  <div class="eyebrow">$ zlib --help</div>
-  <h2 class="sec">
-    <span data-i18n="en">Made for the keyboard and for scripts.</span>
-    <span data-i18n="zh">键盘好用，脚本也好用。</span>
-  </h2>
-  <p class="lede" style="margin-bottom:1.3rem">
-    <span data-i18n="en"><b class="mono">zlib tui</b> puts everything in one full-screen app. Each step is also a command, and <b class="mono">search</b>, <b class="mono">favorites</b>, <b class="mono">recommended</b>, <b class="mono">most-popular</b>, <b class="mono">history</b>, <b class="mono">profile</b>, <b class="mono">doctor</b>, <b class="mono">config</b>, and <b class="mono">download</b> take <b class="mono">--json</b>. Pick one to see what it prints.</span>
-    <span data-i18n="zh"><b class="mono">zlib tui</b> 把所有功能放进一个全屏界面。每一步也都是单独的命令，<b class="mono">search</b>、<b class="mono">favorites</b>、<b class="mono">recommended</b>、<b class="mono">most-popular</b>、<b class="mono">history</b>、<b class="mono">profile</b>、<b class="mono">doctor</b>、<b class="mono">config</b>、<b class="mono">download</b> 都支持 <b class="mono">--json</b>。点一条看它输出什么。</span>
-  </p>
-  <a class="pill-link" href="/send-to-kindle/" style="margin-bottom:2.6rem">
-    <span data-i18n="en">Setting up Send to Kindle</span><span data-i18n="zh">发送到 Kindle 怎么配</span>
-    <span class="en-badge" data-i18n="zh">EN</span>
-    <span class="arw" aria-hidden="true">→</span>
-  </a>
-
-  <div class="cmd-grid">
-    <div class="cmd-list" role="tablist" aria-label="Commands">
-      <button type="button" role="tab" aria-selected="false" data-cmd="login"><span class="k">login</span><span class="d"><span data-i18n="en">Log in and save the domain</span><span data-i18n="zh">登录，并记住域名</span></span></button>
-      <button type="button" role="tab" aria-selected="true" data-cmd="search"><span class="k">search</span><span class="d"><span data-i18n="en">Filter by year, language, and format</span><span data-i18n="zh">按年份、语言和格式筛选</span></span></button>
-      <button type="button" role="tab" aria-selected="false" data-cmd="download"><span class="k">download</span><span class="d"><span data-i18n="en">Fetch a book by its id:hash</span><span data-i18n="zh">按 id:hash 下载</span></span></button>
-      <button type="button" role="tab" aria-selected="false" data-cmd="history"><span class="k">history</span><span class="d"><span data-i18n="en">Re-download or remove past downloads</span><span data-i18n="zh">重新下载或删除下载记录</span></span></button>
-      <button type="button" role="tab" aria-selected="false" data-cmd="profile"><span class="k">profile</span><span class="d"><span data-i18n="en">Check today's download quota</span><span data-i18n="zh">看今天还剩多少下载额度</span></span></button>
-      <button type="button" role="tab" aria-selected="false" data-cmd="kindle"><span class="k">kindle</span><span class="d"><span data-i18n="en">Mail a file to your Kindle address</span><span data-i18n="zh">把文件发送到 Kindle 邮箱</span></span></button>
-      <button type="button" role="tab" aria-selected="false" data-cmd="doctor"><span class="k">doctor</span><span class="d"><span data-i18n="en">Find domains that work from your network</span><span data-i18n="zh">找出你的网络能用的域名</span></span></button>
-      <button type="button" role="tab" aria-selected="false" data-cmd="theme"><span class="k">theme</span><span class="d"><span data-i18n="en">Twenty built-in color themes</span><span data-i18n="zh">20 套内置配色</span></span></button>
-    </div>
-
-    <div class="term">
-      <div class="term-bar">
-        <span class="dot" style="background:var(--t-red)"></span>
-        <span class="dot" style="background:var(--t-yellow)"></span>
-        <span class="dot" style="background:var(--t-green)"></span>
-        <span class="term-title" id="cmdTitle">zlib search</span>
-      </div>
-      <div class="term-body" id="cmdOut"></div>
-    </div>
-  </div>
-</section>
-
-<!-- ── agents ──────────────────────────────────────────────── -->
-<section class="wrap band" id="agents">
-  <div class="eyebrow">/plugin install</div>
-  <h2 class="sec">
-    <span data-i18n="en">Hand it to your coding agent.</span>
-    <span data-i18n="zh">交给你的编码 agent。</span>
-  </h2>
-  <p class="lede" style="margin-bottom:2.4rem">
-    <span data-i18n="en">zlib ships plugins for Claude Code and Codex. The agent calls the same binary you do, reads the same <b class="mono">--json</b> output, and installs zlib first if it is missing. Run <b class="mono">zlib login</b> yourself so your password stays out of the chat.</span>
-    <span data-i18n="zh">zlib 自带 Claude Code 和 Codex 插件。Agent 调用的是同一个二进制，读的是同一份 <b class="mono">--json</b> 输出；没装 zlib 时会先自己装上。<b class="mono">zlib login</b> 请自己运行，密码不要发到对话里。</span>
-  </p>
-  <div class="two">
-    <div class="card">
-      <h3>Claude Code</h3>
-      <p><span data-i18n="en">Install the marketplace, then ask for a book by name.</span><span data-i18n="zh">装上 marketplace，然后直接报书名。</span></p>
-      <pre><span class="p">/</span>plugin marketplace add heartleo/zlib
-<span class="p">/</span>plugin install zlib@zlib-plugin-cc</pre>
-      <p class="after"><span data-i18n="en"><code>/zlib "the pragmatic programmer"</code> searches and downloads. <code>/zlib:kindle</code> sends it on.</span><span data-i18n="zh"><code>/zlib "the pragmatic programmer"</code> 搜索并下载，<code>/zlib:kindle</code> 转寄 Kindle。</span></p>
-    </div>
-    <div class="card">
-      <h3>Codex</h3>
-      <p><span data-i18n="en">A skills-only plugin with no server to keep running.</span><span data-i18n="zh">纯 skills 插件，不需要常驻服务。</span></p>
-      <pre><span class="p">$</span> codex plugin marketplace add heartleo/zlib
-<span class="p">$</span> codex plugin add zlib@zlib</pre>
-      <p class="after"><span data-i18n="en">Ask Codex to find a title, or point the bundled Kindle skill at a local file.</span><span data-i18n="zh">让 Codex 找书，或者把自带的 Kindle skill 指向本地文件。</span></p>
-    </div>
-  </div>
-</section>
-
-<!-- ── mcp ─────────────────────────────────────────────────── -->
-<section class="wrap band" id="mcp">
-  <div class="eyebrow">$ zlib mcp</div>
-  <h2 class="sec">
-    <span data-i18n="en">Or connect over MCP.</span>
-    <span data-i18n="zh">也可以接入 MCP。</span>
-  </h2>
-  <p class="lede" style="margin-bottom:2.4rem">
-    <span data-i18n="en"><b class="mono">zlib mcp</b> is a stdio MCP server built into the same binary. Agents get typed tools with structured results: search, book details, favorites, history, quota, domain checks, downloads with progress, and Kindle delivery. It reuses your local login, so there is nothing else to install.</span>
-    <span data-i18n="zh"><b class="mono">zlib mcp</b> 是内置在同一个二进制里的 stdio MCP 服务。Agent 拿到的是带类型的工具和结构化结果：搜书、图书详情、收藏、下载历史、额度、域名检测、带进度的下载，以及发送到 Kindle。它沿用你本地的登录，不用再装别的东西。</span>
-  </p>
-  <div class="two">
-    <div class="card">
-      <h3>Claude Code</h3>
-      <p><span data-i18n="en">Register it once. The tools show up as <code>mcp__zlib__*</code>.</span><span data-i18n="zh">注册一次，工具以 <code>mcp__zlib__*</code> 的名字出现。</span></p>
-      <pre><span class="p">$</span> claude mcp add zlib -- zlib mcp
-<span class="p">$</span> claude mcp get zlib</pre>
-    </div>
-    <div class="card">
-      <h3>Codex</h3>
-      <p><span data-i18n="en">Add it from the terminal, or as <code>[mcp_servers.zlib]</code> in <code>~/.codex/config.toml</code>.</span><span data-i18n="zh">在终端添加，或写进 <code>~/.codex/config.toml</code> 的 <code>[mcp_servers.zlib]</code>。</span></p>
-      <pre><span class="p">$</span> codex mcp add zlib -- zlib mcp
-<span class="p">$</span> codex mcp get zlib</pre>
-    </div>
-  </div>
-  <div class="status-key">
-    <div><b>--read-only</b><span data-i18n="en">search, details, feeds, history, profile, and domain checks only</span><span data-i18n="zh">只开放搜索、详情、书单、历史、账号和域名检测</span></div>
-    <div><b>--disable-kindle</b><span data-i18n="en">no email, including after a download</span><span data-i18n="zh">不发邮件，下载后也不发</span></div>
-    <div><b>--allowed-dir</b><span data-i18n="en">keep downloads and Kindle attachments inside one folder</span><span data-i18n="zh">把下载和 Kindle 附件限制在一个目录内</span></div>
-    <div><b>--log-level</b><span data-i18n="en">tool names and timings on stderr, never arguments</span><span data-i18n="zh">把工具名和耗时写到 stderr，不记录参数</span></div>
-  </div>
-  <p class="note"><span data-i18n="en">Downloads can replace a file with the same name. Keep your client's approval prompt on for downloads, history deletion, and Kindle delivery.</span><span data-i18n="zh">下载可能覆盖同名文件。下载、删除历史和发送到 Kindle 时，请保留客户端的确认提示。</span></p>
-</section>
-
-<!-- ── access ──────────────────────────────────────────────── -->
-<section class="wrap band" id="access">
-  <div class="access">
-    <div>
-      <div class="eyebrow">$ zlib doctor</div>
-      <h2 class="sec">
-        <span data-i18n="en">When the mirror fights back.</span>
-        <span data-i18n="zh">镜像站不让进的时候。</span>
+<!-- ── tui: the app, and a recording of it ──────────────── -->
+<section class="section ruled" id="tui">
+  <div class="wrap tui-grid" data-reveal>
+    <div data-r>
+      <h2>
+        <span data-i18n="en">One app for all of it.</span>
+        <span data-i18n="zh">一个界面，用上全部功能。</span>
       </h2>
-      <p class="lede">
-        <span data-i18n="en">Most Z-Library web domains now sit behind DiamWall. Run <b class="mono">doctor</b> first: it checks all ten known domains without logging you in or touching your saved session, then lists the ones zlib can use.</span>
-        <span data-i18n="zh">现在大多数 Z-Library 网页域名都挂在 DiamWall 后面。先跑 <b class="mono">doctor</b>。它不用登录，也不动你已经存好的会话，把十个已知域名探一遍，只列出 zlib 能用的那些。</span>
+      <p class="lead">
+        <span data-i18n="en"><code>zlib tui</code> puts search, downloads, history, Kindle and settings in one terminal app.</span>
+        <span data-i18n="zh"><code>zlib tui</code> 把搜索、下载、历史、Kindle 和设置放进同一个终端应用。</span>
       </p>
-      <div class="status-key">
-        <div><b class="ok">healthy</b><span data-i18n="en">listed; pass it to <b>zlib login --domain</b></span><span data-i18n="zh">会列出来，交给 <b>zlib login --domain</b></span></div>
-        <div><b class="warn">challenged</b><span data-i18n="en">a JS challenge page; the API is unavailable there</span><span data-i18n="zh">返回 JS 验证页，这里的 API 用不了</span></div>
-        <div><b class="bad">diamwall_blocked</b><span data-i18n="en">intercepted, so pick another</span><span data-i18n="zh">被拦截了，换一个</span></div>
-        <div><b class="bad">redirect_loop</b><span data-i18n="en">redirects never reached the API</span><span data-i18n="zh">重定向到不了 API</span></div>
-        <div><b class="bad">network_error</b><span data-i18n="en">DNS, TLS, timeout, or reset. Try <b>--proxy</b></span><span data-i18n="zh">DNS、TLS、超时或连接重置，试试 <b>--proxy</b></span></div>
+      <ul class="keys">
+        <li data-key="slash"><kbd>/</kbd><span data-i18n="en">Open the commands</span><span data-i18n="zh">打开命令</span></li>
+        <li data-key="choose"><kbd>↑</kbd><kbd>↓</kbd><span data-i18n="en">Choose</span><span data-i18n="zh">选择</span></li>
+        <li data-key="filter"><kbd>se</kbd><span data-i18n="en">Type to filter</span><span data-i18n="zh">输入即可筛选</span></li>
+        <li data-key="run"><kbd>Enter</kbd><span data-i18n="en">Run it</span><span data-i18n="zh">运行</span></li>
+        <li data-key="back"><kbd>Esc</kbd><span data-i18n="en">Go back; lists keep your place</span><span data-i18n="zh">返回，列表保留当前位置</span></li>
+      </ul>
+    </div>
+    <figure class="win-wrap" data-r>
+      <div class="win tui-win" role="img" aria-label="zlib tui: the home screen, then the command dialog filtered to /search, then the search form">
+        <div class="win-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="win-body" id="tuiOut" aria-hidden="true"><div class="bx"> </div><div class="bx"> </div><div class="bx"> </div><div class="bx"> </div><div class="bx"> </div><div class="bx"> </div><div class="bx"><span>                            </span><span class="mauve hb"><i class="blk"></i></span><span class="ramp hb" style="--mix:3%"><i class="blk"></i></span><span class="ramp hb" style="--mix:8%"><i class="blk"></i></span><span class="ramp hb" style="--mix:12%"><i class="blk"></i></span><span class="ramp hb" style="--mix:15%"><i class="blk"></i></span><span> </span><span class="ramp hb" style="--mix:24%"><i class="blk"></i></span><span>     </span><span class="ramp hb" style="--mix:50%"><i class="blk"></i></span><span class="ramp hb" style="--mix:55%"><i class="blk"></i></span><span class="ramp hb" style="--mix:59%"><i class="blk"></i></span><span class="ramp hb" style="--mix:64%"><i class="blk"></i></span><span class="ramp hb" style="--mix:68%"><i class="blk"></i></span><span> </span><span class="ramp hb" style="--mix:79%"><i class="blk"></i></span><span class="ramp hb" style="--mix:83%"><i class="blk"></i></span><span class="ramp hb" style="--mix:89%"><i class="blk"></i></span><span class="ramp hb" style="--mix:94%"><i class="blk"></i></span></div><div class="bx"><span>                               </span><span class="ramp hb" style="--mix:12%"><i class="blk"></i></span><span class="ramp hb" style="--mix:15%"><i class="blk"></i></span><span> </span><span class="ramp hb" style="--mix:24%"><i class="blk"></i></span><span>       </span><span class="ramp hb" style="--mix:59%"><i class="blk"></i></span><span>   </span><span class="ramp hb" style="--mix:79%"><i class="blk"></i></span><span>   </span><span class="ramp hb" style="--mix:100%"><i class="blk"></i></span></div><div class="bx"><span>                              </span><span class="ramp hb" style="--mix:8%"><i class="blk"></i></span><span class="ramp hb" style="--mix:12%"><i class="blk"></i></span><span>  </span><span class="ramp hb" style="--mix:24%"><i class="blk"></i></span><span>       </span><span class="ramp hb" style="--mix:59%"><i class="blk"></i></span><span>   </span><span class="ramp hb" style="--mix:79%"><i class="blk"></i></span><span class="ramp hb" style="--mix:83%"><i class="blk"></i></span><span class="ramp hb" style="--mix:89%"><i class="blk"></i></span><span class="ramp hb" style="--mix:94%"><i class="blk"></i></span></div><div class="bx"><span>                             </span><span class="ramp hb" style="--mix:3%"><i class="blk"></i></span><span class="ramp hb" style="--mix:8%"><i class="blk"></i></span><span>   </span><span class="ramp hb" style="--mix:24%"><i class="blk"></i></span><span>       </span><span class="ramp hb" style="--mix:59%"><i class="blk"></i></span><span>   </span><span class="ramp hb" style="--mix:79%"><i class="blk"></i></span><span>   </span><span class="ramp hb" style="--mix:100%"><i class="blk"></i></span></div><div class="bx"><span>                            </span><span class="mauve hb"><i class="blk"></i></span><span class="ramp hb" style="--mix:3%"><i class="blk"></i></span><span class="ramp hb" style="--mix:8%"><i class="blk"></i></span><span class="ramp hb" style="--mix:12%"><i class="blk"></i></span><span class="ramp hb" style="--mix:15%"><i class="blk"></i></span><span> </span><span class="ramp hb" style="--mix:24%"><i class="blk"></i></span><span class="ramp hb" style="--mix:27%"><i class="blk"></i></span><span class="ramp hb" style="--mix:32%"><i class="blk"></i></span><span class="ramp hb" style="--mix:36%"><i class="blk"></i></span><span class="ramp hb" style="--mix:41%"><i class="blk"></i></span><span> </span><span class="ramp hb" style="--mix:50%"><i class="blk"></i></span><span class="ramp hb" style="--mix:55%"><i class="blk"></i></span><span class="ramp hb" style="--mix:59%"><i class="blk"></i></span><span class="ramp hb" style="--mix:64%"><i class="blk"></i></span><span class="ramp hb" style="--mix:68%"><i class="blk"></i></span><span> </span><span class="ramp hb" style="--mix:79%"><i class="blk"></i></span><span class="ramp hb" style="--mix:83%"><i class="blk"></i></span><span class="ramp hb" style="--mix:89%"><i class="blk"></i></span><span class="ramp hb" style="--mix:94%"><i class="blk"></i></span></div><div class="bx"> </div><div class="bx"> </div><div class="bx"><span>     </span><span class="mauve hb">/search</span><span>         </span><span class="muted">Search books</span><span>         </span><span class="mauve hb">/favorites</span><span>      </span><span class="muted">Saved books</span></div><div class="bx"><span>     </span><span class="mauve hb">/recommended</span><span>    </span><span class="muted">Recommended</span><span>          </span><span class="mauve hb">/history</span><span>        </span><span class="muted">Download history</span></div><div class="bx"><span>     </span><span class="mauve hb">/config</span><span>         </span><span class="muted">Settings</span><span>             </span><span class="mauve hb">/kindle</span><span>         </span><span class="muted">Send to Kindle</span></div><div class="bx"> </div><div class="bx"> </div><div class="bx"> </div><div class="bx"> </div><div class="bx"> </div><div class="bx"> </div><div class="bx"> </div><div class="bx"><span class="mauve">/</span><span> </span><span class="muted">commands</span><span class="tui-dim"> • </span><span class="mauve">ctrl+c</span><span> </span><span class="muted">quit</span></div></div>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- ── commands: the list beside one transcript ───────────── -->
+<section class="section band" id="commands">
+  <div class="wrap" data-reveal>
+    <div class="head" data-r>
+      <h2>
+        <span data-i18n="en">One command per task.</span>
+        <span data-i18n="zh">每件事一条命令。</span>
+      </h2>
+      <p class="lead">
+        <span data-i18n="en"><span class="ln">Run any of them on its own.</span> <span class="ln">Add <code>--json</code> for scripts.</span></span>
+        <span data-i18n="zh"><span class="ln">也可以单独运行其中任一命令。</span><span class="ln">写脚本时加 <code>--json</code>。</span></span>
+      </p>
+    </div>
+
+    <div class="cmd-grid">
+      <div class="cmd-list" role="tablist" aria-label="Commands" data-r>
+        <p class="cmd-group" aria-hidden="true"><span data-i18n="en">Find books</span><span data-i18n="zh">找书</span></p>
+        <button type="button" role="tab" aria-selected="true" data-cmd="search"><span class="k">search</span><span class="d"><span data-i18n="en">Filter by year, language, format</span><span data-i18n="zh">按年份、语言、格式筛选</span></span></button>
+        <button type="button" role="tab" aria-selected="false" data-cmd="recommended"><span class="k">recommended</span><span class="d"><span data-i18n="en">Also most-popular and favorites</span><span data-i18n="zh">另有 most-popular 和 favorites</span></span></button>
+        <p class="cmd-group" aria-hidden="true"><span data-i18n="en">Get them</span><span data-i18n="zh">获取</span></p>
+        <button type="button" role="tab" aria-selected="false" data-cmd="download"><span class="k">download</span><span class="d"><span data-i18n="en">Fetch a book by ID</span><span data-i18n="zh">按 ID 下载</span></span></button>
+        <button type="button" role="tab" aria-selected="false" data-cmd="history"><span class="k">history</span><span class="d"><span data-i18n="en">Re-download or delete</span><span data-i18n="zh">重新下载或删除</span></span></button>
+        <button type="button" role="tab" aria-selected="false" data-cmd="kindle"><span class="k">kindle</span><span class="d"><span data-i18n="en">Send a file to Kindle</span><span data-i18n="zh">发送文件到 Kindle</span></span></button>
+        <p class="cmd-group" aria-hidden="true"><span data-i18n="en">Set up</span><span data-i18n="zh">设置</span></p>
+        <button type="button" role="tab" aria-selected="false" data-cmd="login"><span class="k">login</span><span class="d"><span data-i18n="en">Password or cookie file</span><span data-i18n="zh">用密码或 Cookie 文件登录</span></span></button>
+        <button type="button" role="tab" aria-selected="false" data-cmd="profile"><span class="k">profile</span><span class="d"><span data-i18n="en">Today’s download quota</span><span data-i18n="zh">今日下载额度</span></span></button>
+        <button type="button" role="tab" aria-selected="false" data-cmd="config"><span class="k">config</span><span class="d"><span data-i18n="en">Network, download and Kindle</span><span data-i18n="zh">网络、下载和 Kindle 设置</span></span></button>
+        <button type="button" role="tab" aria-selected="false" data-cmd="doctor"><span class="k">doctor</span><span class="d"><span data-i18n="en">Find domains that work</span><span data-i18n="zh">找出可用域名</span></span></button>
+        <button type="button" role="tab" aria-selected="false" data-cmd="mirrors"><span class="k">mirrors</span><span class="d"><span data-i18n="en">Trust your own mirror</span><span data-i18n="zh">添加并信任自己的镜像</span></span></button>
+        <button type="button" role="tab" aria-selected="false" data-cmd="theme"><span class="k">theme</span><span class="d"><span data-i18n="en">Pick a color theme</span><span data-i18n="zh">选择配色</span></span></button>
+        <button type="button" role="tab" aria-selected="false" data-cmd="update"><span class="k">update</span><span class="d"><span data-i18n="en">Update to the latest release</span><span data-i18n="zh">更新到最新版本</span></span></button>
+      </div>
+
+      <div class="win-wrap" data-r>
+      <div class="win" role="tabpanel" aria-labelledby="cmdTitle">
+        <div class="win-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="win-body">
+        <span class="visually-hidden" id="cmdTitle" aria-live="polite">zlib search</span>
+        <div id="cmdOut"></div>
+        </div>
+      </div>
+      <p class="win-caption" id="cmdNote" aria-live="polite"></p>
       </div>
     </div>
-    <div class="term">
-      <div class="term-bar">
-        <span class="dot" style="background:var(--t-red)"></span>
-        <span class="dot" style="background:var(--t-yellow)"></span>
-        <span class="dot" style="background:var(--t-green)"></span>
-        <span class="term-title">zlib doctor</span>
+    <p class="more" data-r>
+      <a href="/send-to-kindle/"><span data-i18n="en">Set up Send to Kindle</span><span data-i18n="zh">查看 Kindle 发送设置</span></a>
+    </p>
+  </div>
+</section>
+
+<!-- ── agents: plugin or MCP, for one client at a time ────── -->
+<section class="section" id="agents">
+  <div class="wrap" data-reveal>
+    <div class="head" data-r>
+      <h2>
+        <span data-i18n="en">Hand it to your agent.</span>
+        <span data-i18n="zh">交给你的 Agent。</span>
+      </h2>
+      <p class="lead">
+        <span data-i18n="en">Run <code>zlib login</code> yourself, so your password stays out of the chat.</span>
+        <span data-i18n="zh">自己运行 <code>zlib login</code>，别把密码发进对话。</span>
+      </p>
+    </div>
+
+    <div class="agent">
+      <div class="tabs" role="tablist" aria-label="Agent" data-r>
+        <button type="button" role="tab" aria-selected="true" data-agent="claude">Claude Code</button>
+        <button type="button" role="tab" aria-selected="false" data-agent="codex">Codex</button>
       </div>
-      <div class="term-body" id="doctorOut"></div>
+
+      <div class="pane on" data-r data-agent-pane="claude">
+        <div class="code-pair">
+          <div>
+            <h3><span data-i18n="en">Plugin</span><span data-i18n="zh">插件</span></h3>
+            <pre class="code"><span class="p">/</span>plugin marketplace add heartleo/zlib
+<span class="p">/</span>plugin install zlib@zlib-plugin-cc</pre>
+          </div>
+          <div>
+            <h3><span data-i18n="en">MCP server</span><span data-i18n="zh">MCP 服务器</span></h3>
+            <pre class="code"><span class="p">$</span> claude mcp add zlib -- zlib mcp</pre>
+          </div>
+        </div>
+      </div>
+      <div class="pane" data-r data-agent-pane="codex">
+        <div class="code-pair">
+          <div>
+            <h3><span data-i18n="en">Plugin</span><span data-i18n="zh">插件</span></h3>
+            <pre class="code"><span class="p">$</span> codex plugin marketplace add heartleo/zlib
+<span class="p">$</span> codex plugin add zlib@zlib</pre>
+          </div>
+          <div>
+            <h3><span data-i18n="en">MCP server</span><span data-i18n="zh">MCP 服务器</span></h3>
+            <pre class="code"><span class="p">$</span> codex mcp add zlib -- zlib mcp</pre>
+          </div>
+        </div>
+      </div>
+
+      <p class="note" data-r>
+        <span data-i18n="en"><span class="ln">Then ask for a book by name.</span> <span class="ln">Add <code>--read-only</code> to <code>zlib mcp</code> to hide downloads and Kindle.</span></span>
+        <span data-i18n="zh"><span class="ln">之后告诉它书名即可。</span><span class="ln">给 <code>zlib mcp</code> 加上 <code>--read-only</code>，会隐藏下载和发送到 Kindle 的功能。</span></span>
+      </p>
     </div>
   </div>
 </section>
 
-<!-- ── themes ──────────────────────────────────────────────── -->
-<section class="wrap band" id="themes">
-  <div class="eyebrow">$ zlib theme</div>
-  <h2 class="sec">
-    <span data-i18n="en">Choose a theme.</span>
-    <span data-i18n="zh">选择主题。</span>
-  </h2>
-  <p class="lede">
-    <span data-i18n="en">Run <b class="mono">zlib theme</b> to preview 20 built-in themes, or add your own as a JSON file in the config folder. This page uses <b class="mono">catppuccin-latte</b> in light mode and <b class="mono">catppuccin-mocha</b> in dark mode.</span>
-    <span data-i18n="zh">运行 <b class="mono">zlib theme</b> 可预览 20 套内置配色，也可以在配置目录放一个 JSON 文件自定义主题。本页亮色使用 <b class="mono">catppuccin-latte</b>，暗色使用 <b class="mono">catppuccin-mocha</b>。</span>
-  </p>
-  <div class="swatches" id="swatches"></div>
+<!-- ── access: the transcript first, the reading beside it ── -->
+<section class="section band" id="access">
+  <div class="wrap access" data-reveal>
+    <div class="win-wrap" data-r>
+      <div class="win">
+        <div class="win-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="win-body" id="doctorOut" aria-label="zlib doctor output"></div>
+      </div>
+      <p class="win-caption">
+        <span data-i18n="en">Pass one to <code>zlib login --domain</code>.</span>
+        <span data-i18n="zh">把其中一个传给 <code>zlib login --domain</code>。</span>
+      </p>
+    </div>
+    <div data-r>
+      <h2>
+        <span data-i18n="en">Can’t connect?</span>
+        <span data-i18n="zh">连不上？</span>
+      </h2>
+      <p class="lead">
+        <span data-i18n="en">Run <code>zlib doctor</code> to list the domains that work from your network. Have your own mirror? Run <code>zlib mirrors add &lt;domain&gt;</code>.</span>
+        <span data-i18n="zh"><span class="ln">运行 <code>zlib doctor</code>，列出你的网络能访问的域名。</span><span class="ln">有自己的镜像？运行 <code>zlib mirrors add &lt;domain&gt;</code>。</span></span>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── themes ─────────────────────────────────────────────── -->
+<section class="section" id="themes">
+  <div class="wrap" data-reveal>
+    <div class="head" data-r>
+      <h2>
+        <span data-i18n="en">Pick a theme.</span>
+        <span data-i18n="zh">选个主题。</span>
+      </h2>
+      <p class="lead">
+        <span data-i18n="en">Preview and choose with <code>zlib theme</code>.</span>
+        <span data-i18n="zh">用 <code>zlib theme</code> 预览并选择。</span>
+      </p>
+    </div>
+    <div class="swatches" id="swatches"></div>
+  </div>
 </section>
 
 </main>
 
-<!-- ── cta ─────────────────────────────────────────────────── -->
-<section class="wrap cta">
-  <h2>
-    <span data-i18n="en">Go get a book.</span>
-    <span data-i18n="zh">去找本书吧。</span>
-  </h2>
-  <p>
-    <span data-i18n="en">Free and MIT licensed. It talks to Z-Library, the SMTP server you configure, and GitHub when you run <b>zlib update</b>.</span>
-    <span data-i18n="zh">免费，MIT 协议。只连 Z-Library、你自己配的 SMTP 服务器，以及运行 <b>zlib update</b> 时的 GitHub。</span>
-  </p>
-  <p class="star-ask">
-    <span data-i18n="en">If zlib saves you time, a star on GitHub helps other readers find it.</span>
-    <span data-i18n="zh">如果 zlib 帮你省了时间，在 GitHub 点个 Star，能让更多人找到它。</span>
-  </p>
-  <div class="btns">
-    <a class="btn pri" href="https://github.com/heartleo/zlib/releases/latest" target="_blank" rel="noopener">
-      <span data-i18n="en">Download a release</span><span data-i18n="zh">下载发行版</span>
-    </a>
-    <a class="btn" href="https://github.com/heartleo/zlib" target="_blank" rel="noopener">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-      <span data-i18n="en">Star on GitHub</span><span data-i18n="zh">在 GitHub 点 Star</span>
-    </a>
+<!-- ── close: the download again ──────────────────────────── -->
+<section class="section tight band">
+  <div class="wrap close" data-reveal>
+    <div data-r>
+      <h2>
+        <span data-i18n="en">Get zlib.</span>
+        <span data-i18n="zh">获取 zlib。</span>
+      </h2>
+      <p class="lead">
+        <span data-i18n="en"><span class="ln">Free and MIT licensed.</span> It connects only to <span class="nowrap">Z-Library</span>, your SMTP server, and GitHub for updates.</span>
+        <span data-i18n="zh"><span class="ln">免费，采用 MIT 许可证。</span>只连接 <span class="nowrap">Z-Library</span>、你的 SMTP 服务器，以及检查更新用的 GitHub。</span>
+      </p>
+    </div>
+    <div data-r>
+      <p class="star-ask">
+        <span data-i18n="en">If it saves you time, star it on GitHub.</span>
+        <span data-i18n="zh">觉得有用，就在 GitHub 点个 Star。</span>
+      </p>
+      <div class="btns">
+        <a class="btn pri" href="https://github.com/heartleo/zlib/releases/latest" target="_blank" rel="noopener">
+          <span data-i18n="en">Download a release</span><span data-i18n="zh">下载发行版</span>
+        </a>
+        <a class="btn" href="https://github.com/heartleo/zlib" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- ── footer ──────────────────────────────────────────────── -->
-<footer>
+<!-- ── footer ─────────────────────────────────────────────── -->
+<footer data-reveal>
   <div class="wrap">
     <div class="f-grid">
-      <div class="f-brand">
+      <div class="f-brand" data-r>
         <a class="brand" href="/">zlib<span class="caret" aria-hidden="true"></span></a>
-        <p>
-          <span data-i18n="en">A Z-Library client for people who already have a terminal open.</span>
-          <span data-i18n="zh">一个 Z-Library 客户端。写给终端反正一直开着的那些人。</span>
-        </p>
       </div>
-      <div>
-        <h3 data-i18n="en">Start</h3><h3 data-i18n="zh">开始</h3>
+      <div data-r>
+        <h3><span data-i18n="en">Start</span><span data-i18n="zh">开始</span></h3>
         <ul>
           <li><a href="#install" data-i18n="en">Install</a><a href="#install" data-i18n="zh">安装</a></li>
           <li><a href="#commands" data-i18n="en">Commands</a><a href="#commands" data-i18n="zh">命令</a></li>
           <li><a href="/send-to-kindle/" data-i18n="en">Send to Kindle</a><a href="/send-to-kindle/" data-i18n="zh">发送到 Kindle</a></li>
-          <li><a href="#themes" data-i18n="en">Themes</a><a href="#themes" data-i18n="zh">主题</a></li>
         </ul>
       </div>
-      <div>
-        <h3 data-i18n="en">Docs</h3><h3 data-i18n="zh">文档</h3>
+      <div data-r>
+        <h3><span data-i18n="en">Docs</span><span data-i18n="zh">文档</span></h3>
         <ul>
-          <li><a href="https://github.com/heartleo/zlib#readme" target="_blank" rel="noopener">README</a></li>
-          <li><a href="https://github.com/heartleo/zlib/blob/main/README.zh.md" target="_blank" rel="noopener">中文 README</a></li>
+          <li><a href="https://github.com/heartleo/zlib#readme" target="_blank" rel="noopener"><span data-i18n="en">Readme</span><span data-i18n="zh">英文 Readme</span></a></li>
+          <li><a href="https://github.com/heartleo/zlib/blob/main/README.zh.md" target="_blank" rel="noopener">中文 Readme</a></li>
         </ul>
       </div>
-      <div>
-        <h3 data-i18n="en">Project</h3><h3 data-i18n="zh">项目</h3>
+      <div data-r>
+        <h3><span data-i18n="en">Project</span><span data-i18n="zh">项目</span></h3>
         <ul>
           <li><a href="https://github.com/heartleo/zlib" target="_blank" rel="noopener">GitHub</a></li>
           <li><a href="https://github.com/heartleo/zlib/releases" target="_blank" rel="noopener" data-i18n="en">Releases</a><a href="https://github.com/heartleo/zlib/releases" target="_blank" rel="noopener" data-i18n="zh">发行版</a></li>
-          <li><a href="https://github.com/heartleo/zlib/issues" target="_blank" rel="noopener" data-i18n="en">Report an issue</a><a href="https://github.com/heartleo/zlib/issues" target="_blank" rel="noopener" data-i18n="zh">提 issue</a></li>
+          <li><a href="https://github.com/heartleo/zlib/issues" target="_blank" rel="noopener" data-i18n="en">Report an issue</a><a href="https://github.com/heartleo/zlib/issues" target="_blank" rel="noopener" data-i18n="zh">反馈问题</a></li>
         </ul>
       </div>
     </div>
-    <div class="f-base">
-      <span data-i18n="en">&copy; 2026 heartleo &middot; <a href="https://github.com/heartleo/zlib/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></span>
-      <span data-i18n="zh">&copy; 2026 heartleo &middot; <a href="https://github.com/heartleo/zlib/blob/main/LICENSE" target="_blank" rel="noopener">MIT 协议</a></span>
+    <div class="f-base" data-r>
+      <span>&copy; 2026 heartleo</span>
+      <a href="https://github.com/heartleo/zlib/blob/main/LICENSE" target="_blank" rel="noopener"><span data-i18n="en">MIT License</span><span data-i18n="zh">MIT 许可证</span></a>
     </div>
   </div>
 </footer>
 
+<script src="/site.js"></script>
+<script src="/tui-demo.js" defer></script>
 <script>
 (() => {
   "use strict";
@@ -445,6 +468,40 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ── star count on the nav button ────────────────────── */
+  /* GitHub's public API, cached for an hour so repeat visits stay well under
+     its unauthenticated rate limit. A failed fetch leaves the button without
+     a number, or with the last one this browser saw. */
+  const starEl = $(".nav-star-count");
+  if (starEl) {
+    const KEY = "zlib.stars", TTL = 3600e3;
+    const fmt = n => n < 1000 ? String(n) : (n / 1000).toFixed(n < 10000 ? 1 : 0).replace(/\.0$/, "") + "k";
+    const show = n => {
+      starEl.textContent = fmt(n);
+      starEl.hidden = false;
+      starEl.closest("a").setAttribute("aria-label", `Star zlib on GitHub (${n.toLocaleString("en")} stars)`);
+    };
+    let cached;
+    try { cached = JSON.parse(localStorage.getItem(KEY)); } catch {}
+    if (cached && Number.isInteger(cached.n)) show(cached.n);
+    if (!cached || !(Date.now() - cached.t < TTL)) {
+      fetch("https://api.github.com/repos/heartleo/zlib", { headers: { Accept: "application/vnd.github+json" } })
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(d => {
+          if (!Number.isInteger(d.stargazers_count)) return;
+          show(d.stargazers_count);
+          try { localStorage.setItem(KEY, JSON.stringify({ n: d.stargazers_count, t: Date.now() })); } catch {}
+        })
+        .catch(() => {});
+    }
+  }
+
+  /* ── a hairline under the nav once the page scrolls ── */
+  const navEl = $(".nav");
+  const onScroll = () => navEl.toggleAttribute("data-scrolled", scrollY > 8);
+  addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
 
   /* ── preferences ─────────────────────────────────────── */
   const root = document.documentElement;
@@ -467,9 +524,11 @@
   setTheme(savedTheme || (matchMedia("(prefers-color-scheme: light)").matches ? "latte" : "mocha"));
   setLang(savedLang || ((navigator.language || "en").toLowerCase().startsWith("zh") ? "zh" : "en"));
 
+  /* Theme and language changes cross-fade through site.js when it loaded. */
+  const swap = f => (window.zlibMotion ? window.zlibMotion.swap(f) : f());
   $("#themeToggle").addEventListener("click", () =>
-    setTheme(root.dataset.theme === "mocha" ? "latte" : "mocha"));
-  $$("[data-lang-set]").forEach(b => b.addEventListener("click", () => setLang(b.dataset.langSet)));
+    swap(() => setTheme(root.dataset.theme === "mocha" ? "latte" : "mocha")));
+  $$("[data-lang-set]").forEach(b => b.addEventListener("click", () => swap(() => setLang(b.dataset.langSet))));
 
   /* ── copy buttons ────────────────────────────────────── */
   document.addEventListener("click", async e => {
@@ -483,10 +542,27 @@
   });
 
   /* ── install tabs ────────────────────────────────────── */
+  /* Windows visitors get winget in the hero and the switcher; everyone else
+     keeps Homebrew, which serves macOS and Linux. */
+  const platform = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "").toLowerCase();
+  if (platform.startsWith("win")) {
+    const win = "winget install --id heartleo.zlib --exact";
+    $("#heroCmd").textContent = win;
+    $(".hero .cmdline .p").textContent = ">";
+    $(".hero .copy").dataset.copy = win;
+    queueMicrotask(() => { const t = $('[data-inst="winget"]'); if (t) t.click(); });
+  }
   $$("[data-inst]").forEach(b => b.addEventListener("click", () => {
     const k = b.dataset.inst;
     $$("[data-inst]").forEach(x => x.setAttribute("aria-selected", String(x.dataset.inst === k)));
     $$("[data-pane]").forEach(p => p.classList.toggle("on", p.dataset.pane === k));
+  }));
+
+  /* ── agent tabs ──────────────────────────────────────── */
+  $$("[data-agent]").forEach(b => b.addEventListener("click", () => {
+    const k = b.dataset.agent;
+    $$("[data-agent]").forEach(x => x.setAttribute("aria-selected", String(x.dataset.agent === k)));
+    $$("[data-agent-pane]").forEach(p => p.classList.toggle("on", p.dataset.agentPane === k));
   }));
 
   /* ── text helpers ────────────────────────────────────── */
@@ -533,31 +609,85 @@
     );
   }
 
-  /* Same columns as the picker in internal/cli/book_feed_view.go. */
+  /* Columns follow bookColumnWidths in internal/cli/book_feed_view.go:
+     measured over the whole page so they hold still, sized to the window,
+     the author column dropped when there is no room for it. */
+  const cols = () => {
+    const probe = document.createElement("span");
+    probe.textContent = "0".repeat(20);
+    probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre";
+    out.append(probe);
+    const cw = probe.getBoundingClientRect().width / 20;
+    probe.remove();
+    // one cell of slack: a column count measured mid font swap can run a cell wide
+    return cw ? Math.floor(out.clientWidth / cw) - 1 : 80;
+  };
+  const cut = (s, n) => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + "…" : s);
+  function widths(width) {
+    const books = PAGES[page], numberWidth = String(books.length).length;
+    const titleNeed = Math.max(5, ...books.map(b => b[2].length));
+    const detailNeed = Math.max(6, ...books.map(b => b[3].length));
+    let gap = 3;
+    if (2 + numberWidth + 2 * gap + titleNeed + detailNeed > width) gap = 2;
+    const available = Math.max(1, width - 2 - numberWidth - 2 * gap);
+    if (titleNeed + detailNeed <= available) return [numberWidth, titleNeed, detailNeed, gap];
+    const titleMin = Math.min(16, titleNeed), detailMin = Math.min(8, detailNeed);
+    if (available < titleMin + detailMin) return [numberWidth, Math.min(titleNeed, Math.max(1, width - 2 - numberWidth - gap)), 0, gap];
+    let detail = Math.min(detailNeed, Math.max(detailMin, Math.floor(available / 3)));
+    const title = Math.min(titleNeed, available - detail);
+    detail = Math.min(detailNeed, available - title);
+    return [numberWidth, title, detail, gap];
+  }
   function table() {
-    let h =
-      '<div class="row hdr"><span class="c-cur"> </span><span class="c-num">' + padR("#", 2) + "</span>" + G +
-      '<span class="c-title">' + padR("Title", 40)  + "</span>" + G +
-      '<span class="c-auth">'  + padR("Author", 15) + "</span></div>" +
-      '<div class="sep">  ' + "─".repeat(63) + "</div>";
+    const width = cols();
+    const [nw, tw, aw, gw] = widths(width);
+    const g = '<span class="gap" style="width:' + gw + 'ch"> </span>';
+    const row = (cls, curs, num, title, author) =>
+      '<div class="row' + cls + '"><span class="c-cur">' + curs + "</span>" +
+      '<span class="c-num n" style="width:' + nw + 'ch">' + num.padStart(nw, " ") + "</span>" + g +
+      '<span class="c-title ti" style="width:' + tw + 'ch">' + esc(cut(title, tw)) + "</span>" +
+      (aw ? g + '<span class="c-auth au" style="width:' + aw + 'ch">' + esc(cut(author, aw)) + "</span>" : "") + "</div>";
 
+    let h = row(" hdr", " ", "#", "Title", "Author").replace(/ n"/, '"').replace(/ ti"/, '"').replace(/ au"/, '"') +
+      '<div class="sep" aria-hidden="true"></div>';
     PAGES[page].forEach((b, i) => {
       const on = i === cur;
-      h +=
-        '<div class="row' + (on ? " on" : "") + '">' +
-        '<span class="c-cur">' + (on ? "❯ " : "  ") + "</span>" +
-        '<span class="c-num n">'    + padR(String(i + 1), 2) + "</span>" + G +
-        '<span class="c-title ti">' + esc(padR(b[2], 40))    + "</span>" + G +
-        '<span class="c-auth au">'  + esc(padR(b[3], 15))    + "</span></div>";
+      h += row(on ? " on" : "", on ? "❯ " : "  ", String(i + 1), b[2], b[3]);
     });
-
-    h +=
-      '<div class="help">  <b>↑/↓</b> select · <b>←/→</b> page · <b>/</b> search' +
-      " · <b>enter</b> download · <b>q</b> quit</div>";
+    // the narrow help line the TUI switches to under 70 columns
+    h += width < 70
+      ? '<div class="help">  <b>↑↓</b> · <b>enter</b> · <b>/</b> · <b>q</b> quit</div>'
+      : '<div class="help">  <b>↑/↓</b> select · <b>←/→</b> page · <b>/</b> search' +
+        " · <b>enter</b> download · <b>q</b> quit</div>";
     return h;
   }
 
-  const render = () => { out.innerHTML = head() + table(); };
+  /* The card above the list in book_feed_view.go: title, author, format and
+     size, year, then the reference download accepts. */
+  function card() {
+    const b = PAGES[page][cur];
+    return (
+      '<div class="card-tui">' +
+      '<div><b class="title">' + esc(b[2]) + "</b></div>" +
+      "<div>&nbsp;</div>" +
+      '<div><span class="au">' + esc(b[3]) + "</span></div>" +
+      '<div><span class="f-' + b[4].toLowerCase() + '">' + b[4] + '</span><span class="muted"> · ' + b[5] + "</span></div>" +
+      '<div><span class="muted">Year: ' + b[7] + "</span></div>" +
+      "<div>&nbsp;</div>" +
+      '<div><span class="muted">ID: </span><span class="id">' + ref(b) + "</span></div>" +
+      "</div>"
+    );
+  }
+
+  const render = () => { out.innerHTML = head() + card() + table(); };
+  // a resized window lays its columns out again, as the TUI does; so does the
+  // web font arriving, since the first layout measured the fallback's cells
+  new ResizeObserver(() => render()).observe(out);
+  // (ready alone can settle before the font is even requested)
+  if (document.fonts) {
+    document.fonts.ready.then(render);
+    document.fonts.addEventListener("loadingdone", render);
+  }
 
   /* Enter asks first, like the CLI's "Download book?" dialog. */
   function confirmView() {
@@ -677,10 +807,12 @@
     const w = heads.map((hd, i) => Math.max(hd.length, ...rowsIn.map(r => r[i].length)));
     const G = c => '<i class="' + c + '"></i>';
     const B = '<i class="v mauve"></i>';
-    const run = n => '<i class="h" style="width:' + n + 'ch"></i>';
+    /* Rule runs and cells take the same explicit width in ch, so every joint
+       lands on the same coordinate whatever glyphs the cell holds. */
+    const run = n => '<span class="h" style="width:' + n + 'ch"></span>';
     const rule = (l, m, r) => '<div class="bx mauve">' + G(l) + w.map(n => run(n + 2)).join(G(m)) + G(r) + "</div>";
     const line = (cells, cs) => '<div class="bx">' + B +
-      cells.map((c, i) => " " + '<span class="' + cs[i] + '">' + esc(c.padEnd(w[i])) + "</span> ").join(B) + B + "</div>";
+      cells.map((c, i) => '<span class="cell" style="width:' + (w[i] + 2) + 'ch"> <span class="' + cs[i] + '">' + esc(c.padEnd(w[i])) + "</span> </span>").join(B) + B + "</div>";
     return rule("tl", "t", "tr") +
       line(heads, heads.map(() => "mauve hb")) +
       rule("vr", "x", "vl") +
@@ -690,33 +822,25 @@
 
   const EPUBS = [PAGES[0][0], PAGES[0][1], PAGES[0][3], PAGES[0][5], PAGES[1][0]];
 
+  /* Screens the commands open in a terminal, rendered from the CLI's own
+     views at 80 columns (catppuccin-mocha) on sample data: the login form,
+     the doctor page, the profile page, the settings home and the
+     recommended-books picker. Regenerate them when those views change. */
+  const SCREENS = {"config": "<div class=\"screen\" style=\"--cols:80\"><div class=\"bx\"><span class=\"mauve hb\">Settings</span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"mauve hb\">  NETWORK</span></div><div class=\"bx\"><span class=\"tui-surface hb\">&gt; Domain              https://z-lib.gd</span><span class=\"tui-surface\">                                          </span></div><div class=\"bx\"><span>  Proxy URL           System proxy environment</span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"mauve hb\">  DOWNLOADS</span></div><div class=\"bx\"><span>  Default directory   Current directory</span></div><div class=\"bx\"><span>  Download retries    3</span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"mauve hb\">  KINDLE</span></div><div class=\"bx\"><span>  Kindle address      Add address</span></div><div class=\"bx\"><span>  From address        Add address</span></div><div class=\"bx\"><span>  SMTP host           smtp.gmail.com</span></div><div class=\"bx\"><span>  SMTP port           587</span></div><div class=\"bx\"><span>  SMTP security       starttls</span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"mauve\">esc</span><span> </span><span class=\"muted\">back</span><span class=\"tui-dim\"> • </span><span class=\"mauve\">enter</span><span> </span><span class=\"muted\">edit</span><span class=\"tui-dim\"> • </span><span class=\"mauve\">↑/↓</span><span> </span><span class=\"muted\">select</span></div></div>", "doctor": "<div class=\"screen\" style=\"--cols:54\"><div class=\"bx\"><span class=\"mauve hb\">Doctor</span></div><div class=\"bx\"> </div><div class=\"bx\"> </div><div class=\"bx\"><span>  </span><span>https://article.sk</span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"mauve\"><i class=\"v\"></i></span><span class=\"tui-surface\"> </span><span class=\"mauve tui-surface hb\">https://z-lib.gd  · Current domain</span><span class=\"tui-surface\">                  </span></div><div class=\"bx\"> </div><div class=\"bx\"><span>  </span><span>https://z-lib.gl</span></div><div class=\"bx\"> </div><div class=\"bx\"><span>  </span><span>https://zlib.bz</span></div><div class=\"bx\"> </div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"mauve\">↑/↓</span><span> </span><span class=\"muted\">select</span><span class=\"tui-dim\"> • </span><span class=\"mauve\">r</span><span> </span><span class=\"muted\">check again</span><span class=\"tui-dim\"> • </span><span class=\"mauve\">esc</span><span> </span><span class=\"muted\">back</span></div></div>", "login": "<div class=\"screen\" style=\"--cols:79\"><div class=\"bx\"><span class=\"mauve hb\">Log in</span></div><div class=\"bx\"> </div><div class=\"bx\"> </div><div class=\"bx\"><span>Email</span></div><div class=\"bx\"><span>&gt; </span><span>you@example.com</span><span> </span><span>                                                             </span></div><div class=\"bx\"> </div><div class=\"bx\"><span>Password</span></div><div class=\"bx\"><span>&gt; </span><span>*************</span><span class=\"tui-cursor\"> </span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"tui-surface\">  </span><span class=\"tui-surface\">Log in</span><span class=\"tui-surface\">  </span></div><div class=\"bx\"> </div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"mauve\">esc</span><span> </span><span class=\"muted\">cancel</span><span class=\"tui-dim\"> • </span><span class=\"mauve\">tab</span><span> </span><span class=\"muted\">next</span><span class=\"tui-dim\"> • </span><span class=\"mauve\">shift+tab</span><span> </span><span class=\"muted\">previous</span><span class=\"tui-dim\"> • </span><span class=\"mauve\">enter</span><span> </span><span class=\"muted\">continue</span><span class=\"tui-dim\"> • </span><span class=\"mauve\">ctrl+s</span><span> </span><span class=\"muted\">log in</span></div></div>", "profile": "<div class=\"screen\" style=\"--cols:80\"><div class=\"bx\"><span class=\"mauve hb\">Profile</span></div><div class=\"bx\"> </div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"hb\">Reader</span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"mauve hb\">DAILY DOWNLOADS</span><span>                                                      </span><span class=\"hb\">6 / 10 used</span></div><div class=\"bx\"><span class=\"green-ramp\" style=\"--mix:100%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:99%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:98%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:96%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:95%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:94%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:92%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:91%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:90%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:88%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:87%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:86%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:84%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:83%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:82%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:81%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:79%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:78%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:77%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:75%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:74%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:73%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:71%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:70%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:69%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:67%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:66%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:65%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:63%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:62%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:61%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:60%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:58%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:57%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:56%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:55%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:54%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:52%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:51%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:50%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:49%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:47%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:46%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:45%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:43%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:42%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:41%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"green-ramp\" style=\"--mix:40%\"><span class=\"hh\" style=\"width:1ch\"></span></span><span class=\"tui-dim\"><span class=\"h\" style=\"width:32ch\"></span></span></div><div class=\"bx\"><span class=\"muted\">Resets at </span><span>2026-10-19 00:00</span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"mauve hb\">ACCOUNT</span><span> </span><span class=\"tui-dim\"><span class=\"h\" style=\"width:72ch\"></span></span></div><div class=\"bx\"><span class=\"muted\">Email</span><span>                                    </span><span class=\"muted\">Kindle email</span></div><div class=\"bx\"><span>you@example.com</span><span>                          </span><span>you@kindle.com</span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"muted\">Plan</span></div><div class=\"bx\"><span>Standard</span></div><div class=\"bx\"> </div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"mauve\">esc</span><span> </span><span class=\"muted\">back</span></div></div>", "recommended": "<div class=\"screen\" style=\"--cols:80\"><div class=\"bx\"><span class=\"mauve hb\">Recommended books</span></div><div class=\"bx\"><span class=\"muted\">Book 1 of 5</span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"tl\"></i><span class=\"h\" style=\"width:76ch\"></span><i class=\"tr\"></i></span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"v\"></i></span><span> </span><span class=\"mauve hb\">Dune</span><span>                                                                       </span><span class=\"mauve\"><i class=\"v\"></i></span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"v\"></i></span><span> </span><span>                                                                           </span><span class=\"mauve\"><i class=\"v\"></i></span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"v\"></i></span><span> </span><span>Frank Herbert</span><span>                                                              </span><span class=\"mauve\"><i class=\"v\"></i></span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"v\"></i></span><span> </span><span class=\"muted\">EPUB · 2.8 MB</span><span>                                                              </span><span class=\"mauve\"><i class=\"v\"></i></span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"v\"></i></span><span> </span><span class=\"muted\">Year: 1965</span><span>                                                                 </span><span class=\"mauve\"><i class=\"v\"></i></span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"v\"></i></span><span> </span><span>                                                                           </span><span class=\"mauve\"><i class=\"v\"></i></span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"v\"></i></span><span> </span><span>                                                                           </span><span class=\"mauve\"><i class=\"v\"></i></span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"v\"></i></span><span> </span><span>                                                                           </span><span class=\"mauve\"><i class=\"v\"></i></span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"v\"></i></span><span> </span><span class=\"muted\">ID: 115066162:e9f13b</span><span>                                                       </span><span class=\"mauve\"><i class=\"v\"></i></span></div><div class=\"bx\"><span class=\"mauve\"><i class=\"bl\"></i><span class=\"h\" style=\"width:76ch\"></span><i class=\"br\"></i></span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"muted\">  #   Title                 Author                                              </span></div><div class=\"bx\"><span class=\"tui-surface hb\">&gt; 1   Dune                  Frank Herbert                                       </span></div><div class=\"bx\"><span>  2   Dune Messiah          Frank Herbert                                       </span></div><div class=\"bx\"><span>  3   Children of Dune      Frank Herbert                                       </span></div><div class=\"bx\"> </div><div class=\"bx\"><span class=\"muted\">↑/↓ select · PgUp/PgDn scroll · enter download · q quit</span></div></div>"};
+
   const TRANSCRIPTS = {
-    login: P("zlib login --domain https://z-lib.gd") + BLANK +
-      '<div>  <b class="mauve">Log in</b></div>' + BLANK +
-      '<div>  <span class="mauve">Email</span>     <span class="title">you@example.com</span></div>' +
-      '<div>  <span class="mauve">Password</span>  <span class="muted">••••••••••</span></div>' +
-      L("muted", "            Password is not saved") + BLANK +
-      OK('<span class="title">Logged in successfully.</span>') +
-      INFO("Wrote ZLIB_DOMAIN=https://z-lib.gd to ~/.config/zlib/.env") + BLANK +
-      L("muted", "The session is kept in ~/.config/zlib/session.json.") +
-      L("muted", "Logged in through a browser? Use --cookies FILE."),
+    login: P("zlib login --domain https://z-lib.gd") + SCREENS.login,
 
     search: P('zlib search "dune" --ext epub --count 5') +
       OK('Found <b class="title">5 results</b> · Page 1 / 10') + BLANK +
       box(["#", "ID", "Title", "Authors", "Year", "Format", "Size", "Rating"],
         EPUBS.map((b, i) => [String(i + 1), ref(b), b[2], b[3], b[7], b[4], b[5], b[6]]),
-        ["n", "id", "ti", "au", "muted", "f-epub", "sz", "ra"]) + BLANK +
-      L("muted", "Without a query, search opens a filter form, then the") +
-      L("muted", "picker at the top of this page. --json prints the same") +
-      L("muted", "books for scripts, with IDs that download accepts."),
+        ["n", "id", "ti", "au", "muted", "f-epub", "sz", "ra"]),
 
     download: P("zlib download 115066162:e9f13b --dir ~/books") + BLANK +
       '<div>  Downloading: <span class="title">Dune</span></div>' +
       '<div>  <span class="bar">' + "█".repeat(34) + '</span><span class="muted">  2.8 MB / 2.8 MB</span></div>' + BLANK +
-      OK('Saved to: <span class="title">/home/you/books/Dune.epub</span> <span class="muted">(2936013 bytes)</span>') + BLANK +
-      L("muted", "Ctrl+C removes the partial file, and a failed download") +
-      L("muted", "never replaces a file that is already there.") +
-      L("muted", "--send-to-kindle mails the book once it lands."),
+      OK('Saved to: <span class="title">/home/you/books/Dune.epub</span> <span class="muted">(2936013 bytes)</span>'),
 
     history: P("zlib history --page 1") +
       '<div><b class="title">Download history page 1</b></div>' + BLANK +
@@ -724,54 +848,56 @@
         ["1", ref(PAGES[0][0]), "Dune",                  "epub", "2.8 MB",  "2026-10-18"],
         ["2", ref(PAGES[0][1]), "Dune Messiah",          "epub", "1.4 MB",  "2026-10-17"],
         ["3", ref(PAGES[0][6]), "The Dune Encyclopedia", "pdf",  "24.6 MB", "2026-09-12"]
-      ], ["n", "id", "ti", "muted", "sz", "muted"]) + BLANK +
-      L("muted", "Run it bare for the picker: enter downloads again, d") +
-      L("muted", "removes the entry. Local files stay where they are."),
+      ], ["n", "id", "ti", "muted", "sz", "muted"]),
 
-    profile: P("zlib profile") + BLANK +
-      '<div><b class="title">Reader</b></div>' + BLANK +
-      '<div><b class="mauve">DAILY DOWNLOADS</b>                 <b class="title">6 / 10 used</b></div>' +
-      '<div><span class="green">' + "━".repeat(26) + '</span><span class="muted">' + "─".repeat(18) + "</span></div>" +
-      '<div><span class="muted">Resets at</span> <span class="title">2026-10-19 00:00</span></div>' + BLANK +
-      '<div><b class="mauve">ACCOUNT</b></div>' +
-      '<div><span class="muted">Email          </span><span class="title">you@example.com</span></div>' +
-      '<div><span class="muted">Kindle email   </span><span class="title">you@kindle.com</span></div>' +
-      '<div><span class="muted">Plan           </span><span class="title">Standard</span></div>' + BLANK +
-      L("muted", "The bar turns yellow at 3 downloads left, red at 0.") +
-      L("muted", "--json prints the same numbers for your status bar."),
+    // full-screen pages: the terminal shows the page, not the prompt
+    profile: SCREENS.profile,
 
     kindle: P("zlib kindle send ./dune.epub") +
       L("muted", "  Sending to Kindle...") +
       OK('Email sent to Kindle address: <span class="blue">you@kindle.com</span>') +
-      INFO("Final delivery depends on Amazon approval and file compatibility.") + BLANK +
-      L("muted", "In a terminal, zlib asks before it sends.") +
-      L("muted", "EPUB · PDF · TXT · DOC · DOCX · HTML · RTF · JPG · PNG · BMP · GIF") +
-      L("muted", "The SMTP password comes from ZLIB_SMTP_PWD, never kindle.json."),
+      INFO("Final delivery depends on Amazon approval and file compatibility."),
 
-    doctor: P("zlib doctor") +
-      box(["Available domains"], [
-        ["https://article.sk"],
-        ["https://z-lib.gd  · Current domain"],
-        ["https://z-lib.gl"],
-        ["https://zlib.bz"]
-      ], ["title"], 1) + BLANK +
-      L("muted", "Only domains whose API answered are listed. Pass one") +
-      L("muted", "to zlib login --domain, or set ZLIB_DOMAIN."),
+    doctor: SCREENS.doctor,
+
+    mirrors: P("zlib mirrors add libb.la") +
+      L("muted", "Checking https://libb.la...") +
+      L("muted", "zlib will send your Z-Library login (remix_userid and remix_userkey) to https://libb.la. Only trust a mirror run by you or someone you trust.") +
+      '<div>Trust https://libb.la? [y/N] <span class="title">y</span></div>' +
+      OK('Trusted <span class="title">https://libb.la</span>') +
+      INFO("Use it with `zlib config network domain`, or `zlib login --domain https://libb.la`."),
 
     theme: P("zlib theme nord") +
       OK("Theme set to <b class=\"title\">nord</b>") +
-      INFO("Saved to: ~/.config/zlib/config.json") + BLANK +
-      L("muted", "Run zlib theme with no name to preview all 20:") +
-      '<div><span class="mauve">dark </span>  <span class="muted">catppuccin-mocha, gruvbox-dark, dracula, tokyo,</span></div>' +
-      L("muted", "       nord, solarized-dark, two-dark, … 12 in all") +
-      '<div><span class="mauve">light</span>  <span class="muted">github, catppuccin-latte, gruvbox-light,</span></div>' +
-      L("muted", "       solarized-light, coldark-cold, … 8 in all") + BLANK +
-      L("muted", "ZLIB_THEME overrides the saved choice.")
+      INFO("Saved to: ~/.config/zlib/config.json"),
+
+    recommended: SCREENS.recommended,
+
+    config: SCREENS.config,
+
+    update: P("zlib update") +
+      L("", "zlib v0.0.12 is already up to date (latest release: v0.0.12).")
   };
 
-  const cmdOut = $("#cmdOut"), cmdTitle = $("#cmdTitle");
+  /* the line under the window: how to go further, in both languages */
+  const NOTES = {
+    login: ["Logged in through a browser? Use <code>--cookies FILE</code>.", "在浏览器里登录过？用 <code>--cookies FILE</code> 导入。"],
+    search: ["No query? <code>search</code> opens a filter form.", "不带关键词时，<code>search</code> 会打开筛选表单。"],
+    download: ["Add <code>--send-to-kindle</code> to mail it when it lands.", "加上 <code>--send-to-kindle</code>，下载完成后发送到 Kindle。"],
+    history: ["Run it bare to browse: enter downloads, d deletes.", "不带参数运行可以浏览：回车下载，d 删除。"],
+    kindle: ["First time? Run <code>zlib kindle config</code>.", "第一次使用？先运行 <code>zlib kindle config</code>。"],
+    theme: ["No name? Pick from a live preview.", "不带主题名时，可以边预览边选择。"],
+    recommended: ["<code>zlib most-popular</code> and <code>zlib favorites</code> open the same list.", "<code>zlib most-popular</code> 和 <code>zlib favorites</code> 打开同样的列表。"],
+    config: ["<code>zlib config network</code>, <code>download</code> or <code>kindle</code> opens one page.", "<code>zlib config network</code>、<code>download</code> 或 <code>kindle</code> 直接打开对应页面。"],
+    doctor: ["Pass one to <code>zlib login --domain</code>.", "把其中一个传给 <code>zlib login --domain</code>。"],
+    update: ["Installed with brew, winget or <code>go install</code>? It updates through that.", "用 brew、winget 或 <code>go install</code> 安装的，会通过同样的方式更新。"],
+  };
+  const cmdOut = $("#cmdOut"), cmdTitle = $("#cmdTitle"), cmdNote = $("#cmdNote");
   const showCmd = k => {
+    cmdOut.classList.remove("swap"); void cmdOut.offsetWidth; cmdOut.classList.add("swap");
     cmdOut.innerHTML = TRANSCRIPTS[k];
+    const n = NOTES[k];
+    cmdNote.innerHTML = n ? '<span data-i18n="en">' + n[0] + '</span><span data-i18n="zh">' + n[1] + "</span>" : "";
     cmdTitle.textContent = "zlib " + k;
     $$("[data-cmd]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.cmd === k)));
   };
@@ -791,7 +917,7 @@
     ["gruvbox-dark",     "dark",  "#282828", ["#fe8019", "#83a598", "#b8bb26", "#fabd2f", "#fb4934"], "#ebdbb2", "#928374"]
   ];
   $("#swatches").innerHTML = THEMES.map(([name, note, bg, cols, fg, mut]) =>
-    '<div class="sw"><div class="top" style="background:' + bg + '">' +
+    '<div class="sw" data-r><div class="top" style="background:' + bg + '">' +
       '<div class="strp">' + cols.map(c => '<i style="background:' + c + '"></i>').join("") + "</div>" +
       '<div class="line" style="background:' + fg + ';width:82%"></div>' +
       '<div class="line" style="background:' + mut + ';width:64%"></div>' +

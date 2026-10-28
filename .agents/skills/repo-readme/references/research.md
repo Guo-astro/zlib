@@ -46,7 +46,9 @@ Raw README files fetched from the default branch of each repository.
 - `docs/demo-search.gif` was recorded on 2026-04-10 from `docs/demo-search.tape`,
   which drives the older single-command search form, not the current shell.
   Re-recording needs VHS and a live login, so it was not done. Treat the GIF as
-  illustrative until it is re-recorded.
+  illustrative until it is re-recorded. (Since re-recorded in `3a1e3d3` from
+  fixture data through the TUI shell, in a dark and a light version; the
+  unused April recordings were removed.)
 
 ## Review of 2026-10-15
 

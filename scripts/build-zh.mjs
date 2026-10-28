@@ -1,13 +1,15 @@
-// Generates site/zh/index.html from site/index.html.
+// Generates the Chinese pages under site/zh/ from the bilingual English ones:
+// site/index.html -> site/zh/index.html and
+// site/send-to-kindle/index.html -> site/zh/send-to-kindle/index.html.
 //
-// site/index.html is bilingual: every translated string ships as an adjacent
+// Each source page is bilingual: every translated string ships as an adjacent
 // pair of elements, one `data-i18n="en"` and one `data-i18n="zh"`, and CSS
 // reveals whichever matches the `data-lang` on <html>. That is fine for a
 // single URL, but it gives search engines one page whose Chinese half is
 // display:none, so Chinese queries have nothing to rank. This script emits a
-// second URL that is Chinese all the way down: the English elements are
-// removed outright rather than hidden, and the two pages point at each other
-// with hreflang.
+// second URL per page that is Chinese all the way down: the English elements
+// are removed outright rather than hidden, links between the pages stay on
+// the Chinese side, and each pair points at the other with hreflang.
 //
 // Run from the repo root: node scripts/build-zh.mjs
 
@@ -16,19 +18,37 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const srcPath = resolve(repoRoot, "site/index.html");
-const outPath = resolve(repoRoot, "site/zh/index.html");
-
 const ORIGIN = "https://zlib.heartleo.dev";
 
-// Chinese head copy. These mirror the zh strings already on the page rather
-// than introducing new wording.
-const ZH_TITLE = "zlib — 终端里的 Z-Library 客户端，也能交给 AI agent";
-const ZH_DESCRIPTION =
-  "搜书、下载、发送到 Kindle，全程不用离开终端。开源的 Z-Library 命令行客户端，自带 Claude Code 和 Codex 插件。";
-const ZH_OG_DESCRIPTION =
-  "搜书、下载、发送到 Kindle，全程不用离开终端，也可以交给 Claude Code 或 Codex。";
+// Shared by both pages: the og:image is the same picture.
 const ZH_OG_IMAGE_ALT = "zlib，终端里的 Z-Library 客户端，图中是它的搜索界面。";
+
+// Chinese head copy. These mirror the zh strings already on each page rather
+// than introducing new wording.
+const PAGES = [
+  {
+    src: "site/index.html",
+    out: "site/zh/index.html",
+    path: "/",
+    title: "zlib：终端里的 Z-Library 客户端，也能交给 AI Agent",
+    description:
+      "搜书、下载、发送到 Kindle。开源的 Z-Library 命令行客户端，自带 MCP 服务器，并提供 Claude Code 和 Codex 插件。",
+    ogTitle: "zlib：终端里的 Z-Library 客户端，也能交给 AI Agent",
+    ogDescription: "搜书、下载、发送到 Kindle，全程不用离开终端，也可以交给 Claude Code 或 Codex。",
+  },
+  {
+    src: "site/send-to-kindle/index.html",
+    out: "site/zh/send-to-kindle/index.html",
+    path: "/send-to-kindle/",
+    title: "在终端里把书发到 Kindle：zlib",
+    description: "一条命令，通过你自己的 SMTP 服务器把 EPUB、PDF、DOCX 文件发到 Kindle。",
+    ogTitle: "在终端里把书发到 Kindle",
+    ogDescription: "一条命令，通过你自己的 SMTP 服务器把 EPUB、PDF、DOCX 文件发到 Kindle。",
+    // The TechArticle's own headline and description, in its JSON-LD.
+    ldHeadline: "在终端里把书发到 Kindle",
+    ldDescription: "用 zlib 命令行客户端，通过你自己的 SMTP 服务器把 EPUB、PDF、DOCX 文件发到 Kindle 地址。",
+  },
+];
 
 /**
  * Removes every element carrying `data-i18n="en"`, including its children.
@@ -76,107 +96,115 @@ function stripEnglishElements(html) {
 }
 
 /** Replaces the first match of `re`, failing loudly when the anchor is gone. */
-function replaceOnce(html, re, replacement, label) {
+function replaceOnce(html, re, replacement, label, src) {
   if (!re.test(html)) {
-    throw new Error(`build-zh: could not find ${label} in site/index.html`);
+    throw new Error(`build-zh: could not find ${label} in ${src}`);
   }
   return html.replace(re, replacement);
 }
 
-const src = await readFile(srcPath, "utf8");
-let out = src;
-
-out = replaceOnce(
-  out,
-  /<html lang="en" data-theme="mocha" data-lang="en">/,
-  '<html lang="zh-Hans" data-theme="mocha" data-lang="zh">',
-  "the <html> tag",
-);
-
-out = replaceOnce(out, /<title>[^<]*<\/title>/, `<title>${ZH_TITLE}</title>`, "<title>");
-
-out = replaceOnce(
-  out,
-  /<meta name="description" content="[^"]*">/,
-  `<meta name="description" content="${ZH_DESCRIPTION}">`,
-  "the description meta tag",
-);
-
-// The hreflang set is identical on both pages and already lives in the
-// source, so only the canonical has to move.
-out = replaceOnce(
-  out,
-  /<link rel="canonical" href="[^"]*">/,
-  `<link rel="canonical" href="${ORIGIN}/zh/">`,
-  "the canonical link",
-);
-
-out = replaceOnce(
-  out,
-  /<meta property="og:url" content="[^"]*">/,
-  `<meta property="og:url" content="${ORIGIN}/zh/">`,
-  "og:url",
-);
-out = replaceOnce(
-  out,
-  /<meta property="og:title" content="[^"]*">/,
-  `<meta property="og:title" content="${ZH_TITLE}">`,
-  "og:title",
-);
-out = replaceOnce(
-  out,
-  /<meta property="og:description" content="[^"]*">/,
-  `<meta property="og:description" content="${ZH_OG_DESCRIPTION}">`,
-  "og:description",
-);
-out = replaceOnce(
-  out,
-  /<meta property="og:locale" content="[^"]*">/,
-  '<meta property="og:locale" content="zh_CN">',
-  "og:locale",
-);
-out = replaceOnce(
-  out,
-  /<meta property="og:locale:alternate" content="[^"]*">/,
-  '<meta property="og:locale:alternate" content="en_US">',
-  "og:locale:alternate",
-);
-out = replaceOnce(
-  out,
-  /<meta property="og:image:alt" content="[^"]*">/,
-  `<meta property="og:image:alt" content="${ZH_OG_IMAGE_ALT}">`,
-  "og:image:alt",
-);
-
-// The switcher's EN button has nothing to switch to once the English elements
-// are gone, so it becomes a link to the English URL.
-out = replaceOnce(
-  out,
-  /<button type="button" data-lang-set="en"[^>]*>EN<\/button>\s*<button type="button" data-lang-set="zh"[^>]*>中<\/button>/,
-  '<a href="/" hreflang="en" aria-label="English">EN</a>' +
-    '<button type="button" aria-current="true" aria-label="中文">中</button>',
-  "the language switcher",
-);
-
-out = stripEnglishElements(out);
-
-// setLang() reads localStorage and navigator.language on load. On this page
-// that is a blank-screen bug: a visitor whose stored preference is "en" would
-// switch to a language whose elements no longer exist. Pin it to Chinese.
-out = replaceOnce(
-  out,
-  /setLang\(savedLang \|\| \(\(navigator\.language \|\| "en"\)\.toLowerCase\(\)\.startsWith\("zh"\) \? "zh" : "en"\)\);/,
-  'setLang("zh");',
-  "the setLang() call",
-);
-
-if (/data-i18n="en"/.test(out)) {
-  throw new Error("build-zh: English elements survived the strip");
+/**
+ * Points links between the site's pages at their Chinese URLs: the landing
+ * page and its anchors, and the Kindle guide. Assets such as /style.css and
+ * /favicon.svg are not links and keep their paths.
+ */
+function localizeLinks(html) {
+  return html.replace(
+    /(<a\b[^>]*\bhref=")\/((?:#[^"]*)?|send-to-kindle\/[^"]*)"/g,
+    (_, head, rest) => `${head}/zh/${rest}"`,
+  );
 }
 
-await mkdir(dirname(outPath), { recursive: true });
-await writeFile(outPath, out, "utf8");
+async function buildPage(page) {
+  const src = await readFile(resolve(repoRoot, page.src), "utf8");
+  const zhURL = `${ORIGIN}/zh${page.path}`;
+  const r = (out, re, replacement, label) => replaceOnce(out, re, replacement, label, page.src);
+  let out = src;
 
-console.log(
-  `build-zh: wrote site/zh/index.html (${out.length} bytes, from ${src.length})`,
-);
+  out = r(
+    out,
+    /<html lang="en" data-theme="mocha" data-lang="en">/,
+    '<html lang="zh-Hans" data-theme="mocha" data-lang="zh">',
+    "the <html> tag",
+  );
+  out = r(out, /<title>[^<]*<\/title>/, `<title>${page.title}</title>`, "<title>");
+  out = r(
+    out,
+    /<meta name="description" content="[^"]*">/,
+    `<meta name="description" content="${page.description}">`,
+    "the description meta tag",
+  );
+
+  // The hreflang set is identical on both pages of a pair and already lives
+  // in the source, so only the canonical has to move.
+  out = r(out, /<link rel="canonical" href="[^"]*">/, `<link rel="canonical" href="${zhURL}">`, "the canonical link");
+  out = r(out, /<meta property="og:url" content="[^"]*">/, `<meta property="og:url" content="${zhURL}">`, "og:url");
+  out = r(out, /<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${page.ogTitle}">`, "og:title");
+  out = r(
+    out,
+    /<meta property="og:description" content="[^"]*">/,
+    `<meta property="og:description" content="${page.ogDescription}">`,
+    "og:description",
+  );
+  out = r(out, /<meta property="og:locale" content="[^"]*">/, '<meta property="og:locale" content="zh_CN">', "og:locale");
+  out = r(
+    out,
+    /<meta property="og:locale:alternate" content="[^"]*">/,
+    '<meta property="og:locale:alternate" content="en_US">',
+    "og:locale:alternate",
+  );
+  out = r(
+    out,
+    /<meta property="og:image:alt" content="[^"]*">/,
+    `<meta property="og:image:alt" content="${ZH_OG_IMAGE_ALT}">`,
+    "og:image:alt",
+  );
+
+  if (page.ldHeadline) {
+    out = r(out, /"headline": "[^"]*"/, `"headline": "${page.ldHeadline}"`, "the JSON-LD headline");
+    out = r(out, /("@type": "TechArticle",[\s\S]*?"description": )"[^"]*"/, `$1"${page.ldDescription}"`, "the JSON-LD description");
+    out = r(out, /"url": "[^"]*\/send-to-kindle\/"/, `"url": "${zhURL}"`, "the JSON-LD url");
+    out = r(out, /"inLanguage": "en"/, '"inLanguage": "zh-Hans"', "the JSON-LD inLanguage");
+  }
+
+  out = localizeLinks(out);
+
+  // A relative stylesheet (the guide's ../style.css) would resolve one level
+  // too shallow under /zh/, so every page points at the root copy.
+  out = out.replace(/<link rel="stylesheet" href="(?:\.\.\/)+style\.css">/, '<link rel="stylesheet" href="/style.css">');
+
+  // The switcher's EN button has nothing to switch to once the English
+  // elements are gone, so it becomes a link to this page's English URL.
+  out = r(
+    out,
+    /<button type="button" data-lang-set="en"[^>]*>EN<\/button>\s*<button type="button" data-lang-set="zh"[^>]*>中<\/button>/,
+    `<a href="${page.path}" hreflang="en" aria-label="English">EN</a>` +
+      '<button type="button" aria-current="true" aria-label="中文">中</button>',
+    "the language switcher",
+  );
+
+  out = stripEnglishElements(out);
+
+  // setLang() reads localStorage and navigator.language on load. On this page
+  // that is a blank-screen bug: a visitor whose stored preference is "en"
+  // would switch to a language whose elements no longer exist. Pin it.
+  out = r(
+    out,
+    /setLang\(savedLang \|\| \(\(navigator\.language \|\| "en"\)\.toLowerCase\(\)\.startsWith\("zh"\) \? "zh" : "en"\)\);/,
+    'setLang("zh");',
+    "the setLang() call",
+  );
+
+  if (/data-i18n="en"/.test(out)) {
+    throw new Error(`build-zh: English elements survived the strip in ${page.src}`);
+  }
+
+  const outPath = resolve(repoRoot, page.out);
+  await mkdir(dirname(outPath), { recursive: true });
+  await writeFile(outPath, out, "utf8");
+  console.log(`build-zh: wrote ${page.out} (${out.length} bytes, from ${src.length})`);
+}
+
+for (const page of PAGES) {
+  await buildPage(page);
+}

@@ -44,11 +44,11 @@ jobs:
         with:
           enablement: true
 
-      # site/zh/index.html is generated, not committed: it is site/index.html
-      # with the English half removed, so the Chinese copy gets a URL of its
-      # own instead of sitting behind display:none on the English page. The
-      # script fails loudly if it cannot find what it rewrites, which is what
-      # keeps a markup change in index.html from silently shipping a stale or
+      # site/zh/ is generated, not committed: the landing page and the Kindle
+      # guide with the English half removed, so the Chinese copy gets URLs of
+      # its own instead of sitting behind display:none on the English pages.
+      # The script fails loudly if it cannot find what it rewrites, which is
+      # what keeps a markup change from silently shipping a stale or
       # half-translated page.
       - uses: actions/setup-node@v4
         with:
