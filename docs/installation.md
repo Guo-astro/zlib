@@ -87,6 +87,23 @@ The previous executable remains next to it as `zlib.previous` (or
 `zlib.exe.previous` on Windows). Restart zlib after updating. A source build with
 an unrecognized version must be rebuilt or replaced with a release.
 
+In a terminal, each finished step stays on screen with its timing while the
+download shows a live progress bar, size and transfer rate:
+
+```text
+Checked for updates in 301ms
+Downloaded zlib_0.0.13_linux_x86_64.tar.gz (9.0 MiB) in 4.01s
+Verified checksum (sha256)
+Installed zlib v0.0.13 in 7ms
+ - zlib v0.0.12
+ + zlib v0.0.13
+Restart zlib to use the new version.
+```
+
+Ctrl+C during the download cancels the update and leaves the executable
+unchanged. Without a terminal (a pipe or CI), the same step lines print without
+the progress bar.
+
 If the update cannot identify your package manager, use its normal upgrade
 command: `brew upgrade heartleo/tap/zlib`,
 `winget upgrade --id heartleo.zlib --exact`, or

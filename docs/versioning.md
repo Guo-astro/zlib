@@ -9,7 +9,7 @@ version as **`vX.Y.Z`**, with a lowercase `v` prefix: `v0.0.10`, not `0.0.10`.
 | --- | --- |
 | Git tags and GitHub release names | `v0.0.10` |
 | `zlib version` and `zlib --version` | `zlib version v0.0.10` |
-| `zlib update` messages | `Updated zlib v0.0.9 → v0.0.10.` |
+| `zlib update` messages | `Installed zlib v0.0.10`, ` + zlib v0.0.10` |
 | Changelogs, advisories, issues, docs and commit messages | `Fixed in v0.0.10.` |
 
 Builds between tags report a Go pseudo-version, such as

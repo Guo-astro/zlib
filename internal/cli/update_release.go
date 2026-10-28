@@ -32,6 +32,40 @@ const (
 type releaseUpdater struct {
 	client *http.Client
 	apiURL string
+	// onEvent, when set, receives each step as it happens so a renderer can
+	// show progress. It is called from the goroutine running update.
+	onEvent func(updateEvent)
+}
+
+type updateEventKind int
+
+const (
+	updateChecked updateEventKind = iota
+	updateDownloadStarted
+	updateDownloadProgress
+	updateDownloaded
+	updateVerified
+	updateInstalled
+)
+
+// updateEvent reports one step of a release update.
+type updateEvent struct {
+	kind    updateEventKind
+	version string        // latest release tag
+	archive string        // release archive being downloaded
+	written int64         // bytes downloaded so far
+	total   int64         // expected archive size, or -1 when the server omits it
+	elapsed time.Duration // time the finished step took
+}
+
+// progressInterval limits download progress events to a rate a terminal can
+// redraw smoothly; the final count is always reported by updateDownloaded.
+const progressInterval = 50 * time.Millisecond
+
+func (u releaseUpdater) emit(e updateEvent) {
+	if u.onEvent != nil {
+		u.onEvent(e)
+	}
 }
 
 type updateResult struct {
@@ -54,6 +88,7 @@ func newReleaseUpdater() releaseUpdater {
 
 func (u releaseUpdater) update(ctx context.Context, executable, currentVersion, goos, goarch string) (updateResult, error) {
 	var release githubRelease
+	checkStart := time.Now()
 	metadata, err := u.get(ctx, u.apiURL, maxReleaseJSON)
 	if err != nil {
 		return updateResult{}, fmt.Errorf("check latest release: %w", err)
@@ -65,6 +100,7 @@ func (u releaseUpdater) update(ctx context.Context, executable, currentVersion, 
 		return updateResult{}, fmt.Errorf("invalid latest release tag %q", release.TagName)
 	}
 	result := updateResult{version: release.TagName}
+	u.emit(updateEvent{kind: updateChecked, version: release.TagName, elapsed: time.Since(checkStart)})
 	if semver.Compare(currentVersion, release.TagName) >= 0 {
 		return result, nil
 	}
@@ -100,19 +136,16 @@ func (u releaseUpdater) update(ctx context.Context, executable, currentVersion, 
 	}
 	defer os.Remove(archiveFile.Name())
 	defer archiveFile.Close()
-	if err := u.download(ctx, archiveURL, archiveFile, maxArchive); err != nil {
-		return updateResult{}, fmt.Errorf("download %s: %w", archiveName, err)
-	}
-	if _, err := archiveFile.Seek(0, io.SeekStart); err != nil {
-		return updateResult{}, err
-	}
+	// Hash while downloading so verification needs no second read.
 	actual := sha256.New()
-	if _, err := io.Copy(actual, archiveFile); err != nil {
-		return updateResult{}, err
+	if err := u.download(ctx, archiveURL, archiveName, io.MultiWriter(archiveFile, actual), maxArchive); err != nil {
+		return updateResult{}, fmt.Errorf("download %s: %w", archiveName, err)
 	}
 	if !strings.EqualFold(hex.EncodeToString(actual.Sum(nil)), expected) {
 		return updateResult{}, fmt.Errorf("checksum mismatch for %s", archiveName)
 	}
+	u.emit(updateEvent{kind: updateVerified, archive: archiveName})
+	installStart := time.Now()
 
 	info, err := os.Stat(executable)
 	if err != nil {
@@ -150,6 +183,7 @@ func (u releaseUpdater) update(ctx context.Context, executable, currentVersion, 
 		return updateResult{}, err
 	}
 	result.backup, result.updated = backup, true
+	u.emit(updateEvent{kind: updateInstalled, version: release.TagName, elapsed: time.Since(installStart)})
 	return result, nil
 }
 
@@ -210,12 +244,13 @@ func (u releaseUpdater) get(ctx context.Context, url string, maxBytes int64) ([]
 	return data, nil
 }
 
-func (u releaseUpdater) download(ctx context.Context, url string, destination io.Writer, maxBytes int64) error {
+func (u releaseUpdater) download(ctx context.Context, url, name string, destination io.Writer, maxBytes int64) error {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
 	request.Header.Set("User-Agent", "zlib-update")
+	start := time.Now()
 	response, err := u.client.Do(request)
 	if err != nil {
 		return err
@@ -224,14 +259,37 @@ func (u releaseUpdater) download(ctx context.Context, url string, destination io
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("%s returned HTTP %d", url, response.StatusCode)
 	}
-	n, err := io.Copy(destination, io.LimitReader(response.Body, maxBytes+1))
+	total := response.ContentLength
+	u.emit(updateEvent{kind: updateDownloadStarted, archive: name, total: total})
+	counter := &progressCounter{report: func(written int64) {
+		u.emit(updateEvent{kind: updateDownloadProgress, archive: name, written: written, total: total})
+	}}
+	n, err := io.Copy(io.MultiWriter(destination, counter), io.LimitReader(response.Body, maxBytes+1))
 	if err != nil {
 		return err
 	}
 	if n > maxBytes {
 		return fmt.Errorf("archive exceeds %d bytes", maxBytes)
 	}
+	u.emit(updateEvent{kind: updateDownloaded, archive: name, written: n, total: total, elapsed: time.Since(start)})
 	return nil
+}
+
+// progressCounter counts bytes written and reports the running total at most
+// once per progressInterval.
+type progressCounter struct {
+	written int64
+	last    time.Time
+	report  func(int64)
+}
+
+func (c *progressCounter) Write(p []byte) (int, error) {
+	c.written += int64(len(p))
+	if now := time.Now(); now.Sub(c.last) >= progressInterval {
+		c.last = now
+		c.report(c.written)
+	}
+	return len(p), nil
 }
 
 func extractReleaseBinary(archiveFile *os.File, archiveName, binaryName string, destination io.Writer) error {

@@ -4,13 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"time"
 
+	"charm.land/lipgloss/v2"
 	"github.com/heartleo/zlib/internal/zlib"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
@@ -45,18 +49,21 @@ func runUpdate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("resolve running executable: %w", err)
 	}
 
+	out := cmd.OutOrStdout()
 	method := detectUpdateMethod(cmd.Context(), executable)
 	if method != updateRelease {
 		name, args := updateCommand(method)
-		fmt.Fprintf(cmd.OutOrStdout(), "Updating zlib via %s...\n", name)
+		lipgloss.Fprintf(out, "Updating zlib with %s %s\n", name, colorFaint("("+name+" "+strings.Join(args, " ")+")"))
+		start := time.Now()
 		process := exec.CommandContext(cmd.Context(), name, args...)
-		process.Stdout = cmd.OutOrStdout()
+		process.Stdout = out
 		process.Stderr = cmd.ErrOrStderr()
 		process.Stdin = cmd.InOrStdin()
 		if err := process.Run(); err != nil {
 			return fmt.Errorf("%s update failed: %w", name, err)
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), "Update command finished. Run zlib version to verify it.")
+		lipgloss.Fprintf(out, "%s %s finished %s. Run `zlib version` to confirm.\n",
+			colorGreen(symbolSuccess), name, colorFaint("in "+formatElapsed(time.Since(start))))
 		return nil
 	}
 
@@ -64,18 +71,27 @@ func runUpdate(cmd *cobra.Command, _ []string) error {
 	if !semver.IsValid(currentVersion) {
 		return fmt.Errorf("cannot update a development build (%s); install a release or update the source checkout", zlib.Version)
 	}
-	result, err := newReleaseUpdater().update(cmd.Context(), executable, currentVersion, runtime.GOOS, runtime.GOARCH)
+	return runReleaseUpdate(cmd.Context(), cmd.InOrStdin(), out, isInteractive(), newReleaseUpdater(), executable, currentVersion)
+}
+
+// runReleaseUpdate replaces executable with the latest release asset, showing
+// live progress on a terminal and one line per step elsewhere.
+func runReleaseUpdate(ctx context.Context, in io.Reader, out io.Writer, interactive bool, u releaseUpdater, executable, current string) error {
+	var result updateResult
+	var err error
+	if interactive {
+		result, err = runInteractiveUpdate(ctx, in, out, u, executable, current, runtime.GOOS, runtime.GOARCH)
+	} else {
+		// Without the TUI, Ctrl+C would kill the process before the updater
+		// removes its temporary archive and staged binary.
+		signalCtx, stop := signal.NotifyContext(ctx, os.Interrupt)
+		defer stop()
+		result, err = runPlainUpdate(signalCtx, out, u, executable, current, runtime.GOOS, runtime.GOARCH)
+	}
 	if err != nil {
 		return err
 	}
-	if result.updated {
-		fmt.Fprintf(cmd.OutOrStdout(), "Updated zlib %s → %s. Restart zlib to use the new version.\n", zlib.Version, result.version)
-		fmt.Fprintf(cmd.OutOrStdout(), "Previous executable: %s\n", result.backup)
-	} else if semver.Compare(currentVersion, result.version) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "This build (%s) is newer than the latest release (%s).\n", zlib.Version, result.version)
-	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "zlib %s is already up to date (latest release: %s).\n", zlib.Version, result.version)
-	}
+	printUpdateSummary(out, current, result, semver.Compare(current, result.version) > 0)
 	return nil
 }
 
